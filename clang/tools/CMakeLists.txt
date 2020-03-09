@@ -9,6 +9,7 @@ add_clang_subdirectory(clang-fuzzer)
 add_clang_subdirectory(clang-import-test)
 add_clang_subdirectory(clang-offload-bundler)
 add_clang_subdirectory(checked-c-convert)
+add_clang_subdirectory(recursive-funs-interview)
 
 add_clang_subdirectory(c-index-test)
 
