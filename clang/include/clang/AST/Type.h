@@ -2045,11 +2045,11 @@ public:
   bool isCheckedPointerNtArrayType() const;        // Checked C Nt_Array type.
   bool isOrigCheckedPointerType() const;
   bool isOrigUncheckedPointerType() const;
-  bool isOrigCheckedPointerPtrType() const;            // Checked C _Ptr type.
-  bool isOrigCheckedPointerArrayType() const;          // Checked C _Array_ptr or
+  bool isOrigCheckedPointerPtrType() const;        // Is Originally a Checked C _Ptr type.
+  bool isOrigCheckedPointerArrayType() const;      // Is Originally a Checked C _Array_ptr or
   // _Nt_array_ptr type.
-  bool isOrigExactlyCheckedPointerArrayType() const;   // Checked C _Array_ptr type.
-  bool isOrigCheckedPointerNtArrayType() const;        // Checked C Nt_Array type.
+  bool isOrigExactlyCheckedPointerArrayType() const; // Originally a Checked C _Array_ptr type.
+  bool isOrigCheckedPointerNtArrayType() const;      // Originally a Checked C Nt_Array type.
   bool isAnyPointerType() const;   // Any C pointer or ObjC object pointer
   bool isBlockPointerType() const;
   bool isVoidPointerType() const;
