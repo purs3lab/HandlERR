@@ -13494,7 +13494,8 @@ static bool checkBoundsDeclWithTypeAnnotation(Sema &S, QualType DeclaredTy,
   }
 
   // Make sure that the annotation type is a checked type.
-  if (!(Errors & Annot_Illegal_Type) && !AnnotTy->isOrContainsCheckedType()) {
+  if (!(Errors & Annot_Illegal_Type) && !AnnotTy->isOrContainsCheckedType()
+      && !S.getLangOpts().NoCheckedPtr) {
     S.Diag(AnnotTyLoc,
            diag::err_typecheck_bounds_type_annotation_must_be_checked_type);
     Errors |= Annot_Unchecked;

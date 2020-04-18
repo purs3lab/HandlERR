@@ -783,10 +783,12 @@ def fborland_extensions : Flag<["-"], "fborland-extensions">, Group<f_Group>, Fl
 def fbuiltin : Flag<["-"], "fbuiltin">, Group<f_Group>, Flags<[CoreOption]>;
 def fbuiltin_module_map : Flag <["-"], "fbuiltin-module-map">, Group<f_Group>,
   Flags<[DriverOption]>, HelpText<"Load the clang builtins module map file.">;
+def nonchecked_pointers : Flag<["-"], "fnoncheckedc-pointers">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Consider all pointers as non-checked pointers">;
 def fcheckedc_extension : Flag<["-"], "fcheckedc-extension">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Accept Checked C extension">;
 def fno_checkedc_extension : Flag<["-"], "fno-checkedc-extension">, Group<f_Group>, Flags<[CC1Option]>,
-  HelpText<"Do ont accept Checked C extension">;
+  HelpText<"Do not accept Checked C extension">;
 def fdump_extracted_comparison_facts : Flag<["-"], "fdump-extracted-comparison-facts">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Dump extracted comparison facts">;
 def fdump_inferred_bounds : Flag<["-"], "fdump-inferred-bounds">, Group<f_Group>, Flags<[CC1Option]>,
