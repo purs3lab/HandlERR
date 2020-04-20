@@ -12221,7 +12221,7 @@ void Sema::ActOnUninitializedDecl(Decl *RealDecl) {
       // An unchecked pointer in a checked scope with a bounds expression must
       // be initialized
       if (Ty->isUncheckedPointerType() && InCheckedScope &&
-          Var->hasBoundsExpr())
+          Var->hasBoundsExpr() && !getLangOpts().IgnoreCheckedPtr)
         Diag(Var->getLocation(),
              diag::err_initializer_expected_for_unchecked_pointer)
           << Var;
@@ -13723,9 +13723,9 @@ void Sema::ActOnBoundsDecl(DeclaratorDecl *D, BoundsAnnotations Annots,
     }
 
     if (BoundsExpr) {
-      if (Ty->isPointerType() && !Ty->isCheckedPointerType())
+      if (Ty->isPointerType() && !Ty->isCheckedPointerType() && !getLangOpts().IgnoreCheckedPtr)
         DiagId = diag::err_bounds_declaration_unchecked_local_pointer;
-      else if (Ty->isArrayType() && !Ty->isCheckedArrayType())
+      else if (Ty->isArrayType() && !Ty->isCheckedArrayType() && !getLangOpts().IgnoreCheckedPtr)
         DiagId = diag::err_bounds_declaration_unchecked_local_array;
 
       if (DiagId) {
