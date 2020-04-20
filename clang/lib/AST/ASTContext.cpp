@@ -2880,7 +2880,7 @@ QualType ASTContext::getPointerType(QualType T, CheckedPointerKind kind) const {
     assert(!NewIP && "Shouldn't be in the map!"); (void)NewIP;
   }
   PointerType *New = nullptr;
-  if (!LangOpts.NoCheckedPtr) {
+  if (!LangOpts.IgnoreCheckedPtr) {
     New = new (*this, TypeAlignment) PointerType(T, Canonical, kind);
   } else {
     New = new (*this, TypeAlignment) PointerType(T, Canonical,

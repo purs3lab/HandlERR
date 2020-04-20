@@ -783,7 +783,7 @@ def fborland_extensions : Flag<["-"], "fborland-extensions">, Group<f_Group>, Fl
 def fbuiltin : Flag<["-"], "fbuiltin">, Group<f_Group>, Flags<[CoreOption]>;
 def fbuiltin_module_map : Flag <["-"], "fbuiltin-module-map">, Group<f_Group>,
   Flags<[DriverOption]>, HelpText<"Load the clang builtins module map file.">;
-def nonchecked_pointers : Flag<["-"], "fnoncheckedc-pointers">, Group<f_Group>, Flags<[CC1Option]>,
+def fignore_checkedc_pointers : Flag<["-"], "fignore-checkedc-pointers">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Consider all pointers as non-checked pointers">;
 def fcheckedc_extension : Flag<["-"], "fcheckedc-extension">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Accept Checked C extension">;
