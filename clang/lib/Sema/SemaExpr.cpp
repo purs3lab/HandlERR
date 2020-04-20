@@ -1874,7 +1874,7 @@ ExprResult Sema::ConvertToFullyCheckedType(Expr *E,
   if (CheckedTy.isNull())
     return ExprError();
 
-  assert(!CheckedTy->isOrContainsUncheckedType());
+  assert(!CheckedTy->isOrContainsUncheckedType() || getLangOpts().IgnoreCheckedPtr);
   if (VK == ExprValueKind::VK_RValue) {
     ExprResult ER = ImpCastExprToType(E, CheckedTy, CK_BitCast, VK, nullptr,
                                       Sema::CCK_ImplicitConversion, true);

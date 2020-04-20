@@ -4005,7 +4005,7 @@ bool Sema::DiagnoseCheckedCFunctionCompatibility(FunctionDecl *New,
                                  /*CompareUnqualified=*/false,
                                  /*IgnoreBounds=*/true);
     // If they are, make sure an error message has been emitted.
-    if (BoundsOnlyError && !Err) {
+    if (BoundsOnlyError && !Err && !getLangOpts().IgnoreCheckedPtr) {
           Diag(New->getLocation(), diag::err_conflicting_annots) <<
             New->getDeclName();
           int PrevDiag;
@@ -4014,7 +4014,7 @@ bool Sema::DiagnoseCheckedCFunctionCompatibility(FunctionDecl *New,
             = getNoteDiagForInvalidRedeclaration(Old, New);
           Diag(OldLocation, PrevDiag);
     }
-    return BoundsOnlyError;
+    return BoundsOnlyError && !getLangOpts().IgnoreCheckedPtr;
   } else {
     // One declaration has a prototype and the other doesn't.
     // Look for checked parameters that are not allowed when mixing prototype
