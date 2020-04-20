@@ -3870,7 +3870,7 @@ static bool diagnoseBoundsError(Sema &S,
   const InteropTypeExpr *OldIType = OldAnnots.getInteropTypeExpr();
   const InteropTypeExpr *NewIType = NewAnnots.getInteropTypeExpr();
   if (!S.Context.EquivalentInteropTypes(OldIType, NewIType)) {
-    if (OldIType && NewIType)
+    if (OldIType && NewIType && !S.getLangOpts().IgnoreCheckedPtr)
       DiagId = diag::err_decl_conflicting_annot;
     else if (!IsUncheckedType || IsInconsistent)
       DiagId = NewIType ?

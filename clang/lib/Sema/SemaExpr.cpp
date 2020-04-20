@@ -14313,7 +14313,7 @@ ExprResult Sema::ActOnBoundsCastExprBounds(
   if (CheckBoundsCastBaseType(E1))
     return ExprError();
 
-  if (!DestTy->isCheckedPointerArrayType()) {
+  if (!DestTy->isCheckedPointerArrayType() && !getLangOpts().IgnoreCheckedPtr) {
     Diag(TypeLoc, diag::err_bounds_cast_expected_array_ptr);
     return ExprError();
   } else if (Bounds->isElementCount() && DestTy->isVoidPointerType()) {
