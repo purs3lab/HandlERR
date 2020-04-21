@@ -8511,7 +8511,10 @@ bool ASTContext::typesAreCompatible(QualType LHS, QualType RHS,
                                     bool IgnoreBounds) {
   if (getLangOpts().CPlusPlus)
     return hasSameType(LHS, RHS);
-
+  
+  // Ignore bounds if checked pointers are ignored
+  IgnoreBounds = IgnoreBounds && !getLangOpts().IgnoreCheckedPtr;
+  
   return !mergeTypes(LHS, RHS, false, CompareUnqualified, 
                      /*BlockReturnType=*/false, IgnoreBounds).isNull();
 }
