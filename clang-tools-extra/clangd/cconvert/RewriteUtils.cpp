@@ -570,7 +570,7 @@ bool TypeRewritingVisitor::VisitFunctionDecl(FunctionDecl *FD) {
 
   if (cDecl->numParams() == cDefn->numParams()) {
     // Track whether we did any work and need to make a substitution or not.
-    bool didAny = cDecl->numParams() > 0;
+    bool didAny = false;
     std::string s = "";
     std::vector<std::string> parmStrs;
     // Compare parameters.
@@ -611,6 +611,8 @@ bool TypeRewritingVisitor::VisitFunctionDecl(FunctionDecl *FD) {
           parameterHandled = true;
         }
       }
+
+      didAny |= parameterHandled;
       // if the parameter has no changes? Just dump the original declaration
       if (!parameterHandled) {
         std::string scratch = "";
@@ -636,7 +638,6 @@ bool TypeRewritingVisitor::VisitFunctionDecl(FunctionDecl *FD) {
         returnHandled = true;
         didAny = true;
         std::string ctype = "";
-        didAny = true;
         // definition is more precise than declaration.
         // Section 5.3:
         // https://www.microsoft.com/en-us/research/uploads/prod/2019/05/checkedc-post2019.pdf
@@ -662,11 +663,7 @@ bool TypeRewritingVisitor::VisitFunctionDecl(FunctionDecl *FD) {
     if(!returnHandled) {
       // If we used to implement a bounds-safe interface, continue to do that.
       returnVar = Decl->getOriginalTy() + " ";
-
       endStuff = getExistingIType(Decl, Defn, Declaration);
-      if(!endStuff.empty()) {
-        didAny = true;
-      }
     }
 
     s = getStorageQualifierString(Definition) + returnVar + cDecl->getName() + "(";
