@@ -87,7 +87,7 @@ void nested(int* x) {
 
 void silly(int *x) {
   int *a = (int*){x};
-  // CHECK: _Ptr<int> a = (_Ptr<int> ){x};
+  // CHECK: _Ptr<int> a = (_Ptr<int>){x};
 
   int *b = (int*){(int*) 1};
   // CHECK: int *b = (int*){(int*) 1};

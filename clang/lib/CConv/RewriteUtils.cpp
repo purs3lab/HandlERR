@@ -640,7 +640,7 @@ bool TypeRewritingVisitor::VisitFunctionDecl(FunctionDecl *FD) {
       } else {
         // One of the argument is WILD, emit an itype.
         Ctype =
-            Defn->mkString(Info.getConstraints().getVariables(), true, true);
+            Defn->mkString(Info.getConstraints().getVariables(), false, true);
         ReturnVar = Defn->getRewritableOriginalTy();
         EndStuff = " : itype(" + Ctype + ")";
       }
