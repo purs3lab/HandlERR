@@ -488,6 +488,7 @@ bool ProgramInfo::insertIntoStaticFunctionMap (StaticFunctionMapType &Map,
 
 bool ProgramInfo::insertNewFVConstraint(FunctionDecl *FD, FVConstraint *FVCon,
                                         ASTContext *C) {
+  FD->dump();
   bool ret = false;
   std::string FuncName = FD->getNameAsString();
   if (FD->isGlobal()) {
