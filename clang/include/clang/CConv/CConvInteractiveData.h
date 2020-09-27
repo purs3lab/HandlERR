@@ -67,6 +67,11 @@ private:
   // the above constraint.
   // For the above case, this contains: p -> {s}, q -> {r, s}
   std::map<ConstraintKey, CVars> SrcWMap;
+
+  // Get score for each of the ConstraintKeys, which are wild.
+  // For the above example, the score of s would be 0.5, similarly
+  // the score of r would be 1
+  float getPtrAffectedScore(const CVars &AllKeys);
 };
 
 #endif // _CCONVINTERACTIVEDATA_H

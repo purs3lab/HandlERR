@@ -40,6 +40,14 @@ ConstraintsInfo::getWildAffectedCKeys(const CVars &DWKeys) {
   return IndirectWKeys;
 }
 
+float ConstraintsInfo::getPtrAffectedScore(const CVars &AllKeys) {
+  float TS = 0.0;
+  for (auto CK : AllKeys) {
+    TS += (1.0 / GetRCVars(CK).size());
+  }
+  return TS;
+}
+
 void ConstraintsInfo::print_stats(llvm::raw_ostream &O) {
     O << "{\"WildPtrInfo\":{";
     O << "\"InDirectWildPtrNum\":" << TotalNonDirectWildPointers.size() << ",";
@@ -70,7 +78,8 @@ void ConstraintsInfo::print_stats(llvm::raw_ostream &O) {
       InDWild = getWildAffectedCKeys(T.second);
       findIntersection(InDWild, InSrcNonDirectWildPointers, Tmp);
       O << "\"TotalIndirect\":" << InDWild.size() << ",";
-      O << "\"InSrcIndirect\":" << Tmp.size();
+      O << "\"InSrcIndirect\":" << Tmp.size() << ",";
+      O << "\"InSrcScore\":" << getPtrAffectedScore(Tmp);
       O << "}}";
       AddComma = true;
     }
