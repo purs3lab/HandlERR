@@ -87,3 +87,25 @@ void ConstraintsInfo::print_stats(llvm::raw_ostream &O) {
     O << "}";
     O << "}}";
 }
+
+void ConstraintsInfo::print_per_ptr_stats(llvm::raw_ostream &O) {
+  O << "{\"PerPtrStats\":[";
+  bool AddComma = false;
+  for (auto &T : AllWildPtrs) {
+    if (AddComma) {
+      O << ",\n";
+    }
+    O << "{\"PtrNum\":" << T << ", ";
+    O << "\"InSrc\":" << std::to_string(InSrcWildPtrs.find(T) != InSrcWildPtrs.end()) << ", ";
+    CVars InDWild, Tmp;
+    InDWild = getWildAffectedCKeys({T});
+    findIntersection(InDWild, InSrcNonDirectWildPointers, Tmp);
+    O << "\"TotalIndirect\":" << InDWild.size() << ",";
+    O << "\"InSrcIndirect\":" << Tmp.size() << ",";
+    O << "\"InSrcScore\":" << getPtrAffectedScore(Tmp);
+    O << "}";
+    AddComma = true;
+  }
+  O << "]";
+  O << "}";
+}

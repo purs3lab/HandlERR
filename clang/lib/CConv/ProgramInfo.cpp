@@ -765,11 +765,23 @@ bool ProgramInfo::computeInterimConstraintState
   CAtoms ValidVarsVec;
   for (const auto &I : Variables) {
     std::string FileName = I.first.getFileName();
-    if (FilePaths.count(FileName)) {
+    if (FilePaths.count(FileName) || FileName.find(BaseDir) != std::string::npos) {
       ConstraintVariable *C = I.second;
-      if (C->isForValidDecl()) {
+      //if (C->isForValidDecl()) {
         CAtoms tmp = getVarsFromConstraint(C);
         ValidVarsVec.insert(ValidVarsVec.begin(), tmp.begin(), tmp.end());
+      //}
+    }
+  }
+
+  for (const auto &I : ExprConstraintVars) {
+    std::string FileName = I.first.getFileName();
+    if (FilePaths.count(FileName) || FileName.find(BaseDir) != std::string::npos) {
+      for (auto *C : I.second) {
+        //if (C->isForValidDecl()) {
+        CAtoms tmp = getVarsFromConstraint(C);
+        ValidVarsVec.insert(ValidVarsVec.begin(), tmp.begin(), tmp.end());
+        //}
       }
     }
   }
@@ -780,7 +792,7 @@ bool ProgramInfo::computeInterimConstraintState
 
   std::transform(ValidVarsS.begin() , ValidVarsS.end(),
                  std::inserter(ValidVarsKey, ValidVarsKey.end()) ,
-                 [](const Atom *val){
+                 [](const Atom *val) {
     if (const VarAtom *VA = dyn_cast<VarAtom>(val)) {
       return VA->getLoc();
     }
@@ -819,14 +831,16 @@ bool ProgramInfo::computeInterimConstraintState
       });
 
     TotalNDirectWPtrs.insert(TmpCGrp.begin(), TmpCGrp.end());
-    // We consider only pointers which with in the source files or external
-    // pointers that affected pointers within the source files.
-    if (!TmpCGrp.empty() || ValidVarsS.find(VA) != ValidVarsS.end()) {
-      WildPtrs.insert(VA->getLoc());
-      CVars &CGrp = SrcWMap[VA->getLoc()];
-      CGrp.insert(TmpCGrp.begin(), TmpCGrp.end());
-    }
+    // Should we consider only pointers which with in the source files or
+    // external pointers that affected pointers within the source files.
+    //if (!TmpCGrp.empty() || ValidVarsS.find(VA) != ValidVarsS.end()) {
+    WildPtrs.insert(VA->getLoc());
+    CVars &CGrp = SrcWMap[VA->getLoc()];
+    CGrp.insert(TmpCGrp.begin(), TmpCGrp.end());
+    //}
   }
+  //auto *AA = CS.getVar(11513);
+  //AA->dump();
   findIntersection(WildPtrs, ValidVarsKey, InSrcW);
   findIntersection(TotalNDirectWPtrs, ValidVarsKey, InSrInDirectWPtrs);
 
