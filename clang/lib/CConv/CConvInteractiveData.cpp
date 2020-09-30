@@ -88,7 +88,7 @@ void ConstraintsInfo::print_stats(llvm::raw_ostream &O) {
     O << "}}";
 }
 
-void ConstraintsInfo::print_per_ptr_stats(llvm::raw_ostream &O) {
+void ConstraintsInfo::print_per_ptr_stats(llvm::raw_ostream &O, Constraints &CS) {
   O << "{\"PerPtrStats\":[";
   bool AddComma = false;
   for (auto &T : AllWildPtrs) {
@@ -96,6 +96,7 @@ void ConstraintsInfo::print_per_ptr_stats(llvm::raw_ostream &O) {
       O << ",\n";
     }
     O << "{\"PtrNum\":" << T << ", ";
+    O << "\"Name\":\"" << CS.getVar(T)->getStr() << "\", ";
     O << "\"InSrc\":" << std::to_string(InSrcWildPtrs.find(T) != InSrcWildPtrs.end()) << ", ";
     CVars InDWild, Tmp;
     InDWild = getWildAffectedCKeys({T});

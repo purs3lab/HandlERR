@@ -38,7 +38,7 @@ public:
   CVars &GetSrcCVars(ConstraintKey);
   CVars getWildAffectedCKeys(const std::set<ConstraintKey> &DWKeys);
   void print_stats(llvm::raw_ostream &O);
-  void print_per_ptr_stats(llvm::raw_ostream &O);
+  void print_per_ptr_stats(llvm::raw_ostream &O, Constraints &CS);
 
   std::map<ConstraintKey, struct WildPointerInferenceInfo>
       RealWildPtrsWithReasons;
