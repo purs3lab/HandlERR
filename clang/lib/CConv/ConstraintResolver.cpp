@@ -187,7 +187,7 @@ CVarSet ConstraintResolver::getInvalidCastPVCons(Expr *E) {
   // we need to explicitly store the generated PVConstraints into persistent
   // constraints.
   if (Info.hasPersistentConstraints(E, Context))
-    return Info.getPersistentConstraints(E, Context);
+    return Info.getPersistentConstraintsSet(E, Context);
 
   DstType = E->getType();
   SrcType = E->getType();
@@ -208,12 +208,19 @@ CVarSet ConstraintResolver::getInvalidCastPVCons(Expr *E) {
   return Ret;
 }
 
+inline CSetBkeyPair convertToCSetBKeyPair(const CVarSet &Vars) {
+  BKeySet EmptyBSet;
+  EmptyBSet.clear();
+  return std::make_pair(Vars, EmptyBSet);
+}
+
 // Returns a set of ConstraintVariables which represent the result of
 // evaluating the expression E. Will explore E recursively, but will
 // ignore parts of it that do not contribute to the final result
-CVarSet
+CSetBkeyPair
     ConstraintResolver::getExprConstraintVars(Expr *E) {
-  CVarSet EmptyCSet;
+  CSetBkeyPair EmptyCSBKeySet;
+  BKeySet EmptyBSet;
   if (E != nullptr) {
     auto &CS = Info.getConstraints();
     QualType TypE = E->getType();
@@ -223,16 +230,16 @@ CVarSet
     if (TypE->isRecordType() || TypE->isArithmeticType()) {
       if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
         // If we have a DeclRef, the PVC can get a meaningful name
-        return getBaseVarPVConstraint(DRE);
+        return std::make_pair(getBaseVarPVConstraint(DRE), EmptyBSet);
       } else {
-        return PVConstraintFromType(TypE);
+        return std::make_pair(PVConstraintFromType(TypE), EmptyBSet);
       }
       // NULL
       // Special handling for casts of null is required to enable rewriting
       // statements such as int *x = (int*) 0. If this was handled as a
       // normal null expression, the cast would never be visited.
     } else if (!isa<ExplicitCastExpr>(E) && isNULLExpression(E, *Context)) {
-      return EmptyCSet;
+      return EmptyCSBKeySet;
       // Implicit cast, e.g., T* from T[] or int (*)(int) from int (int),
       //   but also weird int->int * conversions (and back)
     } else if (ImplicitCastExpr *IE = dyn_cast<ImplicitCastExpr>(E)) {
@@ -247,8 +254,8 @@ CVarSet
           !isCastSafe(TypE, SubTypE)) {
         std::string Rsn = "Cast from " + SubTypE.getAsString() +  " to " +
                           TypE.getAsString();
-        constraintAllCVarsToWild(CVs, Rsn, IE);
-        return getInvalidCastPVCons(E);
+        constraintAllCVarsToWild(CVs.first, Rsn, IE);
+        return std::make_pair(getInvalidCastPVCons(E), EmptyBSet);
       }
       // else, return sub-expression's result
       return CVs;
@@ -256,12 +263,12 @@ CVarSet
     } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
       CVarOption CV = Info.getVariable(DRE->getDecl(), Context);
       assert("Declaration without constraint variable?" && CV.hasValue());
-      return {&CV.getValue()};
+      return convertToCSetBKeyPair({&CV.getValue()});
       // x.f
     } else if (MemberExpr *ME = dyn_cast<MemberExpr>(E)) {
       CVarOption CV = Info.getVariable(ME->getMemberDecl(), Context);
       assert("Declaration without constraint variable?" && CV.hasValue());
-      return {&CV.getValue()};
+      return convertToCSetBKeyPair({&CV.getValue()});
       // Checked-C temporary
     } else if (CHKCBindTemporaryExpr *CE = dyn_cast<CHKCBindTemporaryExpr>(E)) {
       return getExprConstraintVars(CE->getSubExpr());
@@ -273,7 +280,7 @@ CVarSet
       if (Info.hasPersistentConstraints(E, Context))
         return Info.getPersistentConstraints(E, Context);
 
-      CVarSet Ret = EmptyCSet;
+      CSetBkeyPair Ret = EmptyCSBKeySet;
       if (ExplicitCastExpr *ECE = dyn_cast<ExplicitCastExpr>(E)) {
         assert(ECE->getType() == TypE);
         Expr *TmpE = ECE->getSubExpr();
@@ -282,15 +289,15 @@ CVarSet
         // handle it as usual so the type in the cast can be rewritten.
         if (!isNULLExpression(ECE, *Context) && TypE->isPointerType()
             && !isCastSafe(TypE, TmpE->getType())) {
-          Ret = getInvalidCastPVCons(E);
+          Ret = convertToCSetBKeyPair(getInvalidCastPVCons(E));
           // NB: Expression ECE itself handled in
           // ConstraintBuilder::FunctionVisitor
         } else {
-          CVarSet Vars = getExprConstraintVars(TmpE);
+          CVarSet Vars = getExprConstraintVars(TmpE).first;
           // PVConstraint introduced for explicit cast so they can be rewritten.
           // Pretty much the same idea as CompoundLiteralExpr.
           PVConstraint *P = getRewritablePVConstraint(ECE);
-          Ret = {P};
+          Ret = convertToCSetBKeyPair({P});
           // ConstraintVars for TmpE when ECE is NULL will be WILD, so
           // constraining GEQ these vars would be the cast always be WILD.
           if (!isNULLExpression(ECE, *Context)) {
@@ -320,7 +327,7 @@ CVarSet
           else if (BO->getRHS()->getType()->isPointerType())
             Ret = getExprConstraintVars(BO->getRHS());
           else
-            Ret = PVConstraintFromType(TypE);
+            Ret = convertToCSetBKeyPair(PVConstraintFromType(TypE));
           break;
           // Pointer-to-member ops unsupported.
         case BO_PtrMemD:
@@ -354,14 +361,14 @@ CVarSet
         case BO_LOr:
         case BO_Shl:
         case BO_Shr:
-          Ret = PVConstraintFromType(TypE);
+          Ret = convertToCSetBKeyPair(PVConstraintFromType(TypE));
           break;
         }
         // x[e]
       } else if (ArraySubscriptExpr *ASE = dyn_cast<ArraySubscriptExpr>(E)) {
-        CVarSet T = getExprConstraintVars(ASE->getBase());
-        CVarSet tmp = handleDeref(T);
-        T.swap(tmp);
+        CSetBkeyPair T = getExprConstraintVars(ASE->getBase());
+        CVarSet tmp = handleDeref(T.first);
+        T.first.swap(tmp);
         Ret = T;
         // ++e, &e, *e, etc.
       } else if (UnaryOperator *UO = dyn_cast<UnaryOperator>(E)) {
@@ -388,17 +395,17 @@ CVarSet
             Ret = getExprConstraintVars(ASE->getBase());
           } else {
             // add a VarAtom to UOExpr's PVConstraint, for &
-            CVarSet T = getExprConstraintVars(UOExpr);
-            assert("Empty constraint vars in AddrOf!" && !T.empty());
-            Ret = addAtomAll(T, CS.getPtr(), CS);
+            CSetBkeyPair T = getExprConstraintVars(UOExpr);
+            assert("Empty constraint vars in AddrOf!" && !T.first.empty());
+            Ret = std::make_pair(addAtomAll(T.first, CS.getPtr(), CS), T.second);
           }
           break;
         }
           // *e
         case UO_Deref: {
           // We are dereferencing, so don't assign to LHS
-          CVarSet T = getExprConstraintVars(UOExpr);
-          Ret = handleDeref(T);
+          CSetBkeyPair T = getExprConstraintVars(UOExpr);
+          Ret = std::make_pair(handleDeref(T.first), T.second);
           break;
         }
           /* Operations on lval; if pointer, just process that */
@@ -415,7 +422,7 @@ CVarSet
         case UO_Minus:
         case UO_LNot:
         case UO_Not:
-          Ret = PVConstraintFromType(TypE);
+          Ret = convertToCSetBKeyPair(PVConstraintFromType(TypE));
           break;
         case UO_Coawait:
         case UO_Real:
@@ -428,6 +435,7 @@ CVarSet
       } else if (CallExpr *CE = dyn_cast<CallExpr>(E)) {
         // Call expression should always get out-of context constraint variable.
         CVarSet ReturnCVs;
+        BKeySet ReturnBSet = EmptyBSet;
 
         // Here, we need to look up the target of the call and return the
         // constraints for the return value of that function.
@@ -438,9 +446,10 @@ CVarSet
           // There are a few reasons that we couldn't get a decl. For example,
           // the call could be done through an array subscript.
           Expr *CalledExpr = CE->getCallee();
-          CVarSet tmp = getExprConstraintVars(CalledExpr);
+          CSetBkeyPair tmp = getExprConstraintVars(CalledExpr);
+          ReturnBSet = tmp.second;
 
-          for (ConstraintVariable *C : tmp) {
+          for (ConstraintVariable *C : tmp.first) {
             if (FVConstraint *FV = dyn_cast<FVConstraint>(C)) {
               ReturnCVs.insert(FV->getReturnVar());
             } else if (PVConstraint *PV = dyn_cast<PVConstraint>(C)) {
@@ -470,7 +479,7 @@ CVarSet
                   // We will constrain the first arg to the return of
                   // realloc, below
                   ReallocFlow = getExprConstraintVars(
-                      CE->getArg(0)->IgnoreParenImpCasts());
+                      CE->getArg(0)->IgnoreParenImpCasts()).first;
                 }
               }
             }
@@ -544,7 +553,7 @@ CVarSet
                                 nullptr, Wild_to_Safe, false, &Info);
           }
         }
-        Ret = TmpCVs;
+        Ret = std::make_pair(TmpCVs, ReturnBSet);
         // e1 ? e2 : e3
       } else if (ConditionalOperator *CO = dyn_cast<ConditionalOperator>(E)) {
         std::vector<Expr *> SubExprs;
@@ -554,11 +563,12 @@ CVarSet
         // { e1, e2, e3, ... }
       } else if (InitListExpr *ILE = dyn_cast<InitListExpr>(E)) {
         std::vector<Expr *> SubExprs = ILE->inits().vec();
-        CVarSet CVars = getAllSubExprConstraintVars(SubExprs);
+        CSetBkeyPair CVars = getAllSubExprConstraintVars(SubExprs);
         if (ILE->getType()->isArrayType()) {
           // Array initialization is similar AddrOf, so the same pattern is
           // used where a new indirection is added to constraint variables.
-          Ret = addAtomAll(CVars, CS.getArr(), CS);
+          Ret = std::make_pair(addAtomAll(CVars.first, CS.getArr(), CS),
+                               CVars.second);
         } else {
           // This branch should only be taken on compound literal expressions
           // with pointer type (e.g. int *a = (int*){(int*) 1}).
@@ -573,15 +583,15 @@ CVarSet
         // (int[]){e1, e2, e3, ... }
       } else if (CompoundLiteralExpr *CLE =
           dyn_cast<CompoundLiteralExpr>(E)) {
-        CVarSet Vars = getExprConstraintVars(CLE->getInitializer());
+        CSetBkeyPair Vars = getExprConstraintVars(CLE->getInitializer());
 
         PVConstraint *P = getRewritablePVConstraint(CLE);
 
         PersistentSourceLoc PL = PersistentSourceLoc::mkPSL(CLE, *Context);
-        constrainConsVarGeq(P, Vars, Info.getConstraints(), &PL, Same_to_Same,
+        constrainConsVarGeq(P, Vars.first, Info.getConstraints(), &PL, Same_to_Same,
                             false, &Info);
-
-        Ret = {P};
+        CVarSet T = {P};
+        Ret = std::make_pair(T, Vars.second);
         // "foo"
       } else if (clang::StringLiteral *Str =
           dyn_cast<clang::StringLiteral>(E)) {
@@ -595,7 +605,7 @@ CVarSet
         P->constrainOuterTo(CS, CS.getNTArr()); // NB: ARR already there
         T = {P};
 
-        Ret = T;
+        Ret = convertToCSetBKeyPair(T);
       } else if (StmtExpr *SE = dyn_cast<StmtExpr>(E)) {
         CVarSet T;
         // retrieve the last "thing" returned by the block
@@ -614,29 +624,36 @@ CVarSet
       return Ret;
     }
   }
-  return EmptyCSet;
+  return EmptyCSBKeySet;
+}
+
+CVarSet ConstraintResolver::getExprConstraintVarsSet(Expr *E) {
+  return getExprConstraintVars(E).first;
 }
 
 // Collect constraint variables for Exprs int a set
-CVarSet ConstraintResolver::getAllSubExprConstraintVars(
+CSetBkeyPair ConstraintResolver::getAllSubExprConstraintVars(
     std::vector<Expr *> &Exprs) {
 
   CVarSet AggregateCons;
+  BKeySet AggregateBKeys;
   for (const auto &E : Exprs) {
-    CVarSet ECons;
+    CSetBkeyPair ECons;
     ECons = getExprConstraintVars(E);
-    AggregateCons.insert(ECons.begin(), ECons.end());
+    AggregateCons.insert(ECons.first.begin(), ECons.first.end());
+    AggregateBKeys.insert(ECons.second.begin(), ECons.second.end());
   }
 
-  return AggregateCons;
+  return std::make_pair(AggregateCons, AggregateBKeys);
 }
 
 void ConstraintResolver::constrainLocalAssign(Stmt *TSt, Expr *LHS, Expr *RHS,
                                               ConsAction CAction) {
   PersistentSourceLoc PL = PersistentSourceLoc::mkPSL(TSt, *Context);
-  CVarSet L = getExprConstraintVars(LHS);
-  CVarSet R = getExprConstraintVars(RHS);
-  constrainConsVarGeq(L, R, Info.getConstraints(), &PL, CAction, false, &Info);
+  CSetBkeyPair L = getExprConstraintVars(LHS);
+  CSetBkeyPair R = getExprConstraintVars(RHS);
+  constrainConsVarGeq(L.first, R.first, Info.getConstraints(), &PL,
+                      CAction, false, &Info);
 
   // Handle pointer arithmetic.
   auto &ABI = Info.getABoundsInfo();
@@ -644,9 +661,9 @@ void ConstraintResolver::constrainLocalAssign(Stmt *TSt, Expr *LHS, Expr *RHS,
 
   // Only if all types are enabled and these are not pointers, then track
   // the assignment.
-  if (AllTypes && !containsValidCons(L) &&
-      !containsValidCons(R)) {
-    ABI.handleAssignment(LHS, L, RHS, R, Context, this);
+  if (AllTypes && !containsValidCons(L.first) &&
+      !containsValidCons(R.first)) {
+    ABI.handleAssignment(LHS, L.first, RHS, R.first, Context, this);
   }
 }
 
@@ -662,12 +679,12 @@ void ConstraintResolver::constrainLocalAssign(Stmt *TSt, DeclaratorDecl *D,
   auto RHSCons = getExprConstraintVars(RHS);
 
   if (V.hasValue())
-    constrainConsVarGeq(&V.getValue(), RHSCons, Info.getConstraints(), PLPtr,
+    constrainConsVarGeq(&V.getValue(), RHSCons.first, Info.getConstraints(), PLPtr,
                         CAction, false, &Info);
   if (AllTypes && !(V.hasValue() && isValidCons(&V.getValue()))
-      && !containsValidCons(RHSCons)) {
+      && !containsValidCons(RHSCons.first)) {
     auto &ABI = Info.getABoundsInfo();
-    ABI.handleAssignment(D, V, RHS, RHSCons, Context, this);
+    ABI.handleAssignment(D, V, RHS, RHSCons.first, Context, this);
   }
 }
 

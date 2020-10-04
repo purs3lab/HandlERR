@@ -21,6 +21,8 @@
 
 typedef uint32_t BoundsKey;
 
+typedef std::set<BoundsKey> BKeySet;
+
 // Class representing scope of a program variable.
 class ProgramVarScope {
 public:

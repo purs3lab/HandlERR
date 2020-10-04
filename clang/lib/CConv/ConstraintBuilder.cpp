@@ -121,7 +121,7 @@ public:
     QualType SrcT = C->getSubExpr()->getType();
     QualType DstT = C->getType();
     if (!isCastSafe(DstT, SrcT)) {
-      auto CVs = CB.getExprConstraintVars(C->getSubExpr());
+      auto CVs = CB.getExprConstraintVarsSet(C->getSubExpr());
       std::string Rsn = "Cast from " + SrcT.getAsString() +  " to " +
                         DstT.getAsString();
       CB.constraintAllCVarsToWild(CVs, Rsn, C);
@@ -165,7 +165,7 @@ public:
       // If the callee declaration could not be found, then we're doing some
       // sort of indirect call through an array or conditional.
       Expr *CalledExpr = E->getCallee();
-      FVCons = CB.getExprConstraintVars(CalledExpr);
+      FVCons = CB.getExprConstraintVarsSet(CalledExpr);
       // When multiple function variables are used in the same expression, they
       // must have the same type.
       if (FVCons.size() > 1) {
@@ -226,11 +226,11 @@ public:
               if (Ty != nullptr && consistentTypeParams.find(Ty->GetIndex())
                   != consistentTypeParams.end())
                 ArgumentConstraints =
-                    CB.getExprConstraintVars(A->IgnoreImpCasts());
+                    CB.getExprConstraintVarsSet(A->IgnoreImpCasts());
               else
-                ArgumentConstraints = CB.getExprConstraintVars(A);
+                ArgumentConstraints = CB.getExprConstraintVarsSet(A);
             } else
-              ArgumentConstraints = CB.getExprConstraintVars(A);
+              ArgumentConstraints = CB.getExprConstraintVarsSet(A);
 
 
             if (callUntyped) {
@@ -296,7 +296,7 @@ public:
     // of the function.
     Expr *RetExpr = S->getRetValue();
 
-    CVarSet RconsVar = CB.getExprConstraintVars(RetExpr);
+    CVarSet RconsVar = CB.getExprConstraintVarsSet(RetExpr);
     // Constrain the return type of the function
     // to the type of the return expression.
     if (CVOpt.hasValue()) {
@@ -361,7 +361,7 @@ private:
 
   // Constraint helpers.
   void constraintInBodyVariable(Expr *e, ConstAtom *CAtom) {
-    CVarSet Var = CB.getExprConstraintVars(e);
+    CVarSet Var = CB.getExprConstraintVarsSet(e);
     constrainVarsTo(Var, CAtom);
   }
 
@@ -372,7 +372,7 @@ private:
     for (const auto &A : E->arguments()) {
       // Get constraint from within the function body
       // of the caller.
-      CVarSet ParameterEC = CB.getExprConstraintVars(A);
+      CVarSet ParameterEC = CB.getExprConstraintVarsSet(A);
 
       // Assign WILD to each of the constraint variables.
       FunctionDecl *FD = E->getDirectCallee();
@@ -395,7 +395,7 @@ private:
   // is WILD.
   void constraintPointerArithmetic(Expr *E, bool ModifyingExpr = true) {
     if (E->getType()->isFunctionPointerType()) {
-      CVarSet Var = CB.getExprConstraintVars(E);
+      CVarSet Var = CB.getExprConstraintVarsSet(E);
       std::string Rsn = "Pointer arithmetic performed on a function pointer.";
       CB.constraintAllCVarsToWild(Var, Rsn, E);
     } else {

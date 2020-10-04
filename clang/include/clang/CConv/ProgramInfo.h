@@ -35,6 +35,8 @@ protected:
   virtual AVarBoundsInfo &getABoundsInfo() = 0;
 };
 
+typedef std::pair<CVarSet, BKeySet> CSetBkeyPair;
+
 class ProgramInfo : public ProgramVariableAdder {
 public:
   // This map holds similar information as the type variable map in
@@ -69,7 +71,11 @@ public:
   void exitCompilationUnit();
 
   bool hasPersistentConstraints(clang::Expr *E, ASTContext *C) const;
-  const CVarSet &getPersistentConstraints(clang::Expr *E, ASTContext *C) const;
+  const CSetBkeyPair &getPersistentConstraints(clang::Expr *E, ASTContext *C) const;
+  void storePersistentConstraints(clang::Expr *E, const CSetBkeyPair &Vars,
+                                  ASTContext *C);
+
+  const CVarSet &getPersistentConstraintsSet(clang::Expr *E, ASTContext *C) const;
   void storePersistentConstraints(clang::Expr *E, const CVarSet &Vars,
                                   ASTContext *C);
 
@@ -122,9 +128,9 @@ private:
   // analysis from compilation unit to compilation unit.
   VariableMap Variables;
 
-  // Map with the same purpose as the Variables map, this stores constraint
-  // variables for non-declaration expressions.
-  std::map<PersistentSourceLoc, CVarSet> ExprConstraintVars;
+  // Map with the similar purpose as the Variables map, this stores constraint
+  // variables and set of bounds key for non-declaration expressions.
+  std::map<PersistentSourceLoc, CSetBkeyPair> ExprConstraintVars;
 
   // Constraint system.
   Constraints CS;

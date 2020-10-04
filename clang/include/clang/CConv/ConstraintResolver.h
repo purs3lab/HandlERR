@@ -31,10 +31,15 @@ public:
   void constraintCVarToWild(CVarOption CVar, const std::string &Rsn,
                             Expr *AtExpr = nullptr);
 
-  // Returns a set of ConstraintVariables which represent the result of
+  // Returns a pair of set of ConstraintVariables and set of BoundsKey
+  // (for array bounds inference) which represent the result of
   // evaluating the expression E. Will explore E recursively, but will
-  // ignore parts of it that do not contribute to the final result
-  CVarSet getExprConstraintVars(Expr *E);
+  // ignore parts of it that do not contribute to the final result.
+  CSetBkeyPair getExprConstraintVars(Expr *E);
+
+  // This function calls getExprConstraintVars and just return the
+  // set of ConstraintVariables (i.e., the first element of the pair).
+  CVarSet getExprConstraintVarsSet(Expr *E);
 
   // Handle assignment of RHS expression to LHS expression using the
   // given action.
@@ -68,7 +73,7 @@ private:
   CVarSet getWildPVConstraint();
   CVarSet PVConstraintFromType(QualType TypE);
 
-  CVarSet getAllSubExprConstraintVars(std::vector<Expr *> &Exprs);
+  CSetBkeyPair getAllSubExprConstraintVars(std::vector<Expr *> &Exprs);
   CVarSet getBaseVarPVConstraint(DeclRefExpr *Decl);
 
   PVConstraint *getRewritablePVConstraint(Expr *E);
