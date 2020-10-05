@@ -216,9 +216,9 @@ public:
             :
               false;
 
-          std::vector<CVarSet> deferred;
+          std::vector<CSetBkeyPair> deferred;
           for (const auto &A : E->arguments()) {
-            CVarSet ArgumentConstraints;
+            CSetBkeyPair ArgumentConstraints;
             if(TFD != nullptr && i < TFD->getNumParams()) {
               // Remove casts to void* on polymorphic types that are used
               // consistently.
@@ -226,11 +226,11 @@ public:
               if (Ty != nullptr && consistentTypeParams.find(Ty->GetIndex())
                   != consistentTypeParams.end())
                 ArgumentConstraints =
-                    CB.getExprConstraintVarsSet(A->IgnoreImpCasts());
+                    CB.getExprConstraintVars(A->IgnoreImpCasts());
               else
-                ArgumentConstraints = CB.getExprConstraintVarsSet(A);
+                ArgumentConstraints = CB.getExprConstraintVars(A);
             } else
-              ArgumentConstraints = CB.getExprConstraintVarsSet(A);
+              ArgumentConstraints = CB.getExprConstraintVars(A);
 
 
             if (callUntyped) {
@@ -240,21 +240,23 @@ public:
               ConstraintVariable *ParameterDC = TargetFV->getParamVar(i);
               // Do not handle bounds key here because we will be
               // doing context-sensitive assignment next.
-              constrainConsVarGeq(ParameterDC, ArgumentConstraints, CS, &PL,
+              constrainConsVarGeq(ParameterDC, ArgumentConstraints.first, CS, &PL,
                                   Wild_to_Safe, false, &Info, false);
               
               if (AllTypes && TFD != nullptr) {
                 auto *PVD = TFD->getParamDecl(i);
-                auto &ABI = Info.getABoundsInfo();
+                auto &CSBI = Info.getABoundsInfo().getCtxSensBoundsHandler();
+
                 // Here, we need to handle context-sensitive assignment.
-                ABI.handleContextSensitiveAssignment(E, PVD, ParameterDC, A,
-                                                  ArgumentConstraints,
-                                                     Context, &CB);
+                CSBI.handleContextSensitiveAssignment(PL, PVD, ParameterDC, A,
+                                                      ArgumentConstraints.first,
+                                                      ArgumentConstraints.second,
+                                                      Context, &CB);
               }
             } else {
               // The argument passed to a function ith varargs; make it wild
               if (HandleVARARGS) {
-                CB.constraintAllCVarsToWild(ArgumentConstraints,
+                CB.constraintAllCVarsToWild(ArgumentConstraints.first,
                                             "Passing argument to a function "
                                             "accepting var args.",
                                             E);

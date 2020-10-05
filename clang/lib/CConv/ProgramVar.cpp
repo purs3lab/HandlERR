@@ -14,6 +14,7 @@
 
 GlobalScope *GlobalScope::ProgScope = nullptr;
 std::set<StructScope, PVSComp> StructScope::AllStScopes;
+std::set<CtxStructScope, PVSComp> CtxStructScope::AllCtxStScopes;
 std::set<FunctionParamScope, PVSComp>
   FunctionParamScope::AllFnParamScopes;
 std::set<FunctionScope, PVSComp> FunctionScope::AllFnScopes;
@@ -34,6 +35,17 @@ const StructScope *StructScope::getStructScope(std::string StName) {
   }
   const auto &SS = *AllStScopes.find(TmpS);
   return &SS;
+}
+
+const CtxStructScope *CtxStructScope::getCtxStructScope(const StructScope *SS,
+                                                        std::string AS,
+                                                        bool IsGlobal) {
+  CtxStructScope TmpCSS(SS->getSName(), AS, IsGlobal);
+  if (AllCtxStScopes.find(TmpCSS) == AllCtxStScopes.end()) {
+    AllCtxStScopes.insert(TmpCSS);
+  }
+  const auto &CSS = *AllCtxStScopes.find(TmpCSS);
+  return &CSS;
 }
 
 const FunctionParamScope *FunctionParamScope::getFunctionParamScope(

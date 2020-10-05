@@ -75,7 +75,10 @@ public:
   void storePersistentConstraints(clang::Expr *E, const CSetBkeyPair &Vars,
                                   ASTContext *C);
 
+  // Get only constraint vars from the persistent contents of the
+  // expression E.
   const CVarSet &getPersistentConstraintsSet(clang::Expr *E, ASTContext *C) const;
+  // Store CVarSet with an empty set of BoundsKey into persistent contents.
   void storePersistentConstraints(clang::Expr *E, const CVarSet &Vars,
                                   ASTContext *C);
 

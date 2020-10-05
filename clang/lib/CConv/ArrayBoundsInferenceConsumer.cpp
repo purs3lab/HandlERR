@@ -167,7 +167,7 @@ static std::string getCalledFunctionName(const Expr *E) {
   return "";
 }
 
-bool tryGetBoundsKeyVar(Expr *E, BoundsKey &BK, ProgramInfo &Info,
+/*bool tryGetBoundsKeyVar(Expr *E, BoundsKey &BK, ProgramInfo &Info,
                         ASTContext *Context) {
   ConstraintResolver CR(Info, Context);
   CVarSet CVs = CR.getExprConstraintVarsSet(E);
@@ -175,7 +175,7 @@ bool tryGetBoundsKeyVar(Expr *E, BoundsKey &BK, ProgramInfo &Info,
   return CR.resolveBoundsKey(CVs, BK) ||
          ABInfo.tryGetVariable(E, *Context, BK);
 
-}
+}*/
 
 bool tryGetBoundsKeyVar(Decl *D, BoundsKey &BK, ProgramInfo &Info,
                         ASTContext *Context) {
@@ -183,6 +183,26 @@ bool tryGetBoundsKeyVar(Decl *D, BoundsKey &BK, ProgramInfo &Info,
   CVarOption CV = Info.getVariable(D, Context);
   auto &ABInfo = Info.getABoundsInfo();
   return CR.resolveBoundsKey(CV, BK) || ABInfo.tryGetVariable(D, BK);
+}
+
+bool tryGetValidBoundsKey(Expr *E, BoundsKey &BK,
+                          ProgramInfo &I, ASTContext *C) {
+  bool Ret = false;
+  ConstraintResolver CR(I, C);
+  auto BCVars = CR.getExprConstraintVars(E);
+  auto &ABI = I.getABoundsInfo();
+  if (CR.containsValidCons(BCVars.first) ||
+      !BCVars.second.empty()) {
+    if (!BCVars.second.empty()) {
+      BK = *BCVars.second.begin();
+      Ret = true;
+    } else if (CR.resolveBoundsKey(BCVars.first, BK)) {
+      Ret = true;
+    }
+  } else if (ABI.tryGetVariable(E, *C, BK)) {
+    Ret = true;
+  }
+  return Ret;
 }
 
 // Check if the provided expression is a call to one of the known
@@ -213,7 +233,7 @@ static bool isAllocatorCall(Expr *E, std::string &FName, ProgramInfo &I,
            BaseExprs.push_back(BO->getRHS());
          } else if (UExpr && UExpr->getKind() == UETT_SizeOf) {
            BaseExprs.push_back(UExpr);
-         } else if (tryGetBoundsKeyVar(PExpr, Tmp, I, C)) {
+         } else if (tryGetValidBoundsKey(PExpr, Tmp, I, C)) {
            BaseExprs.push_back(PExpr);
          } else {
            RetVal = false;
@@ -228,7 +248,7 @@ static bool isAllocatorCall(Expr *E, std::string &FName, ProgramInfo &I,
             UnaryExprOrTypeTraitExpr *UExpr =
                 dyn_cast<UnaryExprOrTypeTraitExpr>(TmpE);
             if ((UExpr && UExpr->getKind() == UETT_SizeOf) ||
-                tryGetBoundsKeyVar(TmpE, Tmp, I, C)) {
+                 tryGetValidBoundsKey(TmpE, Tmp, I, C)) {
               ArgVals.push_back(TmpE);
             } else {
               RetVal = false;
@@ -266,7 +286,7 @@ static void handleAllocatorCall(QualType LHSType, BoundsKey LK, Expr *E,
           FoundKey = false;
           break;
         }
-      } else if (tryGetBoundsKeyVar(TmpE, RK, Info, Context)) {
+      } else if (tryGetValidBoundsKey(TmpE, RK, Info, Context)) {
         // Is this variable?
         if (!FoundKey) {
           FoundKey = true;
@@ -567,7 +587,7 @@ bool LocalVarABVisitor::HandleBinAssign(BinaryOperator *O) {
   BoundsKey LK;
   // is the RHS expression a call to allocator function?
   if (needArrayBounds(LHS, Info, Context) &&
-      tryGetBoundsKeyVar(LHS, LK, Info, Context)) {
+      tryGetValidBoundsKey(LHS, LK, Info, Context)) {
     handleAssignment(LK, LHS->getType(), RHS);
   }
 
@@ -721,12 +741,37 @@ public:
     if (BO->getOpcode() == BO_LT || BO->getOpcode() == BO_GE) {
       Expr *LHS = BO->getLHS()->IgnoreParenCasts();
       Expr *RHS = BO->getRHS()->IgnoreParenCasts();
-      auto LHSCVars = CR->getExprConstraintVarsSet(LHS);
-      auto RHSCVars = CR->getExprConstraintVarsSet(RHS);
+      BoundsKey LKey, RKey;
+      if (tryGetValidBoundsKey(LHS, LKey, I, C) &&
+          tryGetValidBoundsKey(RHS, RKey, I, C)) {
+        // If this the left hand side of a < comparison and
+        // the LHS is the index used in array indexing operation?
+        // Then add the RHS to the possible bounds key.
+        bool IsRKeyBound = (LKey == IndxBKey);
+        if (BO->getOpcode() == BO_GE) {
+          // If we have: x >= y, then this has to be an IfStmt to
+          // consider Y as upper bound.
+          // Why? This is to distinguish between following cases:
+          // In the following case, we should not
+          // consider y as the bound.
+          // for (i=n-1; i >= y; i--) {
+          //      arr[i] = ..
+          // }
+          // Where as the following is a valid case. MAX_LEN is the bound.
+          // if (i >= MAX_LEN) {
+          //     return -1;
+          //  }
+          //  arr[i] = ..
+          IsRKeyBound &= (CurrStmt != nullptr && isa<IfStmt>(CurrStmt));
+        }
 
-      if (!CR->containsValidCons(LHSCVars) &&
+        if (IsRKeyBound)
+          PB.insert(RKey);
+      }
+
+      /*if (!CR->containsValidCons(LHSCVars) &&
           !CR->containsValidCons(RHSCVars)) {
-        BoundsKey LKey, RKey;
+
         auto &ABI = I.getABoundsInfo();
         if ((CR->resolveBoundsKey(LHSCVars, LKey) ||
             ABI.tryGetVariable(LHS, *C, LKey)) &&
@@ -757,7 +802,7 @@ public:
           if (IsRKeyBound)
             PB.insert(RKey);
         }
-      }
+      }*/
     }
     return true;
   }
@@ -864,14 +909,38 @@ void LengthVarInference::VisitArraySubscriptExpr(ArraySubscriptExpr *ASE) {
     VisitArraySubscriptExpr(SubASE);
     return;
   }
-  auto BaseCVars = CR->getExprConstraintVarsSet(BE);
+  //auto BaseCVars = CR->getExprConstraintVars(BE);
   // Next get the index used.
   Expr *IdxExpr = ASE->getIdx()->IgnoreParenCasts();
-  auto IdxCVars = CR->getExprConstraintVarsSet(IdxExpr);
+  //auto IdxCVars = CR->getExprConstraintVars(IdxExpr);
+  BoundsKey BasePtr, IdxKey;
+  auto &ABI = I.getABoundsInfo();
 
   // Get the bounds key of the base and index.
-  if (CR->containsValidCons(BaseCVars) &&
-      !CR->containsValidCons(IdxCVars)) {
+  if (tryGetValidBoundsKey(BE, BasePtr, I, C) &&
+      tryGetValidBoundsKey(IdxExpr, IdxKey, I, C)) {
+    std::set<BoundsKey> PossibleLens;
+    PossibleLens.clear();
+    ComparisionVisitor CV(I, C, IdxKey, PossibleLens);
+    auto &CDNodes = CDG->getControlDependencies(CurBB);
+    if (!CDNodes.empty()) {
+      // Next try to find all the nodes that the CurBB is
+      // control dependent on.
+      // For each of the control dependent node, check if we are comparing the
+      // index variable with another variable.
+      for (auto &CDGNode : CDNodes) {
+        // Collect the possible length bounds keys.
+        CV.TraverseStmt(CDGNode->getTerminatorStmt());
+      }
+      ABI.updatePotentialCountBounds(BasePtr, PossibleLens);
+    }
+  }
+
+  /*
+  // Get the bounds key of the base and index.
+  if ((CR->containsValidCons(BaseCVars.first) ||
+       !BaseCVars.second.empty()) &&
+      !CR->containsValidCons(IdxCVars.first)) {
     BoundsKey BasePtr, IdxKey;
     auto &ABI = I.getABoundsInfo();
     if (CR->resolveBoundsKey(BaseCVars, BasePtr) &&
@@ -893,7 +962,7 @@ void LengthVarInference::VisitArraySubscriptExpr(ArraySubscriptExpr *ASE) {
         ABI.updatePotentialCountBounds(BasePtr, PossibleLens);
       }
     }
-  }
+  }*/
 
 }
 

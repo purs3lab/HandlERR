@@ -17,6 +17,7 @@ set( LLVM_LINK_COMPONENTS
           Constraints.cpp
           ConstraintsGraph.cpp
           ConstraintVariables.cpp
+          CtxSensAVarBounds.cpp
           DeclRewriter.cpp
           IntermediateToolHook.cpp
           MappingVisitor.cpp

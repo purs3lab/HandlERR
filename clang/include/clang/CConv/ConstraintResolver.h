@@ -32,9 +32,9 @@ public:
                             Expr *AtExpr = nullptr);
 
   // Returns a pair of set of ConstraintVariables and set of BoundsKey
-  // (for array bounds inference) which represent the result of
-  // evaluating the expression E. Will explore E recursively, but will
-  // ignore parts of it that do not contribute to the final result.
+  // (for context sensitive array bounds inference) which represent the
+  // result of evaluating the expression E. Will explore E recursively,
+  // but will ignore parts of it that do not contribute to the final result.
   CSetBkeyPair getExprConstraintVars(Expr *E);
 
   // This function calls getExprConstraintVars and just return the
