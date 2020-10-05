@@ -123,7 +123,7 @@ static bool needArrayBounds(Expr *E, ProgramInfo &Info, ASTContext *C) {
   ConstraintResolver CR(Info, C);
   CVarSet ConsVar = CR.getExprConstraintVarsSet(E);
   const auto &EnvMap = Info.getConstraints().getVariables();
-  for (auto CurrCVar : ConsVar) {
+  for (auto *CurrCVar : ConsVar) {
     if (needArrayBounds(CurrCVar, EnvMap) || needNTArrayBounds(CurrCVar, EnvMap))
       return true;
     return false;
@@ -166,16 +166,6 @@ static std::string getCalledFunctionName(const Expr *E) {
     return CalleeDecl->getName();
   return "";
 }
-
-/*bool tryGetBoundsKeyVar(Expr *E, BoundsKey &BK, ProgramInfo &Info,
-                        ASTContext *Context) {
-  ConstraintResolver CR(Info, Context);
-  CVarSet CVs = CR.getExprConstraintVarsSet(E);
-  auto &ABInfo = Info.getABoundsInfo();
-  return CR.resolveBoundsKey(CVs, BK) ||
-         ABInfo.tryGetVariable(E, *Context, BK);
-
-}*/
 
 bool tryGetBoundsKeyVar(Decl *D, BoundsKey &BK, ProgramInfo &Info,
                         ASTContext *Context) {
@@ -768,41 +758,6 @@ public:
         if (IsRKeyBound)
           PB.insert(RKey);
       }
-
-      /*if (!CR->containsValidCons(LHSCVars) &&
-          !CR->containsValidCons(RHSCVars)) {
-
-        auto &ABI = I.getABoundsInfo();
-        if ((CR->resolveBoundsKey(LHSCVars, LKey) ||
-            ABI.tryGetVariable(LHS, *C, LKey)) &&
-            (CR->resolveBoundsKey(RHSCVars, RKey) ||
-             ABI.tryGetVariable(RHS, *C, RKey))) {
-
-          // If this the left hand side of a < comparison and
-          // the LHS is the index used in array indexing operation?
-          // Then add the RHS to the possible bounds key.
-          bool IsRKeyBound = (LKey == IndxBKey);
-          if (BO->getOpcode() == BO_GE) {
-            // If we have: x >= y, then this has to be an IfStmt to
-            // consider Y as upper bound.
-            // Why? This is to distinguish between following cases:
-            // In the following case, we should not
-            // consider y as the bound.
-            // for (i=n-1; i >= y; i--) {
-            //      arr[i] = ..
-            // }
-            // Where as the following is a valid case. MAX_LEN is the bound.
-            // if (i >= MAX_LEN) {
-            //     return -1;
-            //  }
-            //  arr[i] = ..
-            IsRKeyBound &= (CurrStmt != nullptr && isa<IfStmt>(CurrStmt));
-          }
-
-          if (IsRKeyBound)
-            PB.insert(RKey);
-        }
-      }*/
     }
     return true;
   }
@@ -935,34 +890,6 @@ void LengthVarInference::VisitArraySubscriptExpr(ArraySubscriptExpr *ASE) {
       ABI.updatePotentialCountBounds(BasePtr, PossibleLens);
     }
   }
-
-  /*
-  // Get the bounds key of the base and index.
-  if ((CR->containsValidCons(BaseCVars.first) ||
-       !BaseCVars.second.empty()) &&
-      !CR->containsValidCons(IdxCVars.first)) {
-    BoundsKey BasePtr, IdxKey;
-    auto &ABI = I.getABoundsInfo();
-    if (CR->resolveBoundsKey(BaseCVars, BasePtr) &&
-        (CR->resolveBoundsKey(IdxCVars, IdxKey) ||
-            ABI.tryGetVariable(IdxExpr, *C, IdxKey))) {
-      std::set<BoundsKey> PossibleLens;
-      PossibleLens.clear();
-      ComparisionVisitor CV(I, C, IdxKey, PossibleLens);
-      auto &CDNodes = CDG->getControlDependencies(CurBB);
-      if (!CDNodes.empty()) {
-        // Next try to find all the nodes that the CurBB is
-        // control dependent on.
-        // For each of the control dependent node, check if we are comparing the
-        // index variable with another variable.
-        for (auto &CDGNode : CDNodes) {
-          // Collect the possible length bounds keys.
-          CV.TraverseStmt(CDGNode->getTerminatorStmt());
-        }
-        ABI.updatePotentialCountBounds(BasePtr, PossibleLens);
-      }
-    }
-  }*/
 
 }
 
