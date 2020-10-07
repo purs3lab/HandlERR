@@ -856,3 +856,5 @@ add_subdirectory(utils/hmaptool)
 configure_file(
   ${CLANG_SOURCE_DIR}/include/clang/Config/config.h.cmake
   ${CLANG_BINARY_DIR}/include/clang/Config/config.h)
+
+add_subdirectory(../clang/interview-template)
