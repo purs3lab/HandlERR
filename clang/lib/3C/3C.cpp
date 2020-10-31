@@ -342,6 +342,12 @@ bool _3CInterface::SolveConstraints(bool ComputeInterimState) {
       GlobalProgramInfo.print_stats(FilePaths, OutputJson, false, true);
       OutputJson.close();
     }
+    std::string AggregateStats = StatsOutputJson + ".aggregate.json";
+    llvm::raw_fd_ostream AggrJson(AggregateStats, Ec);
+    if (!AggrJson.has_error()) {
+      GlobalProgramInfo.print_aggregate_stats(FilePaths, AggrJson);
+      AggrJson.close();
+    }
 
     llvm::raw_fd_ostream WildPtrInfo(WildPtrInfoJson, Ec);
     if (!WildPtrInfo.has_error()) {

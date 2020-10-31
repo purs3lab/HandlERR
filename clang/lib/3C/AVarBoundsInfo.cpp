@@ -721,8 +721,10 @@ bool AvarBoundsInference::getReachableBoundKeys(const ProgramVarScope *DstScope,
   // reachable from FromVarK.
   if (!SBVar->IsNumConstant()) {
     std::set<BoundsKey> ReachableCons;
-    std::set<BoundsKey> Pre;
-    for (auto CK : PotK) {
+    std::set<BoundsKey> Pre, CurrBK;
+    CurrBK.insert(PotK.begin(), PotK.end());
+    CurrBK.insert(FromVarK);
+    for (auto CK : CurrBK) {
       Pre.clear();
       BKGraph.getPredecessors(CK, Pre);
       for (auto T : Pre) {
@@ -926,10 +928,8 @@ bool AvarBoundsInference::inferBounds(BoundsKey K, AVarGraph &BKGraph, bool From
         ProgramVar *Kvar = BI->getProgramVar(K);
         std::set<BoundsKey> PotentialB;
         PotentialB.clear();
-        for (auto TK : PotBDs[K]) {
-          ProgramVar *TKVar = BI->getProgramVar(TK);
+        for (auto TK : PotBDs[K])
           getReachableBoundKeys(Kvar->getScope(), TK, PotentialB, BKGraph, true);
-        }
 
         if (!PotentialB.empty()) {
           bool Handled = false;
