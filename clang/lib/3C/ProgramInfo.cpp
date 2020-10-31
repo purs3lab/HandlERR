@@ -147,7 +147,7 @@ static void getVarsFromConstraint(ConstraintVariable *V, CAtoms &R) {
 }
 
 // Print aggregate stats
-void ProgramInfo::print_aggregate_stats(const std::set<std::string> &F,
+void ProgramInfo::printAggregateStats(const std::set<std::string> &F,
                                         llvm::raw_ostream &O) {
   std::set<Atom *> AllAtoms;
   CAtoms FoundVars;
@@ -232,7 +232,7 @@ void ProgramInfo::printStats(const std::set<std::string> &F, raw_ostream &O,
   // First, build the map and perform the aggregation.
   for (auto &I : Variables) {
     std::string FileName = I.first.getFileName();
-    if (F.count(FileName)) {
+    if (F.count(FileName) || FileName.find(BaseDir) != std::string::npos) {
       int VarC = 0;
       int PC = 0;
       int NtaC = 0;
@@ -904,11 +904,12 @@ bool ProgramInfo::computeInterimConstraintState(
   // in one of the files being compiled.
   CAtoms ValidVarsVec;
   std::set<Atom *> AllValidVars;
+  CAtoms Tmp;
   for (const auto &I : Variables) {
     std::string FileName = I.first.getFileName();
     ConstraintVariable *C = I.second;
     if (C->isForValidDecl()) {
-      CAtoms Tmp;
+      Tmp.clear();
       getVarsFromConstraint(C, Tmp);
       AllValidVars.insert(Tmp.begin(), Tmp.end());
       if (FilePaths.count(FileName) ||
@@ -952,17 +953,24 @@ bool ProgramInfo::computeInterimConstraintState(
       ImpMap[Pre->getLHS()].insert(Con->getLHS());
     }
 
+  CVars TmpCGrp;
+  CVars OnlyIndirect;
   for (auto *A : DirectWildVarAtoms) {
     auto *VA = dyn_cast<VarAtom>(A);
     if (VA == nullptr)
       continue;
 
-    CVars TmpCGrp;
+    TmpCGrp.clear();
+    OnlyIndirect.clear();
+
     auto BFSVisitor = [&](Atom *SearchAtom) {
       auto *SearchVA = dyn_cast<VarAtom>(SearchAtom);
       if (SearchVA && AllValidVars.find(SearchVA) != AllValidVars.end()) {
         CState.RCMap[SearchVA->getLoc()].insert(VA->getLoc());
         TmpCGrp.insert(SearchVA->getLoc());
+        if (DirectWildVarAtoms.find(SearchVA) == DirectWildVarAtoms.end()) {
+          OnlyIndirect.insert(SearchVA->getLoc());
+        }
       }
     };
     CS.getChkCG().visitBreadthFirst(VA, BFSVisitor);
@@ -971,7 +979,7 @@ bool ProgramInfo::computeInterimConstraintState(
         if (isa<VarAtom>(ImpA))
           CS.getChkCG().visitBreadthFirst(ImpA, BFSVisitor);
 
-    CState.TotalNonDirectWildAtoms.insert(TmpCGrp.begin(), TmpCGrp.end());
+    CState.TotalNonDirectWildAtoms.insert(OnlyIndirect.begin(), OnlyIndirect.end());
     // Should we consider only pointers which with in the source files or
     // external pointers that affected pointers within the source files.
     CState.AllWildAtoms.insert(VA->getLoc());
@@ -1081,8 +1089,8 @@ void ProgramInfo::setTypeParamBinding(CallExpr *CE, unsigned int TypeVarIdx,
 
   auto PSL = PersistentSourceLoc::mkPSL(CE, *C);
   auto CallMap = TypeParamBindings[PSL];
-  assert("Attempting to overwrite type param binding in ProgramInfo." &&
-         CallMap.find(TypeVarIdx) == CallMap.end());
+  /*assert("Attempting to overwrite type param binding in ProgramInfo."
+             && CallMap.find(TypeVarIdx) == CallMap.end());*/
 
   TypeParamBindings[PSL][TypeVarIdx] = CV;
 }

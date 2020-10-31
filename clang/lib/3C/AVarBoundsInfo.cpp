@@ -698,8 +698,10 @@ bool AvarBoundsInference::getReachableBoundKeys(const ProgramVarScope *DstScope,
   // reachable from FromVarK.
   if (!SBVar->isNumConstant()) {
     std::set<BoundsKey> ReachableCons;
-    std::set<BoundsKey> Pre;
-    for (auto CK : PotK) {
+    std::set<BoundsKey> Pre, CurrBK;
+    CurrBK.insert(PotK.begin(), PotK.end());
+    CurrBK.insert(FromVarK);
+    for (auto CK : CurrBK) {
       Pre.clear();
       BKGraph.getPredecessors(CK, Pre);
       for (auto T : Pre) {
