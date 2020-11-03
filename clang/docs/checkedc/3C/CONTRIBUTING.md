@@ -4,7 +4,7 @@ Issues and pull requests related to 3C should be submitted to [CCI's repository]
 
 ## Issues
 
-We do not yet have any specific policies about issues beyond the obvious: please try to provide enough information that we can reproduce the bug you are reporting or understand the specific enhancement you are proposing.  Feel free to go ahead and file issues, even at the current early stage of development, to help inform us of what users want; if we find that we're deluged with issues we're unprepared to address, we'll establish a different policy.  We strive to promptly fix any issues that block basic usage of 3C in our [supported environments](INSTALL.md#supported-environments), but beyond that, we have our own plans that are rapidly evolving and you should not expect that issues will be resolved in any given timeframe.
+Feel free to file issues against 3C, even during this early stage in its development; filed issues will help inform us of what users want.  Please try to provide enough information that we can reproduce the bug you are reporting or understand the specific enhancement you are proposing.  We strive to promptly fix any issues that block basic usage of 3C in our [supported environments](INSTALL.md#supported-environments).
 
 ## Pull requests
 
@@ -25,8 +25,6 @@ ninja check-clang-3c
 This command will build everything needed that hasn't already been built, run the test suite, report success or failure (exit 0 or 1, so you can use it in scripts), and display some information about any failures, which may or may not be enough for you to understand what went wrong.
 
 **(TODO: Describe the custom method.)**
-
-We also have "benchmark tests" that convert larger codebases using 3C, but they are not yet well automated.  When we have time, we will automate them and add them to the standard set of tests in this section.
 
 ## Coding guidelines
 

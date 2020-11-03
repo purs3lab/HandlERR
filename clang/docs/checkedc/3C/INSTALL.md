@@ -41,7 +41,7 @@ You might want to use `-DCMAKE_BUILD_TYPE=RelWithDebInfo` if you are running 3C 
 
 (TODO: Review?)
 
-For OS X Catalina, you have to add `-DDEFAULT_SYSROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk` to the `cmake` command; add it just after the `-DLLVM_ENABLE...` flags. You also need to make sure that the XCode developer command-line tools are installed, per [this thread](https://github.com/Homebrew/homebrew-core/issues/20791). Go to https://developer.apple.com/download/more/, log in with your Apple Developer ID, and download "Command Line Tools for Xcode 11.3.1". Then, enable these by invoking (from the command line), `sudo xcode-select -r`.
+On some OS X versions, you have to add `-DDEFAULT_SYSROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk` to the `cmake` command; add it just after the `-DLLVM_ENABLE...` flags. You also need to make sure that the XCode developer command-line tools are installed, per [this thread](https://github.com/Homebrew/homebrew-core/issues/20791). Go to https://developer.apple.com/download/more/, log in with your Apple Developer ID, and download "Command Line Tools for Xcode 11.3.1". Then, enable these by invoking (from the command line), `sudo xcode-select -r`.
 
 ## CR/LF issues
 
