@@ -13,7 +13,6 @@ We work primarily on Linux.  Checked C supports Windows, but we do not test 3C r
 Assuming you have already cloned the `checkedc-clang` repository, run the following (from the root of the working tree) for a basic build:
 
 ```
-# See https://github.com/correctcomputation/checkedc-clang/issues/296 about this.
 (cd llvm/projects/checkedc-wrapper && git clone https://github.com/microsoft/checkedc)
 
 mkdir build && cd build
