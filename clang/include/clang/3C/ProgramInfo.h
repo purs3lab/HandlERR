@@ -35,6 +35,8 @@ protected:
   virtual AVarBoundsInfo &getABoundsInfo() = 0;
 };
 
+typedef std::pair<CVarSet, BKeySet> CSetBkeyPair;
+
 class ProgramInfo : public ProgramVariableAdder {
 public:
   // This map holds similar information as the type variable map in
@@ -57,6 +59,9 @@ public:
   void printStats(const std::set<std::string> &F, llvm::raw_ostream &O,
                   bool OnlySummary = false, bool JsonFormat = false);
 
+  void print_aggregate_stats(const std::set<std::string> &F,
+                             llvm::raw_ostream &O);
+
   // Populate Variables, VarDeclToStatement, RVariables, and DepthMap with
   // AST data structures that correspond do the data stored in PDMap and
   // ReversePDMap.
@@ -68,7 +73,11 @@ public:
   void exitCompilationUnit();
 
   bool hasPersistentConstraints(clang::Expr *E, ASTContext *C) const;
-  const CVarSet &getPersistentConstraints(clang::Expr *E, ASTContext *C) const;
+  const CSetBkeyPair &getPersistentConstraints(clang::Expr *E, ASTContext *C) const;
+  void storePersistentConstraints(clang::Expr *E, const CSetBkeyPair &Vars,
+                                  ASTContext *C);
+
+  const CVarSet &getPersistentConstraintsSet(clang::Expr *E, ASTContext *C) const;
   void storePersistentConstraints(clang::Expr *E, const CVarSet &Vars,
                                   ASTContext *C);
 
@@ -133,10 +142,10 @@ private:
   // rewritten. It will be false for typedefs we don't support rewritting,
   // such as typedefs that are pointers to anonymous structs
   std::map<PersistentSourceLoc, std::pair<CVarSet, bool>> typedefVars;
-
-  // Map with the same purpose as the Variables map, this stores constraint
-  // variables for non-declaration expressions.
-  std::map<PersistentSourceLoc, CVarSet> ExprConstraintVars;
+  
+  // Map with the similar purpose as the Variables map, this stores constraint
+  // variables and set of bounds key for non-declaration expressions.
+  std::map<PersistentSourceLoc, CSetBkeyPair> ExprConstraintVars;
 
   // Constraint system.
   Constraints CS;
