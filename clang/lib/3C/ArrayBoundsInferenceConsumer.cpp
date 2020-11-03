@@ -121,7 +121,7 @@ static bool needNTArrayBounds(const ConstraintVariable *CV,
 
 static bool needArrayBounds(Expr *E, ProgramInfo &Info, ASTContext *C) {
   ConstraintResolver CR(Info, C);
-  CVarSet ConsVar = CR.getExprConstraintVars(E);
+  CVarSet ConsVar = CR.getExprConstraintVarsSet(E);
   const auto &EnvMap = Info.getConstraints().getVariables();
   for (auto CurrCVar : ConsVar) {
     if (needArrayBounds(CurrCVar, EnvMap) || needNTArrayBounds(CurrCVar, EnvMap))
@@ -170,7 +170,7 @@ static std::string getCalledFunctionName(const Expr *E) {
 bool tryGetBoundsKeyVar(Expr *E, BoundsKey &BK, ProgramInfo &Info,
                         ASTContext *Context) {
   ConstraintResolver CR(Info, Context);
-  CVarSet CVs = CR.getExprConstraintVars(E);
+  CVarSet CVs = CR.getExprConstraintVarsSet(E);
   auto &ABInfo = Info.getABoundsInfo();
   return CR.resolveBoundsKey(CVs, BK) ||
          ABInfo.tryGetVariable(E, *Context, BK);
@@ -725,8 +725,8 @@ public:
     if (BO->getOpcode() == BO_LT || BO->getOpcode() == BO_GE) {
       Expr *LHS = BO->getLHS()->IgnoreParenCasts();
       Expr *RHS = BO->getRHS()->IgnoreParenCasts();
-      auto LHSCVars = CR->getExprConstraintVars(LHS);
-      auto RHSCVars = CR->getExprConstraintVars(RHS);
+      auto LHSCVars = CR->getExprConstraintVarsSet(LHS);
+      auto RHSCVars = CR->getExprConstraintVarsSet(RHS);
 
       if (!CR->containsValidCons(LHSCVars) &&
           !CR->containsValidCons(RHSCVars)) {
@@ -868,10 +868,10 @@ void LengthVarInference::VisitArraySubscriptExpr(ArraySubscriptExpr *ASE) {
     VisitArraySubscriptExpr(SubASE);
     return;
   }
-  auto BaseCVars = CR->getExprConstraintVars(BE);
+  auto BaseCVars = CR->getExprConstraintVarsSet(BE);
   // Next get the index used.
   Expr *IdxExpr = ASE->getIdx()->IgnoreParenCasts();
-  auto IdxCVars = CR->getExprConstraintVars(IdxExpr);
+  auto IdxCVars = CR->getExprConstraintVarsSet(IdxExpr);
 
   // Get the bounds key of the base and index.
   if (CR->containsValidCons(BaseCVars) &&

@@ -466,7 +466,7 @@ AVarBoundsInfo::handlePointerAssignment(clang::Stmt *St, clang::Expr *L,
   findIntersection(LVarVis.StructAccess, RVarVis.StructAccess, CommonStVars);
 
   if (!CommonVars.empty() || CommonStVars.empty()) {
-    for (auto *LHSCVar : CR->getExprConstraintVars(L)) {
+    for (auto *LHSCVar : CR->getExprConstraintVarsSet(L)) {
       if (LHSCVar->hasBoundsKey())
         ArrPointerBoundsKey.insert(LHSCVar->getBoundsKey());
     }
@@ -477,7 +477,7 @@ AVarBoundsInfo::handlePointerAssignment(clang::Stmt *St, clang::Expr *L,
 void
 AVarBoundsInfo::recordArithmeticOperation(clang::Expr *E,
                                           ConstraintResolver *CR) {
-  CVarSet CSet = CR->getExprConstraintVars(E);
+  CVarSet CSet = CR->getExprConstraintVarsSet(E);
   for (auto *CV : CSet) {
     if (CV->hasBoundsKey())
       ArrPointersWithArithmetic.insert(CV->getBoundsKey());

@@ -46,7 +46,7 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
               && TypeVars[TyVar->GetIndex()] != nullptr)
             ArgExpr = ArgExpr->IgnoreImpCasts();
 
-          CVarSet ArgumentConstraints = CR.getExprConstraintVars(ArgExpr);
+          CVarSet ArgumentConstraints = CR.getExprConstraintVarsSet(ArgExpr);
           ConstraintVariable *ParameterC = FV->getParamVar(PIdx);
           for (auto *ArgumentC : ArgumentConstraints) {
             if (needCasting(ArgumentC, ParameterC)) {
