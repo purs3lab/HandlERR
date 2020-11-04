@@ -10,13 +10,14 @@ set( LLVM_LINK_COMPONENTS
           )
         endif()
         add_clang_library(clang3C
+          3C.cpp
+          3CInteractiveData.cpp
           ABounds.cpp
           AVarBoundsInfo.cpp
           AVarGraph.cpp
           ArrayBoundsInferenceConsumer.cpp
           CastPlacement.cpp
-          3C.cpp
-          3CInteractiveData.cpp
+          CtxSensAVarBounds.cpp
           CheckedRegions.cpp
           ConstraintBuilder.cpp
           ConstraintResolver.cpp

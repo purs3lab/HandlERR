@@ -104,7 +104,7 @@ public:
     for (const auto &D : S->decls()) {
       if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
         Expr *InitE = VD->getInit();
-        CB.constrainLocalAssign(S, VD, InitE);
+        CB.constrainLocalAssign(S, VD, InitE, Same_to_Same);
       }
     }
 
@@ -206,25 +206,24 @@ public:
         if (FVConstraint *TargetFV = dyn_cast<FVConstraint>(TmpC)) {
           unsigned I = 0;
           bool CallUntyped = TFD ? TFD->getType()->isFunctionNoProtoType() &&
-                                       E->getNumArgs() != 0 &&
-                                       TargetFV->numParams() == 0
-                                 : false;
+                                   E->getNumArgs() != 0 && 
+                                   TargetFV->numParams() == 0 : false;
 
-          std::vector<CVarSet> Deferred;
+          std::vector<CSetBkeyPair> Deferred;
           for (const auto &A : E->arguments()) {
-            CVarSet ArgumentConstraints;
-            if (TFD != nullptr && I < TFD->getNumParams()) {
+            CSetBkeyPair ArgumentConstraints;
+            if(TFD != nullptr && I < TFD->getNumParams()) {
               // Remove casts to void* on polymorphic types that are used
               // consistently.
               const auto *Ty = getTypeVariableType(TFD->getParamDecl(I));
               if (Ty != nullptr && ConsistentTypeParams.find(Ty->GetIndex()) !=
                                        ConsistentTypeParams.end())
                 ArgumentConstraints =
-                    CB.getExprConstraintVarsSet(A->IgnoreImpCasts());
+                    CB.getExprConstraintVars(A->IgnoreImpCasts());
               else
-                ArgumentConstraints = CB.getExprConstraintVarsSet(A);
+                ArgumentConstraints = CB.getExprConstraintVars(A);
             } else
-              ArgumentConstraints = CB.getExprConstraintVarsSet(A);
+              ArgumentConstraints = CB.getExprConstraintVars(A);
 
             if (CallUntyped) {
               Deferred.push_back(ArgumentConstraints);
@@ -233,20 +232,22 @@ public:
               ConstraintVariable *ParameterDC = TargetFV->getParamVar(I);
               // Do not handle bounds key here because we will be
               // doing context-sensitive assignment next.
-              constrainConsVarGeq(ParameterDC, ArgumentConstraints, CS, &PL,
+              constrainConsVarGeq(ParameterDC, ArgumentConstraints.first, CS, &PL,
                                   Wild_to_Safe, false, &Info, false);
 
               if (AllTypes && TFD != nullptr) {
                 auto *PVD = TFD->getParamDecl(I);
-                auto &ABI = Info.getABoundsInfo();
+                auto &CSBI = Info.getABoundsInfo().getCtxSensBoundsHandler();
                 // Here, we need to handle context-sensitive assignment.
-                ABI.handleContextSensitiveAssignment(
-                    E, PVD, ParameterDC, A, ArgumentConstraints, Context, &CB);
+                CSBI.handleContextSensitiveAssignment(PL, PVD, ParameterDC, A,
+                                                      ArgumentConstraints.first,
+                                                      ArgumentConstraints.second,
+                                                      Context, &CB);
               }
             } else {
               // The argument passed to a function ith varargs; make it wild
               if (HandleVARARGS) {
-                CB.constraintAllCVarsToWild(ArgumentConstraints,
+                CB.constraintAllCVarsToWild(ArgumentConstraints.first,
                                             "Passing argument to a function "
                                             "accepting var args.",
                                             E);
@@ -471,7 +472,7 @@ public:
 
     if (G->hasGlobalStorage() && isPtrOrArrayType(G->getType())) {
       if (G->hasInit()) {
-        CB.constrainLocalAssign(nullptr, G, G->getInit());
+        CB.constrainLocalAssign(nullptr, G, G->getInit(), Same_to_Same);
       }
       // If the location of the previous RecordDecl and the current VarDecl
       // coincide with one another, we constrain the VarDecl to be wild
@@ -497,7 +498,7 @@ public:
       for (auto It = Fields.begin();
            InitIdx < E->getNumInits() && It != Fields.end(); InitIdx++, It++) {
         Expr *InitExpr = E->getInit(InitIdx);
-        CB.constrainLocalAssign(nullptr, *It, InitExpr);
+        CB.constrainLocalAssign(nullptr, *It, InitExpr, Same_to_Same, true);
       }
     }
     return true;
@@ -609,7 +610,7 @@ void ConstraintBuilderConsumer::HandleTranslationUnit(ASTContext &C) {
   TypeVarVisitor TV = TypeVarVisitor(&C, Info);
   ConstraintResolver CSResolver(Info, &C);
   ContextSensitiveBoundsKeyVisitor CSBV =
-      ContextSensitiveBoundsKeyVisitor(&C, Info);
+      ContextSensitiveBoundsKeyVisitor(&C, Info, &CSResolver);
   ConstraintGenVisitor GV = ConstraintGenVisitor(&C, Info, TV);
   TranslationUnitDecl *TUD = C.getTranslationUnitDecl();
   // Generate constraints.
