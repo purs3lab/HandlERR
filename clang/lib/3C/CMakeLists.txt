@@ -15,6 +15,7 @@ set( LLVM_LINK_COMPONENTS
           AVarGraph.cpp
           ArrayBoundsInferenceConsumer.cpp
           CastPlacement.cpp
+          CtxSensAVarBounds.cpp
           3C.cpp
           3CInteractiveData.cpp
           CheckedRegions.cpp

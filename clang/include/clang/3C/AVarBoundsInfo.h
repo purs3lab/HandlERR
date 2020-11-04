@@ -18,6 +18,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/3C/PersistentSourceLoc.h"
 #include "clang/3C/ConstraintVariables.h"
+#include "clang/3C/CtxSensAVarBounds.h"
 
 class ProgramInfo;
 class ConstraintResolver;
@@ -147,14 +148,13 @@ private:
 class AVarBoundsInfo {
 public:
   AVarBoundsInfo() : ProgVarGraph(this), CtxSensProgVarGraph(this),
-                     RevCtxSensProgVarGraph(this) {
+                     RevCtxSensProgVarGraph(this), CSBKeyHandler(this) {
     BCount = 1;
     PVarInfo.clear();
     InProgramArrPtrBoundsKeys.clear();
     BInfo.clear();
     DeclVarMap.clear();
     TmpBoundsKey.clear();
-    CSBoundsKey.clear();
     ArrPointersWithArithmetic.clear();
   }
 
@@ -202,16 +202,14 @@ public:
                                ASTContext *C,
                                ConstraintResolver *CR);
   bool handleAssignment(clang::Expr *L, const CVarSet &LCVars,
+                        const std::set<BoundsKey> &CSLKeys,
                         clang::Expr *R, const CVarSet &RCVars,
+                        const std::set<BoundsKey> &CSRKeys,
                         ASTContext *C, ConstraintResolver *CR);
   bool handleAssignment(clang::Decl *L, CVarOption LCVar,
                         clang::Expr *R, const CVarSet &RCVars,
+                        const std::set<BoundsKey> &CSRKeys,
                         ASTContext *C, ConstraintResolver *CR);
-  // Handle context sensitive assignment.
-  bool handleContextSensitiveAssignment(CallExpr *CE, clang::Decl *L,
-                                        ConstraintVariable *LCVar,
-                                        clang::Expr *R, CVarSet &RCVars,
-                                        ASTContext *C, ConstraintResolver *CR);
 
   // Handle the arithmetic expression. This is required to adjust bounds
   // for pointers that has pointer arithmetic performed on them.
@@ -230,17 +228,22 @@ public:
   // Propagate the array bounds information for all array ptrs.
   bool performFlowAnalysis(ProgramInfo *PI);
 
-  // Reset (i.e., clear) the context sensitive bounds information.
-  void resetContextSensitiveBoundsKey();
-  // Create context sensitive BoundsKey variables for the given set of
-  // ConstraintVariables.
-  bool contextualizeCVar(CallExpr *CE,
-                         const std::set<ConstraintVariable *> &CV,
-                         ASTContext *C);
-  // Get the context sensitive BoundsKey for the given key.
+  // Get the context sensitive BoundsKey for the given key at CallSite
+  // located at PSL.
   // If there exists no context-sensitive bounds key, we just return
   // the provided key.
-  BoundsKey getContextSensitiveBoundsKey(CallExpr *CE, BoundsKey BK);
+  BoundsKey getCtxSensCEBoundsKey(const PersistentSourceLoc &PSL,
+                                  BoundsKey BK);
+  // If E is a MemberAccess expression, then  this function returns the set
+  // containing the context sensitive bounds key for the corresponding struct
+  // access.
+  // This function return empty set on failure.
+  std::set<BoundsKey> getCtxSensFieldBoundsKey(Expr *E, ASTContext *C,
+                                               ProgramInfo &I);
+
+  CtxSensitiveBoundsKeyHandler &getCtxSensBoundsHandler() {
+    return CSBKeyHandler;
+  }
 
   AVarBoundsStats &getBStats() { return BoundsInferStats; }
 
@@ -256,6 +259,7 @@ public:
 
 private:
   friend class AvarBoundsInference;
+  friend class CtxSensitiveBoundsKeyHandler;
   
   friend struct llvm::DOTGraphTraits<AVarGraph>;
   // List of bounds priority in descending order of priorities.
@@ -309,12 +313,8 @@ private:
   // This is the map of pointer variable bounds key and set of bounds key
   // which can be the count bounds.
   std::map<BoundsKey, std::set<BoundsKey>> PotentialCntBounds;
-
-  // Context sensitive bounds key.
-  // For each call-site a map of original bounds key and the bounds key
-  // specific to this call-site.
-  // Note: This map is only active for the compilation unit being parsed.
-  std::map<CallExpr *, std::map<BoundsKey, BoundsKey>> CSBoundsKey;
+  // Context-sensitive bounds key handler
+  CtxSensitiveBoundsKeyHandler CSBKeyHandler;
 
   // BoundsKey helper function: These functions help in getting bounds key from
   // various artifacts.
@@ -327,9 +327,6 @@ private:
   void insertVarKey(PersistentSourceLoc &PSL, BoundsKey NK);
 
   void insertProgramVar(BoundsKey NK, ProgramVar *PV);
-
-  void insertCtxSensBoundsKey(ProgramVar *OldPV, BoundsKey NK,
-                              const CtxFunctionArgScope *CFAS);
 
   // Check if the provided bounds key corresponds to function return.
   bool isFunctionReturn(BoundsKey BK);
@@ -352,41 +349,6 @@ private:
                                 AvarBoundsInference &BI);
 
   void insertParamKey(ParamDeclType ParamDecl, BoundsKey NK);
-};
-
-// This class creates context sensitive bounds key information that is
-// useful to resolve certain bounds information.
-// Consider the following example:
-// _Arry_ptr<int> foo(unsigned int s) : count(s);
-// ....
-// int *a, *c;
-// unsigned b, d;
-// a = foo(b);
-// c = foo(d);
-// ...
-// Here, when we do our analysis we do not know whether b or d is the bounds
-// of a.
-// The reason for this is because we maintain a single bounds variable for foo,
-// consequently, when we do our flow analysis we see that b and d both propagate
-// to s (which is the bounds of the return value of foo).
-// However, if we maintain context sensitive bounds keys, then we know that
-// at a = foo(b), it is b that is passed to s and there by helps us infer that
-// the bounds of a should be b i.e., _Array_ptr<a> : count(b).
-// This class helps in maintaining the context sensitive bounds information.
-class ContextSensitiveBoundsKeyVisitor :
-    public RecursiveASTVisitor<ContextSensitiveBoundsKeyVisitor> {
-public:
-  explicit ContextSensitiveBoundsKeyVisitor(ASTContext *C, ProgramInfo &I,
-                                            ConstraintResolver *CResolver);
-
-  virtual ~ContextSensitiveBoundsKeyVisitor();
-
-  bool VisitCallExpr(CallExpr *CE);
-
-private:
-  ASTContext *Context;
-  ProgramInfo &Info;
-  ConstraintResolver *CR;
 };
 
 #endif // _AVARBOUNDSINFO_H

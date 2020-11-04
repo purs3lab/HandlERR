@@ -1667,9 +1667,15 @@ void FunctionVariableConstraint::brainTransplant(ConstraintVariable *FromCV,
       assert(numParams() == deferred.PS.size());
       for(unsigned i = 0; i < deferred.PS.size(); i++) {
         ConstraintVariable *ParamDC = getParamVar(i);
-        CVarSet ArgDC = deferred.PS[i];
+        CVarSet ArgDC = deferred.PS[i].first;
         constrainConsVarGeq(ParamDC, ArgDC, CS, &(deferred.PL), Wild_to_Safe,
-                            false, &I);
+                            false, &I, false);
+        auto &CSBI = I.getABoundsInfo().getCtxSensBoundsHandler();
+        CSBI.handleContextSensitiveAssignment(deferred.PL, nullptr, ParamDC,
+                                              nullptr,
+                                              deferred.PS[i].first,
+                                              deferred.PS[i].second,
+                                              nullptr, nullptr);
       }
     }
   } else {
@@ -1706,7 +1712,7 @@ void FunctionVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
 
 
 void FunctionVariableConstraint::addDeferredParams
-(PersistentSourceLoc PL, std::vector<CVarSet> Ps) {
+(PersistentSourceLoc PL, std::vector<std::pair<CVarSet, BKeySet>> Ps) {
   ParamDeferment P = { PL, Ps };
   deferredParams.push_back(P);
 }

@@ -198,13 +198,14 @@ inline CSetBkeyPair convertToCSetBKeyPair(const CVarSet &Vars) {
   return std::make_pair(Vars, EmptyBSet);
 }
 
-// Returns a set of ConstraintVariables which represent the result of
-// evaluating the expression E. Will explore E recursively, but will
-// ignore parts of it that do not contribute to the final result
+// Returns a pair of set of ConstraintVariables and set of BoundsKey
+// after evaluating the expression E. Will explore E recursively, but will
+// ignore parts of it that do not contribute to the final result.
 CSetBkeyPair
     ConstraintResolver::getExprConstraintVars(Expr *E) {
   CSetBkeyPair EmptyCSBKeySet;
   BKeySet EmptyBSet;
+  auto &ABI = Info.getABoundsInfo();
   if (E != nullptr) {
     auto &CS = Info.getConstraints();
     QualType TypE = E->getType();
@@ -214,9 +215,11 @@ CSetBkeyPair
     if (TypE->isRecordType() || TypE->isArithmeticType()) {
       if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
         // If we have a DeclRef, the PVC can get a meaningful name
-        return std::make_pair(getBaseVarPVConstraint(DRE), EmptyBSet);
+        return convertToCSetBKeyPair(getBaseVarPVConstraint(DRE));
       } else {
-        return std::make_pair(PVConstraintFromType(TypE), EmptyBSet);
+        // Fetch the context sensitive bounds key.
+        return std::make_pair(PVConstraintFromType(TypE),
+                              ABI.getCtxSensFieldBoundsKey(E, Context, Info));
       }
       // NULL
       // Special handling for casts of null is required to enable rewriting
@@ -239,7 +242,7 @@ CSetBkeyPair
         CVarSet WildCVar = getInvalidCastPVCons(IE);
         constrainConsVarGeq(CVs.first, WildCVar, CS, nullptr, Safe_to_Wild, false,
                             &Info);
-        return convertToCSetBKeyPair(WildCVar);
+        return std::make_pair(WildCVar, CVs.second);
       }
       // else, return sub-expression's result
       return CVs;
@@ -252,7 +255,10 @@ CSetBkeyPair
     } else if (MemberExpr *ME = dyn_cast<MemberExpr>(E)) {
       CVarOption CV = Info.getVariable(ME->getMemberDecl(), Context);
       assert("Declaration without constraint variable?" && CV.hasValue());
-      return convertToCSetBKeyPair({&CV.getValue()});
+      CVarSet MECSet = {&CV.getValue()};
+      // Get Context sensitive bounds key for field access.
+      return std::make_pair(MECSet,
+                            ABI.getCtxSensFieldBoundsKey(ME, Context, Info));
       // Checked-C temporary
     } else if (CHKCBindTemporaryExpr *CE = dyn_cast<CHKCBindTemporaryExpr>(E)) {
       return getExprConstraintVars(CE->getSubExpr());
@@ -533,10 +539,10 @@ CSetBkeyPair
           
           // Make the bounds key context sensitive.
           if (NewCV->hasBoundsKey()) {
-            auto &ABInfo = Info.getABoundsInfo();
+            auto PSL = PersistentSourceLoc::mkPSL(CE, *Context);
             auto CSensBKey =
-                ABInfo.getContextSensitiveBoundsKey(CE,
-                                                    NewCV->getBoundsKey());
+                ABI.getCtxSensCEBoundsKey(PSL,
+                                          NewCV->getBoundsKey());
             NewCV->setBoundsKey(CSensBKey);
           }
 
@@ -652,8 +658,9 @@ void ConstraintResolver::constrainLocalAssign(Stmt *TSt, Expr *LHS, Expr *RHS,
   PersistentSourceLoc PL = PersistentSourceLoc::mkPSL(TSt, *Context);
   CSetBkeyPair L = getExprConstraintVars(LHS);
   CSetBkeyPair R = getExprConstraintVars(RHS);
+  bool HandleBoundsKey = L.second.empty() && R.second.empty();
   constrainConsVarGeq(L.first, R.first, Info.getConstraints(), &PL,
-                      CAction, false, &Info);
+                      CAction, false, &Info, HandleBoundsKey);
 
   // Handle pointer arithmetic.
   auto &ABI = Info.getABoundsInfo();
@@ -661,14 +668,18 @@ void ConstraintResolver::constrainLocalAssign(Stmt *TSt, Expr *LHS, Expr *RHS,
 
   // Only if all types are enabled and these are not pointers, then track
   // the assignment.
-  if (AllTypes && !containsValidCons(L.first) &&
-      !containsValidCons(R.first)) {
-    ABI.handleAssignment(LHS, L.first, RHS, R.first, Context, this);
+  if (AllTypes) {
+    if ((!containsValidCons(L.first) &&
+         !containsValidCons(R.first)) || !HandleBoundsKey) {
+      ABI.handleAssignment(LHS, L.first, L.second, RHS,
+                           R.first, R.second, Context, this);
+    }
   }
 }
 
 void ConstraintResolver::constrainLocalAssign(Stmt *TSt, DeclaratorDecl *D,
-                                              Expr *RHS, ConsAction CAction) {
+                                              Expr *RHS, ConsAction CAction,
+                                              bool IgnoreBnds) {
   PersistentSourceLoc PL, *PLPtr = nullptr;
   if (TSt != nullptr) {
    PL = PersistentSourceLoc::mkPSL(TSt, *Context);
@@ -677,14 +688,18 @@ void ConstraintResolver::constrainLocalAssign(Stmt *TSt, DeclaratorDecl *D,
   // Get the in-context local constraints.
   CVarOption V = Info.getVariable(D, Context);
   auto RHSCons = getExprConstraintVars(RHS);
+  bool HandleBoundsKey = IgnoreBnds || RHSCons.second.empty();
 
   if (V.hasValue())
     constrainConsVarGeq(&V.getValue(), RHSCons.first, Info.getConstraints(), PLPtr,
-                        CAction, false, &Info);
-  if (AllTypes && !(V.hasValue() && isValidCons(&V.getValue()))
-      && !containsValidCons(RHSCons.first)) {
-    auto &ABI = Info.getABoundsInfo();
-    ABI.handleAssignment(D, V, RHS, RHSCons.first, Context, this);
+                        CAction, false, &Info, HandleBoundsKey);
+  if (AllTypes && !IgnoreBnds) {
+    if (!HandleBoundsKey || (!(V.hasValue() && isValidCons(&V.getValue()))
+                             && !containsValidCons(RHSCons.first))) {
+      auto &ABI = Info.getABoundsInfo();
+      ABI.handleAssignment(D, V, RHS, RHSCons.first, RHSCons.second,
+                           Context, this);
+    }
   }
 }
 

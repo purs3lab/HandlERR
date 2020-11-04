@@ -107,7 +107,7 @@ public:
     for (const auto &D : S->decls()) {
       if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
         Expr *InitE = VD->getInit();
-        CB.constrainLocalAssign(S, VD, InitE);
+        CB.constrainLocalAssign(S, VD, InitE, Same_to_Same);
       }
     }
 
@@ -215,9 +215,9 @@ public:
             :
               false;
 
-          std::vector<CVarSet> deferred;
+          std::vector<CSetBkeyPair> deferred;
           for (const auto &A : E->arguments()) {
-            CVarSet ArgumentConstraints;
+            CSetBkeyPair ArgumentConstraints;
             if(TFD != nullptr && i < TFD->getNumParams()) {
               // Remove casts to void* on polymorphic types that are used
               // consistently.
@@ -225,11 +225,11 @@ public:
               if (Ty != nullptr && consistentTypeParams.find(Ty->GetIndex())
                   != consistentTypeParams.end())
                 ArgumentConstraints =
-                    CB.getExprConstraintVarsSet(A->IgnoreImpCasts());
+                    CB.getExprConstraintVars(A->IgnoreImpCasts());
               else
-                ArgumentConstraints = CB.getExprConstraintVarsSet(A);
+                ArgumentConstraints = CB.getExprConstraintVars(A);
             } else
-              ArgumentConstraints = CB.getExprConstraintVarsSet(A);
+              ArgumentConstraints = CB.getExprConstraintVars(A);
 
 
             if (callUntyped) {
@@ -239,21 +239,22 @@ public:
               ConstraintVariable *ParameterDC = TargetFV->getParamVar(i);
               // Do not handle bounds key here because we will be
               // doing context-sensitive assignment next.
-              constrainConsVarGeq(ParameterDC, ArgumentConstraints, CS, &PL,
+              constrainConsVarGeq(ParameterDC, ArgumentConstraints.first, CS, &PL,
                                   Wild_to_Safe, false, &Info, false);
               
               if (AllTypes && TFD != nullptr) {
                 auto *PVD = TFD->getParamDecl(i);
-                auto &ABI = Info.getABoundsInfo();
+                auto &CSBI = Info.getABoundsInfo().getCtxSensBoundsHandler();
                 // Here, we need to handle context-sensitive assignment.
-                ABI.handleContextSensitiveAssignment(E, PVD, ParameterDC, A,
-                                                  ArgumentConstraints,
-                                                     Context, &CB);
+                CSBI.handleContextSensitiveAssignment(PL, PVD, ParameterDC, A,
+                                                      ArgumentConstraints.first,
+                                                      ArgumentConstraints.second,
+                                                      Context, &CB);
               }
             } else {
               // The argument passed to a function ith varargs; make it wild
               if (HandleVARARGS) {
-                CB.constraintAllCVarsToWild(ArgumentConstraints,
+                CB.constraintAllCVarsToWild(ArgumentConstraints.first,
                                             "Passing argument to a function "
                                             "accepting var args.",
                                             E);
@@ -424,7 +425,7 @@ public:
     if (G->hasGlobalStorage() &&
         isPtrOrArrayType(G->getType())) {
       if (G->hasInit()) {
-        CB.constrainLocalAssign(nullptr, G, G->getInit());
+        CB.constrainLocalAssign(nullptr, G, G->getInit(), Same_to_Same);
       }
       // If the location of the previous RecordDecl and the current VarDecl
       // coincide with one another, we constrain the VarDecl to be wild
@@ -440,7 +441,7 @@ public:
     return true;
   }
 
-  bool VisitInitListExpr(InitListExpr *E){
+  bool VisitInitListExpr(InitListExpr *E) {
     if (E->getType()->isStructureType()) {
       const RecordDecl *Definition =
           E->getType()->getAsStructureType()->getDecl()->getDefinition();
@@ -449,7 +450,7 @@ public:
       const auto fields = Definition->fields();
       for (auto it = fields.begin(); initIdx < E->getNumInits() && it != fields.end(); initIdx++, it++) {
         Expr *InitExpr = E->getInit(initIdx);
-        CB.constrainLocalAssign(nullptr, *it, InitExpr);
+        CB.constrainLocalAssign(nullptr, *it, InitExpr, Same_to_Same, true);
       }
     }
     return true;
