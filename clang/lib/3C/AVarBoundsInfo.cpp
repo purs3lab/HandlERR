@@ -64,8 +64,7 @@ void AVarBoundsStats::print(llvm::raw_ostream &O,
 bool hasArray(ConstraintVariable *CK, Constraints &CS) {
   auto &E = CS.getVariables();
   if (PVConstraint *PV = dyn_cast<PVConstraint>(CK)) {
-    if ((PV->hasArr(E, 0) || PV->hasNtArr(E, 0)) &&
-        PV->isTopCvarUnsizedArr()) {
+    if (PV->hasArr(E, 0) || PV->hasNtArr(E, 0)) {
       return true;
     }
   }
@@ -75,8 +74,7 @@ bool hasArray(ConstraintVariable *CK, Constraints &CS) {
 bool isInSrcArray(ConstraintVariable *CK, Constraints &CS) {
   auto &E = CS.getVariables();
   if (PVConstraint *PV = dyn_cast<PVConstraint>(CK)) {
-    if ((PV->hasArr(E, 0) || PV->hasNtArr(E, 0)) &&
-        PV->isTopCvarUnsizedArr() && PV->isForValidDecl()) {
+    if ((PV->hasArr(E, 0) || PV->hasNtArr(E, 0)) && PV->isForValidDecl()) {
       return true;
     }
   }
