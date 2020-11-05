@@ -6,7 +6,7 @@ The `3c` tool is a command-line interface to the 3C software for conversion of C
 
 `3c` supports an iterative workflow for converting a C program to Checked C as follows:
 
-1. Run `3c`.  It reads a set of `.c` files and the header files they transitively include (these files may be written in Checked C or, as a special case, plain C), performs a whole-program static analysis to infer as many additions or corrections to Checked C annotations as possible, and writes out the updated files.  `3c` accepts various flags to control the assumptions it makes and the types of changes it makes on a given pass.
+1. Run `3c`.  It reads a set of `.c` files and the header files they transitively include (these files may be written in Checked C or, as a special case, plain C), performs a whole-program static analysis to infer as many additions or corrections to Checked C annotations as possible, and writes out the updated files.  `3c` accepts various options to control the assumptions it makes and the types of changes it makes on a given pass.
 
 2. Review the changes made by `3c` as well as what it didn't change and any diagnostics it produced.  Manually add annotations to help Checked C verify the safety of your existing code, edit your code to make its safety easier to verify, and/or mark parts of the code that you don't want to try to verify with Checked C (because you know they are beyond what Checked C can handle or verifying them just isn't worthwhile to you at the moment).
 
@@ -16,7 +16,7 @@ For a complete, worked example, see [our tutorial](https://github.com/correctcom
 
 ## Basic usage
 
-The task of `3c` is complicated by the fact that the build system for a typical C codebase will call the C compiler once per `.c` file, possibly with different flags for each file (include directories, preprocessor definitions, etc.), and then link all the object files at the end.  A Clang-based whole-program analysis like 3C needs to process all `.c` files at once _with the correct flags for each_.  To achieve this, you get your build system to produce a Clang "compilation database" (a file named `compile_commands.json`) containing the list of `.c` files and the flags for each ([how to do this depends on the build system](../../docs/JSONCompilationDatabase.rst)), and then 3C reads this database.
+The task of `3c` is complicated by the fact that the build system for a typical C codebase will call the C compiler once per `.c` file, possibly with different options for each file (include directories, preprocessor definitions, etc.), and then link all the object files at the end.  A Clang-based whole-program analysis like 3C needs to process all `.c` files at once _with the correct options for each_.  To achieve this, you get your build system to produce a Clang "compilation database" (a file named `compile_commands.json`) containing the list of `.c` files and the options for each ([how to do this depends on the build system](../../docs/JSONCompilationDatabase.rst)), and then 3C reads this database.
 
 However, in a simpler setting, you can manually run `3c` on one or more source files, for example:
 
@@ -30,17 +30,17 @@ The `-alltypes` option causes `3c` to try to infer array types.  We want to make
 
 ## More about file handling and compiler options
 
-As an additional safeguard, `f.checked.c` or `f.checked.h` is not written if it is outside the _base directory_, which defaults to the working directory but can be overridden with the `-base-dir` flag.  This can help ensure that you don't unintentionally modify external libraries, though of course if their header files are not annotated for Checked C, your ability to convert your own program to Checked C may be limited.  (See [below](#annotated-system-headers) about system headers.)  However, there is a bug in the way the base directory check handles `..` path components in `-I` directories and `#include` paths (terrible, we know!), so until we can fix the bug, please avoid using `..` path components (e.g., use `-I` with an absolute path instead).
+As an additional safeguard, `f.checked.c` or `f.checked.h` is not written if it is outside the _base directory_, which defaults to the working directory but can be overridden with the `-base-dir` option.  This can help ensure that you don't unintentionally modify external libraries (though if their header files are not [annotated for Checked C](#annotated-headers), your ability to convert your own program to Checked C may be limited).  However, there is a bug in the way the base directory check handles `..` path components in `-I` directories and `#include` paths (terrible, we know!), so until we can fix the bug, please avoid using `..` path components (e.g., use `-I` with an absolute path instead).
 
-You can ignore the errors about a compilation database not being found.  You can specify a single set of flags to use for all files by prefixing them with `-extra-arg-before=`, for example:
+You can ignore the errors about a compilation database not being found.  You can specify a single set of compiler options to use for all files by prefixing them with `-extra-arg-before=`, for example:
 
 ```
 3c -alltypes -output-postfix=checked -extra-arg-before=-Isome/include/path foo.c bar.c
 ```
 
-(If you were using a compilation database, such "extra" flags would be added to any flags in the database.)
+(If you were using a compilation database, such "extra" options would be added to any compiler options in the database.)
 
-## Annotated system headers
+## Annotated headers
 
 If a Checked C program uses an element (function, variable, type, etc.) from an external library and the only available declaration of the element uses unsafe C pointers, the Checked C code will have to use unsafe pointers to interact with that element.  Having a declaration that uses Checked C annotations (even if the safety of the implementation with respect to those annotations has not been verified) will enable both you and 3C to write better Checked C code.
 
@@ -56,12 +56,8 @@ EOL
 PATH/TO/clang/tools/3c/utils/update-includes.py list
 ```
 
-## Flags
+## Useful 3C-specific options
 
-An incomplete list of useful flags accepted by `3c`:
+An incomplete list of useful options specific to `3c` (ordinary compiler options may be passed via `-extra-arg-before` as stated [above](#more-about-file-handling-and-compiler-options)):
 
 - `-warn-root-cause`: Show information about the _root causes_ that prevent `3c` from converting unsafe pointers (`T *`) to safe ones (`_Ptr<T>`, etc.).
-
-(TODO: Did I miss anything?)
-
-(TODO: Is anything from https://github.com/correctcomputation/checkedc-clang/wiki/Checked-C-Convert#running-checked-c-convert worth including?)
