@@ -12,6 +12,8 @@ The `3c` tool is a command-line interface to the 3C software for conversion of C
 
 3. Repeat until you are satisfied.
 
+For a complete, worked example, see [our tutorial](https://github.com/correctcomputation/checkedc-tiny-bignum-c/tree/v0_3cconvert) (FIXME: Update this link once Kyle and Shilpa get things sorted out).
+
 ## Basic usage
 
 The task of `3c` is complicated by the fact that the build system for a typical C codebase will call the C compiler once per `.c` file, possibly with different flags for each file (include directories, preprocessor definitions, etc.), and then link all the object files at the end.  A Clang-based whole-program analysis like 3C needs to process all `.c` files at once _with the correct flags for each_.  To achieve this, you get your build system to produce a Clang "compilation database" (a file named `compile_commands.json`) containing the list of `.c` files and the flags for each ([how to do this depends on the build system](../../docs/JSONCompilationDatabase.rst)), and then 3C reads this database.
