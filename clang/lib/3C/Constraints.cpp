@@ -24,6 +24,15 @@ static cl::OptionCategory SolverCategory("solver options");
 static cl::opt<bool> DebugSolver("debug-solver",
   cl::desc("Dump intermediate solver state"),
   cl::init(false), cl::cat(SolverCategory));
+static cl::opt<bool>
+  OnlyGreatestSol("only-g-sol",
+                  cl::desc("Perform only greatest solution for Pty Constrains."),
+                  cl::init(false), cl::cat(SolverCategory));
+
+static cl::opt<bool>
+  OnlyLeastSol("only-l-sol",
+               cl::desc("Perform only least solution for Pty Constrains."),
+               cl::init(false), cl::cat(SolverCategory));
 
 Constraint::Constraint(ConstraintKind K, const std::string &Rsn,
                        PersistentSourceLoc *PL): Constraint(K, Rsn) {
@@ -404,14 +413,31 @@ bool Constraints::graph_based_solve() {
   // Now solve PtrType constraints
   if (res && AllTypes) {
     env.doCheckedSolve(false);
+    bool RegularSolve = !(OnlyGreatestSol || OnlyLeastSol);
 
-    // Step 1: Greatest solution
-    res = do_solve(SolPtrTypCG, Empty, env, this, false, nullptr, Conflicts);
+    if (OnlyLeastSol) {
+      // Do only least solution.
+      // First reset ptr solution to NTArr.
+      std::set<VarAtom *> rest = env.resetSolution(
+        [](VarAtom *VA) -> bool {
+          // We want to reset solution for all pointers.
+          return true;
+        },
+        getNTArr());
+      res = do_solve(SolPtrTypCG, Empty, env, this, true, nullptr, Conflicts);
+    } else if (OnlyGreatestSol) {
+      // Do only greatest solution
+      res = do_solve(SolPtrTypCG, Empty, env, this, false, nullptr, Conflicts);
+    } else {
+      // Regular solve
+      // Step 1: Greatest solution
+      res = do_solve(SolPtrTypCG, Empty, env, this, false, nullptr, Conflicts);
+    }
 
 
     // Step 2: Reset all solutions but for function params,
     // and compute the least.
-    if (res) {
+    if (res && RegularSolve) {
 
       // We want to find all local variables with an upper bound that provide a
       // lower bound for return variables that are not otherwise bounded.

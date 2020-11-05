@@ -1355,7 +1355,9 @@ static void createAtomGeq(Constraints &CS, Atom *L, Atom *R, std::string &Rsn,
         // Note: reversal.
         CS.addConstraint(CS.createGeq(R, L, Rsn, PSL, true));
       } else {
+        // Add edges both ways.
         CS.addConstraint(CS.createGeq(L, R, Rsn, PSL, true));
+        CS.addConstraint(CS.createGeq(R, L, Rsn, PSL, true));
       }
       CS.addConstraint(CS.createGeq(L, R, Rsn, PSL, false));
       if (doEqType) {

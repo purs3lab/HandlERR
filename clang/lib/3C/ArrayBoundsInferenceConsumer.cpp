@@ -902,8 +902,11 @@ void LengthVarInference::VisitStmt(Stmt *St) {
 // (or any assignments of X to the variables of the same scope as arr) to be
 // the size of arr.
 void LengthVarInference::VisitArraySubscriptExpr(ArraySubscriptExpr *ASE) {
-  assert (CurBB != nullptr && "Array dereference does not belong "
-                              "to any basic block");
+  //assert (CurBB != nullptr && "Array dereference does not belong "
+  //                            "to any basic block");
+  // If this does not belong to any BB, ignore.
+  if (CurBB == nullptr)
+    return;
   // First, get the BoundsKey for the base.
   Expr *BE = ASE->getBase()->IgnoreParenCasts();
 
