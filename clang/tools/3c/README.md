@@ -12,7 +12,7 @@ The `3c` tool is a command-line interface to the 3C software for conversion of C
 
 3. Repeat until you are satisfied.
 
-For a complete, worked example, see [our tutorial](https://github.com/correctcomputation/checkedc-tiny-bignum-c/tree/v0_3cconvert) (FIXME: Update this link once Kyle and Shilpa get things sorted out).
+For a complete, worked example, see [our tutorial](https://github.com/correctcomputation/checkedc-tiny-bignum-c).
 
 The Microsoft `checkedc-clang` wiki has lots of helpful [advice on porting C programs to Checked C](https://github.com/Microsoft/checkedc/wiki/Legacy-Conversion-Tips), not specific to 3C.
 
