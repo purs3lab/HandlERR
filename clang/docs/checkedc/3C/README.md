@@ -2,8 +2,6 @@
 
 The 3C (**C**hecked-**C**-**C**onvert) software facilitates conversion of existing C code to Checked C by automatically inferring as many Checked C annotations as possible and guiding the developer through the process of assigning the remaining ones.  3C aims to provide the first feasible way for organizations with large legacy C codebases (that they don't want to drop everything to rewrite in a better language) to comprehensively verify their code's spatial memory safety.
 
-(TODO)
-
 This document describes 3C in general.  The inference logic is implemented in the [`clang/lib/3C` directory](../../lib/3C) in the form of a library that can potentially be used in multiple contexts.  As of November 2020, the only way to use 3C is via the `3c` command line tool in the [`clang/tools/3c` directory](../../tools/3c); its usage is documented in [the readme there](../../tools/3c/README.md).  There is also code for a custom build of `clangd` named `clangd3c` that can be used to interactively convert code from within an IDE, but it is currently unmaintained and fails to build and thus we have disabled the build target; we may revive `clangd3c` at some point.
 
 ## What 3C users should know about the development process
