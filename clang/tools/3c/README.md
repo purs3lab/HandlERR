@@ -26,6 +26,10 @@ However, in a simpler setting, you can manually run `3c` on one or more source f
 
 This will write the new version of each file `f.c` to `f.checked.c` in the same directory (or `f.h` to `f.checked.h`).  If `f.checked.c` would be identical to `f.c`, it is not created.
 
+The `-alltypes` option causes `3c` to try to infer array types.  We want to make this the default but haven't done so yet because it breaks some things.
+
+## More about file handling and compiler options
+
 As an additional safeguard, `f.checked.c` or `f.checked.h` is not written if it is outside the _base directory_, which defaults to the working directory but can be overridden with the `-base-dir` flag.  This can help ensure that you don't unintentionally modify external libraries, though of course if their header files are not annotated for Checked C, your ability to convert your own program to Checked C may be limited.  (See [below](#annotated-system-headers) about system headers.)  However, there is a bug in the way the base directory check handles `..` path components in `-I` directories and `#include` paths (terrible, we know!), so until we can fix the bug, please avoid using `..` path components (e.g., use `-I` with an absolute path instead).
 
 You can ignore the errors about a compilation database not being found.  You can specify a single set of flags to use for all files by prefixing them with `-extra-arg-before=`, for example:
@@ -36,13 +40,11 @@ You can ignore the errors about a compilation database not being found.  You can
 
 (If you were using a compilation database, such "extra" flags would be added to any flags in the database.)
 
-The `-alltypes` option causes `3c` to try to infer array types.  We want to make this the default but haven't done so yet because it breaks some things.
-
 ## Annotated system headers
 
-As mentioned above, if a Checked C program uses an external library, the library's headers must have Checked C annotations on the declarations of the elements (functions, variables, types, etc.) used by the program in order for the program to access those items safely.  Elements with unannotated declarations can only be accessed unsafely.
+If a Checked C program uses an element (function, variable, type, etc.) from an external library and the only available declaration of the element uses unsafe C pointers, the Checked C code will have to use unsafe pointers to interact with that element.  Having a declaration that uses Checked C annotations (even if the safety of the implementation with respect to those annotations has not been verified) will enable both you and 3C to write better Checked C code.
 
-In the future, we may have some scheme analogous to [DefinitelyTyped](https://definitelytyped.org/) to distribute Checked C headers for existing C libraries.  In the meantime, the Checked C project maintains annotated versions of the most common "system" header files (`stdio.h`, etc.).  The annotated header files do not include all elements, but they `#include` your system's original header files, so your program can still use unannotated elements unsafely.  If you followed the [build instructions](../../docs/checkedc/3C/README.md), these header files should be present in `llvm/projects/checkedc-wrapper/checkedc/include`.
+In the future, we may have some scheme analogous to [DefinitelyTyped](https://definitelytyped.org/) to distribute Checked C headers for existing C libraries.  In the meantime, the Checked C project maintains annotated versions of the most common "system" header files (`stdio.h`, etc.).  The annotated header files do not include all elements, but they `#include` your system's original header files, so your program can still use unannotated elements (though it may have to use unsafe pointers to do so).  If you followed the [build instructions](../../docs/checkedc/3C/README.md), the annotated header files should be present in `llvm/projects/checkedc-wrapper/checkedc/include`.  The Microsoft `checkedc-clang` wiki has [a bit more information about these header files](https://github.com/Microsoft/checkedc-clang/wiki/Checked-C-clang-user-manual#header-files).
 
 Currently, the annotated header files are named with a `_checked.h` suffix, e.g., `stdio_checked.h`, so that `stdio_checked.h` can `#include <stdio.h>` without causing infinite recursion.  We hope to switch to `#include_next` and remove the suffix soon.  In the meantime, you have to modify your code to `#include <stdio_checked.h>` instead of `stdio.h` and so forth.  The `clang/tools/3c/utils/update-includes.py` tool will do this for you.  It takes one argument: the name of a file containing a list of paths of `.c` and `.h` files to be updated.  In the example of the previous section, you would run:
 
