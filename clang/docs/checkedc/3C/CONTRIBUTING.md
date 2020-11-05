@@ -24,8 +24,6 @@ ninja check-clang-3c
 
 This command will build everything needed that hasn't already been built, run the test suite, report success or failure (exit 0 or 1, so you can use it in scripts), and display some information about any failures, which may or may not be enough for you to understand what went wrong.
 
-**(TODO: Describe the custom method.)**
-
 ## Coding guidelines
 
 Please follow [LLVM coding standards](https://llvm.org/docs/CodingStandards.html#name-types-functions-variables-and-enumerators-properly) in your code. Specifically:
