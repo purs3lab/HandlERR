@@ -28,8 +28,21 @@ private:
   Rewriter &Writer;
   ConstraintResolver CR;
 
-  bool needCasting(ConstraintVariable *, ConstraintVariable *);
-  std::string getCastString(ConstraintVariable *Src, ConstraintVariable *Dst);
-  void surroundByCast(const std::string &, Expr *);
+  enum CastNeeded { NO_CAST = 0, CAST_TO_CHECKED, CAST_TO_WILD };
+
+  CastNeeded needCasting(const ConstraintVariable *SrcInt,
+                         const ConstraintVariable *SrcExt,
+                         const ConstraintVariable *DstInt,
+                         const ConstraintVariable *DstExt);
+
+  std::string getCastString(const ConstraintVariable *SrcInt,
+                            const ConstraintVariable *SrcExt,
+                            const ConstraintVariable *DstInt,
+                            const ConstraintVariable *DstExt);
+
+  void surroundByCast(const ConstraintVariable *SrcInt,
+                      const ConstraintVariable *SrcExt,
+                      const ConstraintVariable *DstInt,
+                      const ConstraintVariable *DstExt, Expr *);
 };
 #endif // LLVM_CLANG_3C_CASTPLACEMENT_H

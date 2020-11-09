@@ -86,7 +86,7 @@ PointerVariableConstraint::getNamedNonPtrPVConstraint(StringRef Name,
 
 PointerVariableConstraint::PointerVariableConstraint(
     PointerVariableConstraint *Ot, Constraints &CS)
-    : ConstraintVariable(ConstraintVariable::PointerVariable, Ot->BaseType,
+    : ConstraintVariable(ConstraintVariable::PointerVariable, Ot->OriginalType,
                          Ot->Name),
       FV(nullptr), PartOfFuncPrototype(Ot->PartOfFuncPrototype) {
   this->ArrSizes = Ot->ArrSizes;

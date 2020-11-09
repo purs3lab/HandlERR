@@ -18,47 +18,71 @@
 using namespace clang;
 
 bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
-  auto *FD = dyn_cast_or_null<FunctionDecl>(CE->getCalleeDecl());
-  if (FD && Rewriter::isRewritable(CE->getExprLoc())) {
-    // Get the constraint variable for the function.
-    FVConstraint *FV = Info.getFuncConstraint(FD, Context);
-    // Function has no definition i.e., external function.
+  // Get the constraint variable for the function.
+  Decl *CalleeDecl = CE->getCalleeDecl();
+  FVConstraint *FV = nullptr;
+  FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(CalleeDecl);
+  if (FD) {
+    FV = Info.getFuncConstraint(FD, Context);
     assert("Function has no definition" && FV != nullptr);
+  } else if (isa_and_nonnull<VarDecl>(CalleeDecl)) {
+    CVarOption Opt = Info.getVariable(cast<VarDecl>(CalleeDecl), Context);
+    if (Opt.hasValue()) {
+      if (isa<PVConstraint>(Opt.getValue()))
+        FV = cast<PVConstraint>(Opt.getValue()).getFV();
+      else
+        FV = dyn_cast<FVConstraint>(&Opt.getValue());
+    }
+  }
 
-    // Did we see this function in another file?
-    auto Fname = FD->getNameAsString();
-    if (!ConstraintResolver::canFunctionBeSkipped(Fname)) {
-      // Now we need to check the type of the arguments and corresponding
-      // parameters to see if any explicit casting is needed.
-      ProgramInfo::CallTypeParamBindingsT TypeVars;
-      if (Info.hasTypeParamBindings(CE, Context))
-        TypeVars = Info.getTypeParamBindings(CE, Context);
-      unsigned PIdx = 0;
-      for (const auto &A : CE->arguments()) {
-        if (PIdx < FD->getNumParams()) {
-          // Avoid adding incorrect casts to generic function arguments by
-          // removing implicit casts when on arguments with a consistently
-          // used generic type.
-          Expr *ArgExpr = A;
+  if (FV && Rewriter::isRewritable(CE->getExprLoc())) {
+    // Now we need to check the type of the arguments and corresponding
+    // parameters to see if any explicit casting is needed.
+    ProgramInfo::CallTypeParamBindingsT TypeVars;
+    if (Info.hasTypeParamBindings(CE, Context))
+      TypeVars = Info.getTypeParamBindings(CE, Context);
+
+    // Cast on arguments
+    unsigned PIdx = 0;
+    for (const auto &A : CE->arguments()) {
+      if (PIdx < FV->numParams()) {
+        // Avoid adding incorrect casts to generic function arguments by
+        // removing implicit casts when on arguments with a consistently
+        // used generic type.
+        Expr *ArgExpr = A;
+        if (FD) {
           const TypeVariableType *TyVar =
-              getTypeVariableType(FD->getParamDecl(PIdx));
+            getTypeVariableType(FD->getParamDecl(PIdx));
           if (TyVar && TypeVars.find(TyVar->GetIndex()) != TypeVars.end() &&
               TypeVars[TyVar->GetIndex()] != nullptr)
             ArgExpr = ArgExpr->IgnoreImpCasts();
+        }
 
-          CVarSet ArgumentConstraints = CR.getExprConstraintVars(ArgExpr);
-          // TODO: Casting should be based on external param constraint
-          ConstraintVariable *ParameterC = FV->getParamVar(PIdx);
-          for (auto *ArgumentC : ArgumentConstraints) {
-            if (needCasting(ArgumentC, ParameterC)) {
-              // We expect the cast string to end with "(".
-              std::string CastString = getCastString(ArgumentC, ParameterC);
-              surroundByCast(CastString, A);
-              break;
-            }
+        CVarSet ArgumentConstraints = CR.getExprConstraintVars(ArgExpr);
+        // TODO: Casting should be based on external param constraint
+        ConstraintVariable *ParamInt = FV->getInternalParamVar(PIdx);
+        ConstraintVariable *ParamExt = FV->getParamVar(PIdx);
+        for (auto *ArgumentC : ArgumentConstraints) {
+          if (needCasting(ArgumentC, ArgumentC, ParamInt, ParamExt) != NO_CAST) {
+            surroundByCast(ArgumentC, ArgumentC, ParamInt, ParamExt, A);
+            break;
           }
         }
-        PIdx++;
+      }
+      PIdx++;
+    }
+
+    // Cast on return
+    CVarSet ArgumentConstraints = CR.getExprConstraintVars(CE);
+    ConstraintVariable *RetInt = FV->getInternalReturnVar();
+    ConstraintVariable *RetExt = FV->getReturnVar();
+    for (auto *ArgumentC : ArgumentConstraints)  {
+      // Order of ParameterC and ArgumentC is reversed from when inserting
+      // parameter casts because assignment now goes from returned to its
+      // local use.
+      if (needCasting(RetInt, RetExt, ArgumentC, ArgumentC) != NO_CAST) {
+        surroundByCast(RetInt, RetExt, ArgumentC, ArgumentC,  CE);
+        break;
       }
     }
   }
@@ -67,47 +91,68 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
 
 // Check whether an explicit casting is needed when the pointer represented
 // by src variable is assigned to dst.
-bool CastPlacementVisitor::needCasting(ConstraintVariable *Src,
-                                       ConstraintVariable *Dst) {
+CastPlacementVisitor::CastNeeded
+CastPlacementVisitor::needCasting(const ConstraintVariable *SrcInt,
+                                  const ConstraintVariable *SrcExt,
+                                  const ConstraintVariable *DstInt,
+                                  const ConstraintVariable *DstExt) {
   const auto &E = Info.getConstraints().getVariables();
-  // Check if the src is a checked type.
-  if (Src->isChecked(E)) {
-    // If Dst has an itype, Src must have exactly the same checked type. If this
-    // is not the case, we must insert a case.
-    if (Dst->hasItype())
-      return !Dst->solutionEqualTo(Info.getConstraints(), Src);
+  bool SIChecked = SrcInt->isChecked(E) && !SrcInt->hasItype();
+  bool SEChecked = SrcExt->isChecked(E);
+  bool DIChecked = DstInt->isChecked(E) && !DstInt->hasItype();
+  bool DEChecked = DstExt->isChecked(E);
 
-    // Is Dst Wild?
-    // TODO: The Dinfo == WILD comparison seems to be the cause of a cast
-    //       insertion bug. Can it be removed?
-    if (!Dst->isChecked(E))
-      return true;
+  // Cast prefix is only the part of the cast to the left of the expression
+  // being cast. It does not contain the required closing parenthesis.
+  if (SEChecked && SIChecked && !DEChecked) {
+    // C-style cast to wild
+    return CastNeeded::CAST_TO_WILD;
+  } else if ( !SEChecked && DIChecked && DEChecked) {
+    // _Assume_bounds_cast to checked
+    return CastNeeded::CAST_TO_CHECKED;
   }
-  return false;
+  return CastNeeded::NO_CAST;
 }
 
-// Get the type name to insert for casting.
-std::string CastPlacementVisitor::getCastString(ConstraintVariable *Src,
-                                                ConstraintVariable *Dst) {
-  assert(needCasting(Src, Dst) && "No casting needed.");
-  return "(" + Dst->getRewritableOriginalTy() + ")";
+std::string
+CastPlacementVisitor::getCastString(const ConstraintVariable *SrcInt,
+                                    const ConstraintVariable *SrcExt,
+                                    const ConstraintVariable *DstInt,
+                                    const ConstraintVariable *DstExt) {
+  CastNeeded CastType = needCasting(SrcInt, SrcExt, DstInt, DstExt);
+  const auto &E = Info.getConstraints().getVariables();
+  switch (CastType) {
+    case CAST_TO_WILD:
+      return "((" + DstExt->getRewritableOriginalTy() + ")";
+    case CAST_TO_CHECKED:
+      return "_Assume_bounds_cast<" + DstExt->mkString(E, false) + ">(";
+    default:
+      llvm_unreachable("No casting needed");
+  }
 }
 
-void CastPlacementVisitor::surroundByCast(const std::string &CastPrefix,
+
+void CastPlacementVisitor::surroundByCast(const ConstraintVariable *SrcInt,
+                                          const ConstraintVariable *SrcExt,
+                                          const ConstraintVariable *DstInt,
+                                          const ConstraintVariable *DstExt,
                                           Expr *E) {
+  std::string CastPrefix = getCastString(SrcInt, SrcExt, DstInt, DstExt);
+
+  // TODO: Is this spacial handling for casts-on-casts still required?
   // If E is already a cast expression, we will try to rewrite the cast instead
   // of adding a new expression.
-  if (auto *CE = dyn_cast<CStyleCastExpr>(E->IgnoreParens())) {
-    SourceRange CastTypeRange(CE->getLParenLoc(), CE->getRParenLoc());
-    Writer.ReplaceText(CastTypeRange, CastPrefix);
-  } else {
+  //if (auto *CE = dyn_cast<CStyleCastExpr>(E->IgnoreParens())) {
+  //  SourceRange CastTypeRange(CE->getLParenLoc(), CE->getRParenLoc());
+  //  Writer.ReplaceText(CastTypeRange, CastString);
+  //} else {
     bool FrontRewritable = Writer.isRewritable(E->getBeginLoc());
     bool EndRewritable = Writer.isRewritable(E->getEndLoc());
     if (FrontRewritable && EndRewritable) {
-      bool FFail = Writer.InsertTextAfterToken(E->getEndLoc(), ")");
-      bool EFail = Writer.InsertTextBefore(E->getBeginLoc(), "(" + CastPrefix);
+      bool BFail = Writer.InsertTextBefore(E->getBeginLoc(), CastPrefix);
+      bool EFail = Writer.InsertTextAfterToken(E->getEndLoc(), ")");
       assert("Locations were rewritable, fail should not be possible." &&
-             !FFail && !EFail);
+             !BFail && !EFail);
     } else {
       // This means we failed to insert the text at the end of the RHS.
       // This can happen because of Macro expansion.
@@ -117,9 +162,9 @@ void CastPlacementVisitor::surroundByCast(const std::string &CastPrefix,
       auto NewCRA = clang::Lexer::makeFileCharRange(
           CRA, Context->getSourceManager(), Context->getLangOpts());
       std::string SrcText = clang::tooling::getText(CRA, *Context);
-      // Only insert if there is anything to write.
-      if (!SrcText.empty())
-        Writer.ReplaceText(NewCRA, "(" + CastPrefix + SrcText + ")");
+      assert("Cannot insert cast! Perhaps something funny with macros?" &&
+             !SrcText.empty());
+      Writer.ReplaceText(NewCRA, CastPrefix + SrcText + ")");
     }
-  }
+  //}
 }
