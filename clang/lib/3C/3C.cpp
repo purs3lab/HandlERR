@@ -403,7 +403,11 @@ bool _3CInterface::solveConstraints() {
   if (DumpIntermediate)
     GlobalProgramInfo.dump();
 
+  auto &PStats = GlobalProgramInfo.getPerfStats();
+
+  PStats.startConstraintSolverTime();
   runSolver(GlobalProgramInfo, FilePaths);
+  PStats.endConstraintSolverTime();
 
   if (Verbose)
     errs() << "Constraints solved\n";
@@ -487,8 +491,10 @@ bool _3CInterface::solveConstraints() {
 
 bool _3CInterface::writeConvertedFileToDisk(const std::string &FilePath) {
   std::lock_guard<std::mutex> Lock(InterfaceMutex);
+  bool RetVal = false;
   if (std::find(SourceFiles.begin(), SourceFiles.end(), FilePath) !=
       SourceFiles.end()) {
+    RetVal = true;
     std::vector<std::string> SourceFiles;
     SourceFiles.clear();
     SourceFiles.push_back(FilePath);
@@ -502,11 +508,12 @@ bool _3CInterface::writeConvertedFileToDisk(const std::string &FilePath) {
     if (RewriteTool) {
       int ToolExitCode = Tool.run(RewriteTool.get());
       if (ToolExitCode != 0)
-        return false;
+        RetVal = false;
     }
-    return true;
   }
-  return false;
+  GlobalProgramInfo.getPerfStats().endTotalTime();
+  GlobalProgramInfo.getPerfStats().startTotalTime();
+  return RetVal;
 }
 
 bool _3CInterface::writeAllConvertedFilesToDisk() {
@@ -525,6 +532,8 @@ bool _3CInterface::writeAllConvertedFilesToDisk() {
   } else
     llvm_unreachable("No action");
 
+  GlobalProgramInfo.getPerfStats().endTotalTime();
+  GlobalProgramInfo.getPerfStats().startTotalTime();
   return true;
 }
 

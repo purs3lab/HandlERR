@@ -17,6 +17,60 @@
 
 using namespace clang;
 
+void PerformanceStats::startCompileTime() {
+  CompileTimeSt = clock();
+}
+
+void PerformanceStats::endCompileTime() {
+  CompileTime += getTimeSpentInSeconds(CompileTimeSt);
+}
+
+void PerformanceStats::startConstraintBuilderTime() {
+  ConstraintBuilderTimeSt = clock();
+}
+
+void PerformanceStats::endConstraintBuilderTime() {
+  ConstraintBuilderTime += getTimeSpentInSeconds(ConstraintBuilderTimeSt);
+}
+
+void PerformanceStats::startConstraintSolverTime() {
+  ConstraintSolverTimeSt = clock();
+}
+
+void PerformanceStats::endConstraintSolverTime() {
+  ConstraintSolverTime += getTimeSpentInSeconds(ConstraintSolverTimeSt);
+}
+
+void PerformanceStats::startArrayBoundsInferenceTime() {
+  ArrayBoundsInferenceTimeSt = clock();
+}
+
+void PerformanceStats::endArrayBoundsInferenceTime() {
+  ArrayBoundsInferenceTime += getTimeSpentInSeconds(ArrayBoundsInferenceTimeSt);
+}
+
+void PerformanceStats::startRewritingTime() {
+  RewritingTimeSt = clock();
+}
+
+void PerformanceStats::endRewritingTime() {
+  RewritingTime += getTimeSpentInSeconds(RewritingTimeSt);
+}
+
+void PerformanceStats::startTotalTime() {
+  TotalTimeSt = clock();
+}
+
+void PerformanceStats::endTotalTime() {
+  TotalTime += getTimeSpentInSeconds(TotalTimeSt);
+}
+
+void PerformanceStats::printPerformanceStats(raw_ostream &O) {
+  O << TotalTime << "," << ConstraintBuilderTime << ",";
+  O << ConstraintSolverTime << "," << ArrayBoundsInferenceTime;
+  O << "," << RewritingTime << "\n";
+}
+
 ProgramInfo::ProgramInfo() : Persisted(true) {
   ExternalFunctionFVCons.clear();
   StaticFunctionFVCons.clear();
