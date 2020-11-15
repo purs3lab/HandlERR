@@ -23,6 +23,8 @@ static cl::opt<bool> DisableArrH("disable-arr-hu",
 
 void IntermediateToolHook::HandleTranslationUnit(ASTContext &Context) {
   Info.enterCompilationUnit(Context);
+  Info.getPerfStats().startArrayBoundsInferenceTime();
   HandleArrayVariablesBoundsDetection(&Context, Info, !DisableArrH);
+  Info.getPerfStats().endArrayBoundsInferenceTime();
   Info.exitCompilationUnit();
 }

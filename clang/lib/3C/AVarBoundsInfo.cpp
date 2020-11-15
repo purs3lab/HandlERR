@@ -485,8 +485,9 @@ bool AVarBoundsInfo::isValidBoundVariable(clang::Decl *D) {
     return true;
   } else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
     return !VD->getNameAsString().empty();
-  } else if(FieldDecl *FD = dyn_cast<FieldDecl>(D)) {
-    return !FD->getNameAsString().empty();
+  } else if (FieldDecl *FD = dyn_cast<FieldDecl>(D)) {
+    //return !FD->getNameAsString().empty();
+    return true;
   }
   return false;
 }
@@ -1142,6 +1143,9 @@ void AVarBoundsInfo::getBoundsNeededArrPointers(const std::set<BoundsKey> &ArrPt
 // predecessors have bounds.
 bool AVarBoundsInfo::performFlowAnalysis(ProgramInfo *PI) {
   bool RetVal = false;
+  auto &PStats = PI->getPerfStats();
+
+  PStats.startArrayBoundsInferenceTime();
   AvarBoundsInference ABI(this);
   // First get all the pointer vars which are ARRs
   std::set<BoundsKey> ArrPointers;
@@ -1218,7 +1222,7 @@ bool AVarBoundsInfo::performFlowAnalysis(ProgramInfo *PI) {
     ArrNeededBounds = ArrNeededBoundsNew;
   }
 
-
+  PStats.endArrayBoundsInferenceTime();
   return RetVal;
 }
 

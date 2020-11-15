@@ -24,6 +24,54 @@
 #include "3CInteractiveData.h"
 
 
+class PerformanceStats {
+public:
+  double CompileTime;
+  double ConstraintBuilderTime;
+  double ConstraintSolverTime;
+  double ArrayBoundsInferenceTime;
+  double RewritingTime;
+  double TotalTime;
+
+  PerformanceStats() {
+    CompileTime = ConstraintBuilderTime = 0;
+    ConstraintSolverTime = ArrayBoundsInferenceTime = 0;
+    RewritingTime = TotalTime = 0;
+
+    CompileTimeSt = ConstraintBuilderTimeSt = 0;
+    ConstraintSolverTimeSt = ArrayBoundsInferenceTimeSt = 0;
+    RewritingTimeSt = TotalTimeSt = 0;
+  }
+
+  void startCompileTime();
+  void endCompileTime();
+
+  void startConstraintBuilderTime();
+  void endConstraintBuilderTime();
+
+  void startConstraintSolverTime();
+  void endConstraintSolverTime();
+
+  void startArrayBoundsInferenceTime();
+  void endArrayBoundsInferenceTime();
+
+  void startRewritingTime();
+  void endRewritingTime();
+
+  void startTotalTime();
+  void endTotalTime();
+
+  void printPerformanceStats(raw_ostream &O);
+
+private:
+  clock_t CompileTimeSt;
+  clock_t ConstraintBuilderTimeSt;
+  clock_t ConstraintSolverTimeSt;
+  clock_t ArrayBoundsInferenceTimeSt;
+  clock_t RewritingTimeSt;
+  clock_t TotalTimeSt;
+
+};
 class ProgramVariableAdder {
 public:
   virtual void addVariable(clang::DeclaratorDecl *D,
@@ -106,6 +154,8 @@ public:
   Constraints &getConstraints() { return CS;  }
   AVarBoundsInfo &getABoundsInfo() { return ArrBInfo; }
 
+  PerformanceStats &getPerfStats() { return PerfS; }
+
   ConstraintsInfo &getInterimConstraintState() {
     return CState;
   }
@@ -137,6 +187,9 @@ private:
   // Map with the similar purpose as the Variables map, this stores constraint
   // variables and set of bounds key for non-declaration expressions.
   std::map<PersistentSourceLoc, CSetBkeyPair> ExprConstraintVars;
+
+  //Performance stats
+  PerformanceStats PerfS;
 
   // Constraint system.
   Constraints CS;

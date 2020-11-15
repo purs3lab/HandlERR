@@ -238,6 +238,8 @@ _3CInterface::_3CInterface(const struct _3COptions &CCopt,
     errs() << "If rewriting more than one , can't output to stdout\n";
     assert(false && "Rewriting more than one files requires OutputPostfix");
   }
+
+  GlobalProgramInfo.getPerfStats().startTotalTime();
 }
 
 bool _3CInterface::BuildInitialConstraints() {
@@ -277,7 +279,11 @@ bool _3CInterface::SolveConstraints(bool ComputeInterimState) {
   if (DumpIntermediate)
     GlobalProgramInfo.dump();
 
+  auto &PStats = GlobalProgramInfo.getPerfStats();
+
+  PStats.startConstraintSolverTime();
   runSolver(GlobalProgramInfo, FilePaths);
+  PStats.endConstraintSolverTime();
 
   if (Verbose)
     outs() << "Constraints solved\n";
@@ -380,10 +386,15 @@ bool _3CInterface::WriteConvertedFileToDisk(const std::string &FilePath) {
         newFrontendActionFactoryA<RewriteAction<RewriteConsumer,
     ProgramInfo>>(GlobalProgramInfo);
 
+    GlobalProgramInfo.getPerfStats().endTotalTime();
+    GlobalProgramInfo.getPerfStats().startTotalTime();
+
     if (RewriteTool)
       Tool.run(RewriteTool.get());
     return true;
   }
+  GlobalProgramInfo.getPerfStats().endTotalTime();
+  GlobalProgramInfo.getPerfStats().startTotalTime();
   return false;
 
 }
@@ -402,6 +413,8 @@ bool _3CInterface::WriteAllConvertedFilesToDisk() {
   else
     llvm_unreachable("No action");
 
+  GlobalProgramInfo.getPerfStats().endTotalTime();
+  GlobalProgramInfo.getPerfStats().startTotalTime();
   return true;
 }
 
