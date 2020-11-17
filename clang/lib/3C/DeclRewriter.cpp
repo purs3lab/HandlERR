@@ -524,10 +524,12 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   // Get rewritten parameter variable declarations
   std::vector<std::string> ParmStrs;
   for (unsigned I = 0; I < Defnc->numParams(); ++I) {
-    PVConstraint *Defn = Defnc->getParamVar(I);
+    PVConstraint *ArgCV = Defnc->getParamVar(I);
+    PVConstraint *ParamCV = Defnc->getInternalParamVar(I);
     ParmVarDecl *PVDecl = Definition->getParamDecl(I);
     std::string Type, IType;
-    this->buildDeclVar(Defn, PVDecl, Type, IType, RewriteParams, RewriteReturn);
+    this->buildDeclVar(ParamCV, ArgCV, PVDecl, Type, IType, RewriteParams,
+                       RewriteReturn);
     ParmStrs.push_back(Type + IType);
   }
 
@@ -540,10 +542,10 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   }
 
   // Get rewritten return variable
-  PVConstraint *Defn = Defnc->getReturnVar();
   std::string ReturnVar, ItypeStr;
-  this->buildDeclVar(Defn, FD, ReturnVar, ItypeStr, RewriteParams,
-                     RewriteReturn);
+  // FIXME: need to split internal/external CV for return
+  this->buildDeclVar(Defnc->getInternalReturnVar(), Defnc->getReturnVar(), FD,
+                     ReturnVar, ItypeStr, RewriteParams, RewriteReturn);
 
   // If the return is a function pointer, we need to rewrite the whole
   // declaration even if no actual changes were made to the parameters. It could
@@ -619,17 +621,20 @@ void FunctionDeclBuilder::buildItypeDecl(PVConstraint *Defn,
   return;
 }
 
-void FunctionDeclBuilder::buildDeclVar(PVConstraint *Defn, DeclaratorDecl *Decl,
-                                       std::string &Type, std::string &IType,
-                                       bool &RewriteParm, bool &RewriteRet) {
+void
+FunctionDeclBuilder::buildDeclVar(PVConstraint *ParamCV, PVConstraint *ArgCV,
+                                  DeclaratorDecl *Decl, std::string &Type,
+                                  std::string &IType, bool &RewriteParm,
+                                  bool &RewriteRet) {
   const auto &Env = Info.getConstraints().getVariables();
-  if (isAValidPVConstraint(Defn) && Defn->isChecked(Env)) {
-    if (Defn->anyChanges(Env) && !Defn->anyArgumentIsWild(Env)) {
-      buildCheckedDecl(Defn, Decl, Type, IType, RewriteParm, RewriteRet);
+  if (isAValidPVConstraint(ArgCV) && ArgCV->isChecked(Env)) {
+    bool AnyChanges = ArgCV->anyChanges(Env);
+    if (AnyChanges && ParamCV->isChecked(Env)) {
+      buildCheckedDecl(ArgCV, Decl, Type, IType, RewriteParm, RewriteRet);
       return;
     }
-    if (Defn->anyChanges(Env)) {
-      buildItypeDecl(Defn, Decl, Type, IType, RewriteParm, RewriteRet);
+    if (AnyChanges) {
+      buildItypeDecl(ArgCV, Decl, Type, IType, RewriteParm, RewriteRet);
       return;
     }
   }
@@ -639,9 +644,9 @@ void FunctionDeclBuilder::buildDeclVar(PVConstraint *Defn, DeclaratorDecl *Decl,
     Type = getSourceText(Decl->getSourceRange(), *Context);
     IType = "";
   } else {
-    Type = Defn->getOriginalTy() + " ";
+    Type = ArgCV->getOriginalTy() + " ";
     IType =
-        getExistingIType(Defn) + ABRewriter.getBoundsString(Defn, Decl, false);
+      getExistingIType(ArgCV) + ABRewriter.getBoundsString(ArgCV, Decl, false);
   }
 }
 

@@ -574,10 +574,12 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
     NewCV = F;
     // Add mappings from the parameters PLoc to the constraint variables for
     // the parameters.
-    for (unsigned i = 0; i < FD->getNumParams(); i++) {
-      ParmVarDecl *PVD = FD->getParamDecl(i);
+    for (unsigned I = 0; I < FD->getNumParams(); I++) {
+      ParmVarDecl *PVD = FD->getParamDecl(I);
       const Type *Ty = PVD->getType().getTypePtr();
-      ConstraintVariable *PV = F->getParamVar(i);
+      // TODO: this needs to be the internal representation for the parameter
+      //       constraint
+      ConstraintVariable *PV = F->getInternalParamVar(I);
       unifyIfTypedef(Ty, *AstContext, PVD, dyn_cast<PVConstraint>(PV));
       PV->setValidDecl();
       PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(PVD, *AstContext);
@@ -774,9 +776,10 @@ CVarOption ProgramInfo::getVariable(clang::Decl *D, clang::ASTContext *C) {
     // Get corresponding FVConstraint vars.
     FVConstraint *FunFVar = getFuncFVConstraint(FD, C);
     assert(FunFVar != nullptr && "Unable to find function constraints.");
-    return CVarOption(*FunFVar->getParamVar(PIdx));
-  }
-  if (FunctionDecl *FD = dyn_cast<FunctionDecl>(D)) {
+    // TODO: use internal constraint
+    return CVarOption(*FunFVar->getInternalParamVar(PIdx));
+
+  } else if (FunctionDecl *FD = dyn_cast<FunctionDecl>(D)) {
     FVConstraint *FunFVar = getFuncFVConstraint(FD, C);
     if (FunFVar == nullptr) {
       llvm::errs() << "No fun constraints for " << FD->getName() << "?!\n";

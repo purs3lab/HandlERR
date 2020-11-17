@@ -230,6 +230,7 @@ public:
               Deferred.push_back(ArgumentConstraints);
             } else if (I < TargetFV->numParams()) {
               // constrain the arg CV to the param CV
+              // TODO: this needs to be the external constraint variable
               ConstraintVariable *ParameterDC = TargetFV->getParamVar(I);
               // Do not handle bounds key here because we will be
               // doing context-sensitive assignment next.
@@ -292,8 +293,9 @@ public:
       if (FVConstraint *FV = dyn_cast<FVConstraint>(&CVOpt.getValue())) {
         // This is to ensure that the return type of the function is same
         // as the type of return expression.
-        constrainConsVarGeq(FV->getReturnVar(), RconsVar, Info.getConstraints(),
-                            &PL, Same_to_Same, false, &Info);
+        constrainConsVarGeq(FV->getInternalReturnVar(), RconsVar,
+                            Info.getConstraints(), &PL, Same_to_Same, false,
+                            &Info);
       }
     }
     return true;

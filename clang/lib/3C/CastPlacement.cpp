@@ -47,6 +47,7 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
             ArgExpr = ArgExpr->IgnoreImpCasts();
 
           CVarSet ArgumentConstraints = CR.getExprConstraintVars(ArgExpr);
+          // TODO: Casting should be based on external param constraint
           ConstraintVariable *ParameterC = FV->getParamVar(PIdx);
           for (auto *ArgumentC : ArgumentConstraints) {
             if (needCasting(ArgumentC, ParameterC)) {

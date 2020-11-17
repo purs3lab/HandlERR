@@ -413,11 +413,17 @@ typedef struct {
 class FunctionVariableConstraint : public ConstraintVariable {
 private:
   FunctionVariableConstraint(FunctionVariableConstraint *Ot, Constraints &CS);
+  struct ParamArgPair {
+    PVConstraint *ParameterConstraint;
+    PVConstraint *ArgumentsConstraint;
+  };
+
   // N constraints on the return value of the function.
-  PVConstraint *ReturnVar;
+  ParamArgPair ReturnVar;
   // A vector of K sets of N constraints on the parameter values, for
   // K parameters accepted by the function.
-  std::vector<PVConstraint *> ParamVars;
+  std::vector<ParamArgPair> ParamVars;
+
   // Storing of parameters in the case of untyped prototypes
   std::vector<ParamDeferment> DeferredParams;
   // File name in which this declaration is found.
@@ -443,7 +449,11 @@ public:
                              std::string N, ProgramInfo &I,
                              const clang::ASTContext &C);
 
-  PVConstraint *getReturnVar() const { return ReturnVar; }
+  PVConstraint *getReturnVar() const { return ReturnVar.ArgumentsConstraint; }
+
+  PVConstraint *getInternalReturnVar() const {
+    return ReturnVar.ParameterConstraint;
+  }
 
   const std::vector<ParamDeferment> &getDeferredParams() const {
     return DeferredParams;
@@ -465,9 +475,15 @@ public:
   void mergeDeclaration(ConstraintVariable *FromCV, ProgramInfo &I,
                         std::string &ReasonFailed) override;
 
+  // TODO: naming
   PVConstraint *getParamVar(unsigned I) const {
     assert(I < ParamVars.size());
-    return ParamVars.at(I);
+    return ParamVars.at(I).ArgumentsConstraint;
+  }
+
+  PVConstraint *getInternalParamVar(unsigned I) const {
+    assert(I < ParamVars.size());
+    return ParamVars.at(I).ParameterConstraint;
   }
 
   bool hasItype() const override;
