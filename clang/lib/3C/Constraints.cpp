@@ -65,17 +65,12 @@ void Constraints::editConstraintHook(Constraint *C) {
           return;
         }
         // Make this checked only if the const atom is other than Ptr.
-        if (RHSA) {
-          if (!dyn_cast<PtrAtom>(E->getLHS())) {
-            E->setChecked(getWild());
-            E->setReason(POINTER_IS_ARRAY_REASON);
-          }
+        if (RHSA && !isa<PtrAtom>(E->getLHS())) {
+          addConstraint(createGeq(RHSA, getWild(), POINTER_IS_ARRAY_REASON));
         } else {
           assert(LHSA && "Adding constraint between constants?!");
-          if (!dyn_cast<PtrAtom>(E->getRHS())) {
-            E->setChecked(getWild());
-            E->setReason(POINTER_IS_ARRAY_REASON);
-          }
+          if (!isa<PtrAtom>(E->getRHS()))
+            addConstraint(createGeq(LHSA, getWild(), POINTER_IS_ARRAY_REASON));
         }
       }
     }
@@ -397,7 +392,7 @@ bool Constraints::graphBasedSolve() {
       doSolve(SolChkCG, SavedImplies, Env, this, true, nullptr, Conflicts);
 
   // Now solve PtrType constraints
-  if (Res && AllTypes) {
+  if (Res) {
     Env.doCheckedSolve(false);
 
     // Step 1: Greatest solution
@@ -462,9 +457,23 @@ bool Constraints::graphBasedSolve() {
         Res = doSolve(SolPtrTypCG, Empty, Env, this, false, &Rest, Conflicts);
       }
     }
+
+    // If we're not doing the all types solution, make any atoms with array or
+    // nt_array solution WILD.
+    std::set<VarAtom *> Rest;
+    Env.doCheckedSolve(true);
+    if (!AllTypes) {
+      Rest = Env.resetSolution([&Env](VarAtom *VA) {
+        // TODO: This is ugly
+        Env.doCheckedSolve(false);
+        bool IsArrType = !isa<PtrAtom>(Env.getAssignment(VA));
+        Env.doCheckedSolve(true);
+        return IsArrType;
+      }, getWild());
+    }
+
     // If PtrType solving (partly) failed, make the affected VarAtoms wild.
     if (!Res) {
-      std::set<VarAtom *> Rest;
       Env.doCheckedSolve(true);
       for (VarAtom *VA : Conflicts) {
         assert(VA != nullptr);
@@ -475,9 +484,12 @@ bool Constraints::graphBasedSolve() {
         Rest.insert(VA);
       }
       Conflicts.clear();
-      /* FIXME: Should we propagate the old res? */
-      Res = doSolve(SolChkCG, SavedImplies, Env, this, true, &Rest, Conflicts);
     }
+
+    // Re-run checked solving step if atoms were affected by the last two steps.
+    if (!Rest.empty())
+      Res = doSolve(SolChkCG, SavedImplies, Env, this, true, &Rest, Conflicts);
+
     // Final Step: Merge ptyp solution with checked solution.
     Env.mergePtrTypes();
   }
