@@ -629,7 +629,7 @@ FunctionDeclBuilder::buildDeclVar(PVConstraint *ParamCV, PVConstraint *ArgCV,
   const auto &Env = Info.getConstraints().getVariables();
   if (isAValidPVConstraint(ArgCV) && ArgCV->isChecked(Env)) {
     bool AnyChanges = ArgCV->anyChanges(Env);
-    if (AnyChanges && ParamCV->isChecked(Env)) {
+    if (AnyChanges && ParamCV->solutionEqualTo(Info.getConstraints(), ArgCV)) {
       buildCheckedDecl(ArgCV, Decl, Type, IType, RewriteParm, RewriteRet);
       return;
     }

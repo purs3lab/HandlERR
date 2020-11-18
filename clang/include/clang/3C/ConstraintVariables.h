@@ -125,6 +125,12 @@ public:
   // isChecked instead.
   virtual bool anyChanges(const EnvironmentMap &E) const = 0;
 
+  // Returns true if this constraint variable has a full checked pointer type
+  // after solving. This is diffent from isChecked because it requires that all
+  // pointers levels are checked, whereas isChecked only needs a single checked
+  // pointer level.
+  virtual bool isFullyChecked(const EnvironmentMap &E) const = 0;
+
   // Here, AIdx is the pointer level which needs to be checked.
   // By default, we check for all pointer levels (or VarAtoms)
   virtual bool hasWild(const EnvironmentMap &E, int AIdx = -1) const = 0;
@@ -376,6 +382,7 @@ public:
                        PersistentSourceLoc *PL) const override;
   void constrainOuterTo(Constraints &CS, ConstAtom *C, bool DoLB = false);
   bool anyChanges(const EnvironmentMap &E) const override;
+  bool isFullyChecked(const EnvironmentMap &E) const override;
   bool anyArgumentIsWild(const EnvironmentMap &E);
   bool hasWild(const EnvironmentMap &E, int AIdx = -1) const override;
   bool hasArr(const EnvironmentMap &E, int AIdx = -1) const override;
@@ -503,6 +510,7 @@ public:
   void constrainToWild(Constraints &CS, const std::string &Rsn,
                        PersistentSourceLoc *PL) const override;
   bool anyChanges(const EnvironmentMap &E) const override;
+  bool isFullyChecked(const EnvironmentMap &E) const override;
   bool hasWild(const EnvironmentMap &E, int AIdx = -1) const override;
   bool hasArr(const EnvironmentMap &E, int AIdx = -1) const override;
   bool hasNtArr(const EnvironmentMap &E, int AIdx = -1) const override;

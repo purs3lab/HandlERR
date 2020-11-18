@@ -109,6 +109,7 @@ PointerVariableConstraint::PointerVariableConstraint(
   this->Parent = Ot;
   this->IsGeneric = Ot->IsGeneric;
   this->IsZeroWidthArray = Ot->IsZeroWidthArray;
+  this->BaseType = Ot->BaseType;
   // We need not initialize other members.
 }
 
@@ -962,6 +963,8 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
   // ConstraintVariable for the return
   bool IsGeneric = FD != nullptr && getTypeVariableType(FD) != nullptr;
   // TODO: Code is duplicated from parameter code above
+  // TODO: Since I equate checked constraints for atoms > 0, I should really
+  //       only duplicate the first atom.
   auto *RetInternal = new PVConstraint(RT, D, RETVAR, I, Ctx, &N, IsGeneric);
   auto *RetExternal = new PVConstraint(RT, D, RETVAR, I, Ctx, &N, IsGeneric);
   ReturnVar = {RetInternal, RetExternal};
@@ -972,8 +975,7 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
       CS.addConstraint(CS.createGeq(InternalA, ExternalA, false));
       CS.addConstraint(CS.createGeq(ExternalA, InternalA, false));
     }
-    QualType QT = FD->getReturnType();
-    if (QT->isVoidPointerType() || QT->isFunctionPointerType()) {
+    if (J > 0 || RT->isVoidPointerType() || RT->isFunctionPointerType()) {
       CS.addConstraint(CS.createGeq(InternalA, ExternalA, true));
       CS.addConstraint(CS.createGeq(ExternalA, InternalA, true));
     }
@@ -1766,6 +1768,17 @@ Atom *PointerVariableConstraint::getAtom(unsigned AtomIdx, Constraints &CS) {
   return nullptr;
 }
 
+bool PointerVariableConstraint::isFullyChecked(const EnvironmentMap &E) const {
+  for (const Atom *VA : vars) {
+    const Atom *CA = getSolution(VA, E);
+    if (isa<WildAtom>(CA))
+      return false;
+  }
+  //if (FV)
+  //  return FV->isFullyChecked(E);
+  return true;
+}
+
 // Brain Transplant params and returns in [FromCV], recursively.
 void FunctionVariableConstraint::brainTransplant(ConstraintVariable *FromCV,
                                                  ProgramInfo &I) {
@@ -1852,4 +1865,11 @@ void FunctionVariableConstraint::addDeferredParams(PersistentSourceLoc PL,
 
 bool FunctionVariableConstraint::getIsOriginallyChecked() const {
   return ReturnVar.ArgumentsConstraint->getIsOriginallyChecked();
+}
+
+bool FunctionVariableConstraint::isFullyChecked(const EnvironmentMap &E) const {
+  return ReturnVar.ArgumentsConstraint->isFullyChecked(E) &&
+         llvm::all_of(ParamVars, [&E](ParamArgPair P) {
+           return P.ArgumentsConstraint->isFullyChecked(E);
+         });
 }
