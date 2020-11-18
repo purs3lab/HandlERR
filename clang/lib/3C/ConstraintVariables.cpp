@@ -933,8 +933,19 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
       for (unsigned J = 0; J < Param->getCvars().size(); J++) {
         Atom *ParamA = Pair.ParameterConstraint->getCvars()[J];
         Atom *ArgA = Pair.ArgumentsConstraint->getCvars()[J];
-        CS.addConstraint(CS.createGeq(ParamA, ArgA, false));
-        CS.addConstraint(CS.createGeq(ArgA, ParamA, false));
+        if (isa<VarAtom>(ParamA) || isa<VarAtom>(ArgA)) {
+          // Equate pointer types for internal and external parameter constraint
+          // variables.
+          CS.addConstraint(CS.createGeq(ParamA, ArgA, false));
+          CS.addConstraint(CS.createGeq(ArgA, ParamA, false));
+          // For void pointers and function pointers, also equate checked
+          // constraints. This causes the external constraint variable to solve
+          // to WILD if the internal is WILD, so itypes will not be added.
+          if (QT->isVoidPointerType() || QT->isFunctionPointerType()) {
+            CS.addConstraint(CS.createGeq(ParamA, ArgA, true));
+            CS.addConstraint(CS.createGeq(ArgA, ParamA, true));
+          }
+        }
       }
       ParamVars.push_back(Pair);
     }
@@ -950,14 +961,22 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
 
   // ConstraintVariable for the return
   bool IsGeneric = FD != nullptr && getTypeVariableType(FD) != nullptr;
+  // TODO: Code is duplicated from parameter code above
   auto *RetInternal = new PVConstraint(RT, D, RETVAR, I, Ctx, &N, IsGeneric);
   auto *RetExternal = new PVConstraint(RT, D, RETVAR, I, Ctx, &N, IsGeneric);
   ReturnVar = {RetInternal, RetExternal};
   for (unsigned J = 0; J < RetInternal->getCvars().size(); J++) {
     Atom *InternalA = RetInternal->getCvars()[J];
     Atom *ExternalA = RetExternal->getCvars()[J];
-    CS.addConstraint(CS.createGeq(InternalA, ExternalA, false));
-    CS.addConstraint(CS.createGeq(ExternalA, InternalA, false));
+    if (isa<VarAtom>(InternalA) || isa<VarAtom>(ExternalA)) {
+      CS.addConstraint(CS.createGeq(InternalA, ExternalA, false));
+      CS.addConstraint(CS.createGeq(ExternalA, InternalA, false));
+    }
+    QualType QT = FD->getReturnType();
+    if (QT->isVoidPointerType() || QT->isFunctionPointerType()) {
+      CS.addConstraint(CS.createGeq(InternalA, ExternalA, true));
+      CS.addConstraint(CS.createGeq(ExternalA, InternalA, true));
+    }
   }
 }
 
