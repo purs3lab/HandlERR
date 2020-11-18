@@ -61,16 +61,15 @@ void Constraints::editConstraintHook(Constraint *C) {
       if (!E->constraintIsChecked()) {
         VarAtom *LHSA = dyn_cast<VarAtom>(E->getLHS());
         VarAtom *RHSA = dyn_cast<VarAtom>(E->getRHS());
+        assert((LHSA || RHSA) && "Adding constraint between constants?!");
         if (LHSA != nullptr && RHSA != nullptr) {
           return;
         }
         // Make this checked only if the const atom is other than Ptr.
         if (RHSA && !isa<PtrAtom>(E->getLHS())) {
           addConstraint(createGeq(RHSA, getWild(), POINTER_IS_ARRAY_REASON));
-        } else {
-          assert(LHSA && "Adding constraint between constants?!");
-          if (!isa<PtrAtom>(E->getRHS()))
-            addConstraint(createGeq(LHSA, getWild(), POINTER_IS_ARRAY_REASON));
+        } else if (LHSA && !isa<PtrAtom>(E->getRHS())) {
+          addConstraint(createGeq(LHSA, getWild(), POINTER_IS_ARRAY_REASON));
         }
       }
     }
