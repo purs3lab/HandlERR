@@ -242,6 +242,16 @@ _3CInterface::_3CInterface(const struct _3COptions &CCopt,
   GlobalProgramInfo.getPerfStats().startTotalTime();
 }
 
+_3CInterface::~_3CInterface() {
+  std::error_code Ec;
+  std::string AggregateStats = StatsOutputJson + ".aggregate.json";
+  llvm::raw_fd_ostream AggrJson(AggregateStats, Ec);
+  if (!AggrJson.has_error()) {
+    GlobalProgramInfo.print_aggregate_stats(FilePaths, AggrJson);
+    AggrJson.close();
+  }
+}
+
 bool _3CInterface::BuildInitialConstraints() {
 
   std::lock_guard<std::mutex> Lock(InterfaceMutex);

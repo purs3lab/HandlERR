@@ -67,9 +67,12 @@ void PerformanceStats::endTotalTime() {
 }
 
 void PerformanceStats::printPerformanceStats(raw_ostream &O) {
-  O << TotalTime << "," << ConstraintBuilderTime << ",";
-  O << ConstraintSolverTime << "," << ArrayBoundsInferenceTime;
-  O << "," << RewritingTime << "\n";
+  O << "{\"TotalTime\":" << TotalTime;
+  O << ", \"ConstraintBuilderTime\":" << ConstraintBuilderTime;
+  O << ", \"ConstraintSolverTime\":" << ConstraintSolverTime;
+  O << ", \"ArrayBoundsInferenceTime\":" << ArrayBoundsInferenceTime;
+  O << ", \"RewritingTime\":" << RewritingTime;
+  O << "}";
 }
 
 ProgramInfo::ProgramInfo() :
@@ -273,7 +276,11 @@ void ProgramInfo::print_aggregate_stats(const std::set<std::string> &F,
   O << "},";
   O << "{\"NtArrBoundsStats\":";
   ArrBInfo.print_stats(O, NtArrPtrs, true);
-  O << "}]}";
+  O << "},";
+  O << "{\"TimingStats\":";
+  PerfS.printPerformanceStats(O);
+  O << "}";
+  O<<"]}";
 
 }
 
