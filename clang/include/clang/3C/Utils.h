@@ -157,6 +157,8 @@ bool isTypeHasVoid(clang::QualType QT);
 // Check if the provided declaration is in system header.
 bool isInSysHeader(clang::Decl *D);
 
+std::string replaceAll(std::string s, std::string search, std::string replace);
+
 std::string getSourceText(const clang::SourceRange &SR,
                           const clang::ASTContext &C);
 

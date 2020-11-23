@@ -335,6 +335,19 @@ bool isInSysHeader(clang::Decl *D) {
   return false;
 }
 
+std::string replaceAll(std::string s, std::string search, std::string replace ) {
+  for( size_t pos = 0; ; pos += replace.length() ) {
+    // Locate the substring to replace
+    pos = s.find( search, pos );
+    if( pos == std::string::npos ) break;
+    if (isalnum(s.at(pos+search.length()))) continue;
+    // Replace by erasing and inserting
+    s.erase( pos, search.length() );
+    s.insert( pos, replace );
+  }
+  return s;
+}
+
 std::string getSourceText(const clang::SourceRange &SR,
                           const clang::ASTContext &C) {
   assert(SR.isValid() && "Invalid Source Range requested.");

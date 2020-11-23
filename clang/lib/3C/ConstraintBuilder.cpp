@@ -25,6 +25,7 @@ unsigned int lastRecordLocation = -1;
 void processRecordDecl(RecordDecl *Declaration, ProgramInfo &Info,
                        ASTContext *Context, ConstraintResolver CB,
                        bool IsInFunction) {
+  std::string yeet = getSourceText(Declaration->getSourceRange(), *Context);
   if (RecordDecl *Definition = Declaration->getDefinition()) {
     // store current record's location to cross-ref later in a VarDecl
     lastRecordLocation = Definition->getBeginLoc().getRawEncoding();
@@ -56,7 +57,7 @@ void processRecordDecl(RecordDecl *Declaration, ProgramInfo &Info,
               (FL.isInSystemHeader() || Definition->isUnion());
           // mark field wild if the above is true and the field is a pointer
           if (isPtrOrArrayType(FieldTy) &&
-              (FieldInUnionOrSysHeader || IsInLineStruct)) {
+              (FieldInUnionOrSysHeader)) {
             std::string Rsn = "Union or external struct field encountered";
             CVarOption CV = Info.getVariable(F, Context);
             CB.constraintCVarToWild(CV, Rsn);
@@ -91,7 +92,7 @@ public:
           if (SR.isValid() && FL.isValid() && isPtrOrArrayType(VD->getType())) {
             if (lastRecordLocation == VD->getBeginLoc().getRawEncoding()) {
               CVarOption CV = Info.getVariable(VD, Context);
-              CB.constraintCVarToWild(CV, "Inline struct encountered.");
+              //CB.constraintCVarToWild(CV, "Inline struct encountered.");
             }
           }
         }
@@ -419,7 +420,7 @@ public:
       unsigned int EndLoc = G->getEndLoc().getRawEncoding();
       if (lastRecordLocation >= BeginLoc && lastRecordLocation <= EndLoc) {
         CVarOption CV = Info.getVariable(G, Context);
-        CB.constraintCVarToWild(CV, "Inline struct encountered.");
+//        CB.constraintCVarToWild(CV, "Inline struct encountered.");
       }
     }
 

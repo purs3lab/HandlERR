@@ -80,6 +80,7 @@ protected:
         ValidBoundsKey(false), IsForDecl(false) {}
 
 public:
+  std::string RewritingBaseType;
   // Create a "for-rewriting" representation of this ConstraintVariable.
   // The 'emitName' parameter is true when the generated string should include
   // the name of the variable, false for just the type.

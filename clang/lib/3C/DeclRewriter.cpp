@@ -18,6 +18,7 @@
 #include "clang/Rewrite/Core/Rewriter.h"
 #include "llvm/Support/raw_ostream.h"
 #include <sstream>
+#include <regex>
 
 #ifdef FIVE_C
 #include <clang/3C/DeclRewriter_5C.h>
@@ -60,12 +61,71 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
   for (const auto &I : Info.getVarMap())
     Keys.insert(I.first);
   MappingVisitor MV(Keys, Context);
-  for (const auto &D : TUD->decls())
+
+  // Logic similar to what was in ConstraintBuilder before:
+  // keep track of the last encountered struct and as we come across VarDecls
+  // see which of the structs collide with it
+  RecordDecl *lastRecord = nullptr;
+  std::string lastRecordDef = "";
+  // Map to keep a VarDecl and its associated struct definition
+  // We want the struct definition and not the whole VarDecl because
+  // mkString needs access to the "base type"
+  std::map<Decl *, std::string> inlinestructdefs;
+  std::set<Decl *> inlines;
+
+  for (const auto &D : TUD->decls()) {
     MV.TraverseDecl(D);
+    if (RecordDecl *RD = dyn_cast<RecordDecl>(D)) {
+      lastRecord = RD;
+      lastRecordDef = getSourceText(lastRecord->getSourceRange(), Context);
+    }
+    if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
+      if(lastRecord == nullptr) continue;
+      uint lastRecordLocation = lastRecord->getBeginLoc().getRawEncoding();
+      auto VarTy = VD->getType();
+      uint BeginLoc = VD->getBeginLoc().getRawEncoding();
+      uint EndLoc = VD->getEndLoc().getRawEncoding();
+      bool IsInLineStruct = lastRecordLocation >= BeginLoc && lastRecordLocation <= EndLoc;
+      if (IsInLineStruct) {
+        inlinestructdefs[VD] = lastRecordDef;
+        inlines.insert(VD);
+      }
+    }
+
+    // HUGE WIP: Right now, we can't convert inline structs that occur within
+    // functions. The following code is essentially a replication of the code
+    // above. Ideally, I'd abstract it away into a function to avoid code duplication
+    // but since it crashes, I want to focus on making it functional first
+    // Key Point: The rewriting works!! I.e. if I debug interactively and look at
+    // the string it spits out, it's exactly what we want! For some reason though,
+    // the Rewriter doesn't seem to like it, complains about
+    // Assertion failed: (getPiece(StartPiece).size() > NumBytes), function erase
+    if(FunctionDecl *FD = dyn_cast<FunctionDecl>(D)) {
+      if (FD->hasBody() && FD->isThisDeclarationADefinition()) {
+        for (auto &D : FD->decls()) {
+          if (RecordDecl *RD = dyn_cast<RecordDecl>(D)) {
+            lastRecord = RD;
+            lastRecordDef = getSourceText(lastRecord->getSourceRange(), Context);
+          }
+          if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
+            if (lastRecord == nullptr) continue;
+            uint lastRecordLocation = lastRecord->getBeginLoc().getRawEncoding();
+            auto VarTy = VD->getType();
+            uint BeginLoc = VD->getBeginLoc().getRawEncoding();
+            uint EndLoc = VD->getEndLoc().getRawEncoding();
+            bool IsInLineStruct = lastRecordLocation >= BeginLoc && lastRecordLocation <= EndLoc;
+            if (IsInLineStruct) {
+              inlinestructdefs[VD] = lastRecordDef;
+              inlines.insert(VD);
+            }
+          }
+        }
+      }
+    }
+  }
   SourceToDeclMapType PSLMap;
   VariableDecltoStmtMap VDLToStmtMap;
   std::tie(PSLMap, VDLToStmtMap) = MV.getResults();
-
   // Add declarations from this map into the rewriting set
   for (const auto &V : Info.getVarMap()) {
     // PLoc specifies the location of the variable whose type it is to
@@ -88,13 +148,38 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
         if (VDLToStmtMap.find(D) != VDLToStmtMap.end())
           DS = VDLToStmtMap[D];
 
+        // Decided to create a global variable inside PVConstraint temporarily
+        // to forego changing mkString's signature.
+        PV->RewritingBaseType = inlinestructdefs[D];
         std::string newTy = getStorageQualifierString(D) +
                             PV->mkString(Info.getConstraints().getVariables()) +
                             ABRewriter.getBoundsString(PV, D);
-        if (auto *VD = dyn_cast<VarDecl>(D))
-          RewriteThese.insert(new VarDeclReplacement(VD, DS, newTy));
-        else if (auto *FD = dyn_cast<FieldDecl>(D))
+        if (auto *VD = dyn_cast<VarDecl>(D)) {
+            RewriteThese.insert(new VarDeclReplacement(VD, DS, newTy));
+        }
+        else if (auto *FD = dyn_cast<FieldDecl>(D)) {
+          // For an inline struct, line 162 does literally nothing
           RewriteThese.insert(new FieldDeclReplacement(FD, DS, newTy));
+          auto inlinedecl = inlines.begin();
+          // Here's the idea: If a FieldDecl coincides with some inline struct
+          // VarDecl, let's replace what we WOULD rewrite the FieldDecl for
+          // in the actual struct definition associated with the VarDecl
+          while (inlinedecl != inlines.end()) {
+            if (FD->getEndLoc().getRawEncoding() <=
+                    (*inlinedecl)->getEndLoc().getRawEncoding() &&
+                FD->getBeginLoc().getRawEncoding() >=
+                    (*inlinedecl)->getBeginLoc().getRawEncoding()) {
+              // I currently use a helper function tucked away in Utils.cpp
+              // but I think using regex_replace might be more robust, but I couldn't
+              // get it to work just yet
+              // inlinestructdefs[*inlinedecl] = std::regex_replace(inlinestructdefs[*inlinedecl], std::regex(getSourceText(D->getSourceRange(), Context)), newTy);
+              inlinestructdefs[*inlinedecl] = replaceAll(
+                  inlinestructdefs[*inlinedecl],
+                  getSourceText(D->getSourceRange(), Context), newTy);
+            }
+            inlinedecl++;
+          }
+        }
         else if (auto *PD = dyn_cast<ParmVarDecl>(D))
           RewriteThese.insert(new ParmVarDeclReplacement(PD, DS, newTy));
         else

@@ -710,7 +710,8 @@ std::string PointerVariableConstraint::mkString(const EnvironmentMap &E,
     if (FV) {
       Ss << FV->mkString(E);
     } else {
-      Ss << BaseType;
+      if (RewritingBaseType == "") Ss << BaseType;
+      else Ss << RewritingBaseType;
     }
   }
 
