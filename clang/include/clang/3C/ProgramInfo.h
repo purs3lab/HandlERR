@@ -138,6 +138,12 @@ private:
   // variables for non-declaration expressions.
   std::map<PersistentSourceLoc, CVarSet> ExprConstraintVars;
 
+  // Implicit casts do not physically exist in the source code, so their source
+  // location can collide with the source location of another expression. Since
+  // we need to look up constraint variables for implicit casts for the cast
+  // placement, the variables are stored in this separate map.
+  std::map<PersistentSourceLoc, CVarSet> ImplicitCastConstraintVars;
+
   // Constraint system.
   Constraints CS;
   // Is the ProgramInfo persisted? Only tested in asserts. Starts at true.

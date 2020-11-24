@@ -212,26 +212,6 @@ CVarSet ConstraintResolver::getExprConstraintVars(Expr *E) {
     }
     if (!isa<ExplicitCastExpr>(E) && isNULLExpression(E, *Context)) {
       return EmptyCSet;
-      // Implicit cast, e.g., T* from T[] or int (*)(int) from int (int),
-      //   but also weird int->int * conversions (and back)
-    }
-    if (ImplicitCastExpr *IE = dyn_cast<ImplicitCastExpr>(E)) {
-      // We should not use persistent source location for compiler
-      // generated constructs.
-      QualType SubTypE = IE->getSubExpr()->getType();
-      auto CVs = getExprConstraintVars(IE->getSubExpr());
-      // if TypE is a pointer type, and the cast is unsafe, return WildPtr
-      if (TypE->isPointerType() &&
-          !(SubTypE->isFunctionType() || SubTypE->isArrayType() ||
-            SubTypE->isVoidPointerType()) &&
-          !isCastSafe(TypE, SubTypE)) {
-        CVarSet WildCVar = getInvalidCastPVCons(IE);
-        constrainConsVarGeq(CVs, WildCVar, CS, nullptr, Safe_to_Wild, false,
-                            &Info);
-        return WildCVar;
-      }
-      // else, return sub-expression's result
-      return CVs;
       // variable (x)
     }
     if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
@@ -249,6 +229,7 @@ CVarSet ConstraintResolver::getExprConstraintVars(Expr *E) {
     if (CHKCBindTemporaryExpr *CE = dyn_cast<CHKCBindTemporaryExpr>(E)) {
       return getExprConstraintVars(CE->getSubExpr());
     }
+
     // Apart from the above expressions constraints for all the other
     // expressions can be cached.
     // First, check if the expression has constraints that are cached?
@@ -256,7 +237,29 @@ CVarSet ConstraintResolver::getExprConstraintVars(Expr *E) {
       return Info.getPersistentConstraints(E, Context);
 
     CVarSet Ret = EmptyCSet;
-    if (ExplicitCastExpr *ECE = dyn_cast<ExplicitCastExpr>(E)) {
+    // Implicit cast, e.g., T* from T[] or int (*)(int) from int (int),
+    //   but also weird int->int * conversions (and back)
+    if (ImplicitCastExpr *IE = dyn_cast<ImplicitCastExpr>(E)) {
+      // ImplicitCastExpr is a compiler generated AST node, so we would not
+      // typically want to depend on its source location being unique, but
+      // their constraint var sets are stored in a separate map, avoiding
+      // source location collision with other expressions.
+      QualType SubTypE = IE->getSubExpr()->getType();
+      auto CVs = getExprConstraintVars(IE->getSubExpr());
+      // if TypE is a pointer type, and the cast is unsafe, return WildPtr
+      if (TypE->isPointerType() &&
+          !(SubTypE->isFunctionType() || SubTypE->isArrayType() ||
+            SubTypE->isVoidPointerType()) &&
+          !isCastSafe(TypE, SubTypE)) {
+        CVarSet WildCVar = getInvalidCastPVCons(IE);
+        constrainConsVarGeq(CVs, WildCVar, CS, nullptr, Safe_to_Wild, false,
+                            &Info);
+        Ret = WildCVar;
+      } else {
+        // else, return sub-expression's result
+        Ret = CVs;
+      }
+    } else if (ExplicitCastExpr *ECE = dyn_cast<ExplicitCastExpr>(E)) {
       assert(ECE->getType() == TypE);
       Expr *TmpE = ECE->getSubExpr();
       // Is cast internally safe? Return WILD if not.
@@ -266,7 +269,8 @@ CVarSet ConstraintResolver::getExprConstraintVars(Expr *E) {
           !isCastSafe(TypE, TmpE->getType())) {
         CVarSet Vars = getExprConstraintVars(TmpE);
         Ret = getInvalidCastPVCons(ECE);
-        constrainConsVarGeq(Vars, Ret, CS, nullptr, Safe_to_Wild, false, &Info);
+        constrainConsVarGeq(Vars, Ret, CS, nullptr, Safe_to_Wild, false,
+                            &Info);
         // NB: Expression ECE itself handled in
         // ConstraintBuilder::FunctionVisitor
       } else {
@@ -279,8 +283,8 @@ CVarSet ConstraintResolver::getExprConstraintVars(Expr *E) {
         // constraining GEQ these vars would be the cast always be WILD.
         if (!isNULLExpression(ECE, *Context)) {
           PersistentSourceLoc PL = PersistentSourceLoc::mkPSL(ECE, *Context);
-          constrainConsVarGeq(P, Vars, Info.getConstraints(), &PL, Same_to_Same,
-                              false, &Info);
+          constrainConsVarGeq(P, Vars, Info.getConstraints(), &PL,
+                              Same_to_Same, false, &Info);
         }
       }
     }

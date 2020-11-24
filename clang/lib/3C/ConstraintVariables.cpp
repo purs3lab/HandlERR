@@ -1769,7 +1769,7 @@ Atom *PointerVariableConstraint::getAtom(unsigned AtomIdx, Constraints &CS) {
 }
 
 bool PointerVariableConstraint::isFullyChecked(const EnvironmentMap &E) const {
-  for (const Atom *VA : vars) {
+  for (const Atom *VA : Vars) {
     const Atom *CA = getSolution(VA, E);
     if (isa<WildAtom>(CA))
       return false;

@@ -651,10 +651,16 @@ void ProgramInfo::unifyIfTypedef(const Type* Ty, ASTContext& Context, Declarator
 
 bool ProgramInfo::hasPersistentConstraints(Expr *E, ASTContext *C) const {
   auto PSL = PersistentSourceLoc::mkPSL(E, *C);
+  bool HasImpCastConstraint =
+    isa<ImplicitCastExpr>(E) &&
+    ImplicitCastConstraintVars.find(PSL) != ImplicitCastConstraintVars.end() &&
+    !ImplicitCastConstraintVars.at(PSL).empty();
+  bool HasExprConstraint =
+    !isa<ImplicitCastExpr>(E) &&
+    ExprConstraintVars.find(PSL) != ExprConstraintVars.end() &&
+    !ExprConstraintVars.at(PSL).empty();
   // Has constraints only if the PSL is valid.
-  return PSL.valid() &&
-         ExprConstraintVars.find(PSL) != ExprConstraintVars.end() &&
-         !ExprConstraintVars.at(PSL).empty();
+  return PSL.valid() && (HasExprConstraint || HasImpCastConstraint);
 }
 
 // Get the set of constraint variables for an expression that will persist
@@ -667,7 +673,10 @@ const CVarSet &ProgramInfo::getPersistentConstraints(Expr *E,
   assert(hasPersistentConstraints(E, C) &&
          "Persistent constraints not present.");
   PersistentSourceLoc PLoc = PersistentSourceLoc::mkPSL(E, *C);
-  return ExprConstraintVars.at(PLoc);
+  if (isa<ImplicitCastExpr>(E))
+    return ImplicitCastConstraintVars.at(PLoc);
+  else
+    return ExprConstraintVars.at(PLoc);
 }
 
 void ProgramInfo::storePersistentConstraints(Expr *E, const CVarSet &Vars,
@@ -681,8 +690,11 @@ void ProgramInfo::storePersistentConstraints(Expr *E, const CVarSet &Vars,
   // have been computed and cached when the expression has not in fact been
   // visited before. To avoid this, the expression is not cached and instead is
   // recomputed each time it's needed.
-  if (PSL.valid() && Rewriter::isRewritable(E->getBeginLoc()))
-    ExprConstraintVars[PSL].insert(Vars.begin(), Vars.end());
+  if (PSL.valid() && Rewriter::isRewritable(E->getBeginLoc())) {
+    auto &ExprMap = isa<ImplicitCastExpr>(E) ? ImplicitCastConstraintVars
+                                             : ExprConstraintVars;
+    ExprMap[PSL].insert(Vars.begin(), Vars.end());
+  }
 }
 
 // The Rewriter won't let us re-write things that are in macros. So, we
