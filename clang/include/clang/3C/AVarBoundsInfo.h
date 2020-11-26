@@ -284,6 +284,7 @@ private:
   std::set<BoundsKey> PointerBoundsKey;
   // Set of BoundsKey that correspond to array pointers.
   std::set<BoundsKey> ArrPointerBoundsKey;
+  std::set<BoundsKey> NtArrPointerBoundsKey;
   // Set of BoundsKey that correspond to array pointers with in the program
   // being compiled i.e., it does not include array pointers that belong
   // to libraries.

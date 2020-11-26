@@ -71,6 +71,16 @@ bool hasArray(ConstraintVariable *CK, Constraints &CS) {
   return false;
 }
 
+bool hasOnlyNtArray(ConstraintVariable *CK, Constraints &CS) {
+  auto &E = CS.getVariables();
+  if (PVConstraint *PV = dyn_cast<PVConstraint>(CK)) {
+    if (PV->hasNtArr(E, 0)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool isInSrcArray(ConstraintVariable *CK, Constraints &CS) {
   auto &E = CS.getVariables();
   if (PVConstraint *PV = dyn_cast<PVConstraint>(CK)) {
@@ -1019,6 +1029,11 @@ void AVarBoundsInfo::computerArrPointers(ProgramInfo *PI,
       if (isInSrcArray(PI->getVarMap().at(PSL), CS)) {
         InProgramArrPtrBoundsKeys.insert(Bkey);
       }
+
+      if (hasOnlyNtArray(PI->getVarMap().at(PSL), CS)) {
+        NtArrPointerBoundsKey.insert(Bkey);
+      }
+
       continue;
     }
 
@@ -1043,6 +1058,10 @@ void AVarBoundsInfo::computerArrPointers(ProgramInfo *PI,
       // Does this array belongs to a valid program variable?
       if (isInSrcArray(FV->getParamVar(ParmNum), CS)) {
         InProgramArrPtrBoundsKeys.insert(Bkey);
+      }
+
+      if (hasOnlyNtArray(FV->getParamVar(ParmNum), CS)) {
+        NtArrPointerBoundsKey.insert(Bkey);
       }
 
       continue;
@@ -1071,6 +1090,10 @@ void AVarBoundsInfo::computerArrPointers(ProgramInfo *PI,
       // Does this array belongs to a valid program variable?
       if (isInSrcArray(FV->getReturnVar(), CS)) {
         InProgramArrPtrBoundsKeys.insert(Bkey);
+      }
+
+      if (hasOnlyNtArray(FV->getReturnVar(), CS)) {
+        NtArrPointerBoundsKey.insert(Bkey);
       }
       continue;
     }
@@ -1149,6 +1172,7 @@ bool AVarBoundsInfo::performFlowAnalysis(ProgramInfo *PI) {
   AvarBoundsInference ABI(this);
   // First get all the pointer vars which are ARRs
   std::set<BoundsKey> ArrPointers;
+  NtArrPointerBoundsKey.clear();
   computerArrPointers(PI, ArrPointers);
 
   // Repopulate array bounds key.
@@ -1262,10 +1286,40 @@ void AVarBoundsInfo::print_stats(llvm::raw_ostream &O,
     if (C->isForValidDecl() && C->hasBoundsKey())
       InSrcBKeys.insert(C->getBoundsKey());
   }
+
+  std::set<BoundsKey> NTArraysReqBnds;
+  NTArraysReqBnds.clear();
+  auto &NTA = NtArrPointerBoundsKey;
+  auto &APTRS = ArrPointerBoundsKey;
+
+  for (auto NTBK : NtArrPointerBoundsKey) {
+
+    auto *PVG = const_cast<AVarGraph*>(&ProgVarGraph);
+
+    (*PVG).visitBreadthFirst(NTBK, [NTBK, &NTA,
+                                    &NTArraysReqBnds,
+                                    &APTRS](BoundsKey BK) {
+      if (NTA.find(BK) == NTA.end() &&
+          APTRS.find(BK) != APTRS.end()) {
+        NTArraysReqBnds.insert(NTBK);
+      }
+    });
+  }
+
+  std::set<BoundsKey> NTArrayReqNoBounds;
+  NTArrayReqNoBounds.clear();
+
+  std::set_difference(NtArrPointerBoundsKey.begin(), NtArrPointerBoundsKey.end(),
+                      NTArraysReqBnds.begin(), NTArraysReqBnds.end(),
+                      std::inserter(NTArrayReqNoBounds, NTArrayReqNoBounds.begin()));
+
+
   findIntersection(InProgramArrPtrBoundsKeys, InSrcBKeys, InSrcArrBKeys);
   if (!JsonFormat) {
     findIntersection(ArrPointerBoundsKey, InSrcArrBKeys, Tmp);
     O << "NumPointersNeedBounds:" << Tmp.size() << ",\n";
+    findIntersection(NTArrayReqNoBounds, InSrcArrBKeys, Tmp);
+    O << "NumNTNoBounds:" << Tmp.size() << ",\n";
     O << "Details:\n";
     findIntersection(InvalidBounds, InSrcArrBKeys, Tmp);
     O << "Invalid:" << Tmp.size() << "\n,BoundsFound:\n";
@@ -1273,6 +1327,8 @@ void AVarBoundsInfo::print_stats(llvm::raw_ostream &O,
   } else {
     findIntersection(ArrPointerBoundsKey, InSrcArrBKeys, Tmp);
     O << "{\"NumPointersNeedBounds\":" << Tmp.size() << ",";
+    findIntersection(NTArrayReqNoBounds, InSrcArrBKeys, Tmp);
+    O << "\"NumNTNoBounds\":" << Tmp.size() << ",";
     O << "\"Details\":{";
     findIntersection(InvalidBounds, InSrcArrBKeys, Tmp);
     O << "\"Invalid\":" << Tmp.size() << ",\"BoundsFound\":{";
