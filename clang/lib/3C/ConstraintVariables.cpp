@@ -1338,6 +1338,10 @@ bool FunctionVariableConstraint::hasItype() const {
   return ReturnVar.ArgumentsConstraint->hasItype();
 }
 
+bool FunctionVariableConstraint::hasBoundsStr() const {
+  return ReturnVar.ArgumentsConstraint->hasItype();
+}
+
 bool FunctionVariableConstraint::solutionEqualTo(
     Constraints &CS, const ConstraintVariable *CV) const {
   bool Ret = false;
@@ -1746,6 +1750,8 @@ void PointerVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
   Vars = NewVatoms;
   if (!From->ItypeStr.empty())
     ItypeStr = From->ItypeStr;
+  if (!From->BoundsAnnotationStr.empty())
+    BoundsAnnotationStr = From->BoundsAnnotationStr;
   if (FV) {
     assert(From->FV);
     FV->mergeDeclaration(From->FV, Info, ReasonFailed);

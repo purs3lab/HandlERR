@@ -99,10 +99,10 @@ CastPlacementVisitor::needCasting(const ConstraintVariable *SrcInt,
                                   const ConstraintVariable *DstInt,
                                   const ConstraintVariable *DstExt) {
   const auto &E = Info.getConstraints().getVariables();
-  bool SIChecked = SrcInt->isFullyChecked(E) && !SrcInt->hasItype();
-  bool SEChecked = SrcExt->isFullyChecked(E) || SrcExt->hasItype();
-  bool DIChecked = DstInt->isFullyChecked(E) && !DstInt->hasItype();
-  bool DEChecked = DstExt->isFullyChecked(E) || DstExt->hasItype();
+  bool SIChecked = SrcInt->isFullyChecked(E) && !(SrcInt->hasItype() || SrcInt->hasBoundsStr());
+  bool SEChecked = SrcExt->isFullyChecked(E) || (SrcExt->hasItype() || SrcExt->hasBoundsStr());
+  bool DIChecked = DstInt->isFullyChecked(E) && !(DstInt->hasItype() || DstInt->hasBoundsStr());
+  bool DEChecked = DstExt->isFullyChecked(E) || (DstExt->hasItype() || DstExt->hasBoundsStr());
 
   // Cast prefix is only the part of the cast to the left of the expression
   // being cast. It does not contain the required closing parenthesis.

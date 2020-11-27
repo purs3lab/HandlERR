@@ -94,6 +94,7 @@ public:
   virtual void dumpJson(llvm::raw_ostream &O) const = 0;
 
   virtual bool hasItype() const = 0;
+  virtual bool hasBoundsStr() const = 0;
   bool hasBoundsKey() const { return ValidBoundsKey; }
   BoundsKey getBoundsKey() const {
     assert(ValidBoundsKey && "No valid Bkey");
@@ -494,6 +495,7 @@ public:
   }
 
   bool hasItype() const override;
+  bool hasBoundsStr() const override;
   bool solutionEqualTo(Constraints &CS,
                        const ConstraintVariable *CV) const override;
 
