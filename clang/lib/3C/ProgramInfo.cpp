@@ -483,6 +483,16 @@ bool ProgramInfo::insertNewFVConstraint(FunctionDecl *FD, FVConstraint *FVCon,
     // external method.
     Ret = insertIntoExternalFunctionMap(ExternalFunctionFVCons, FuncName, FVCon,
                                         FD, C);
+    bool IsDef = FVCon->hasBody();
+    if (IsDef) {
+      // Some function (e.g, atoi) are given definitions inside the system
+      // headers. Here we ensure that such functions are treated the same as
+      // function without definitions.
+      SourceLocation DefnLoc = FD->getDefinition()->getLocation();
+      bool DefinedInSysHeader = C->getSourceManager().isInSystemHeader(DefnLoc);
+      if (!DefinedInSysHeader)
+        DefinedExternalFunction.insert(FuncName);
+    }
   } else {
     // static method
     auto Psl = PersistentSourceLoc::mkPSL(FD, *C);
