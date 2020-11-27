@@ -98,6 +98,8 @@ CastPlacementVisitor::needCasting(const ConstraintVariable *SrcInt,
                                   const ConstraintVariable *SrcExt,
                                   const ConstraintVariable *DstInt,
                                   const ConstraintVariable *DstExt) {
+  if (SrcExt->solutionEqualTo(Info.getConstraints(), DstExt))
+    return CastNeeded::NO_CAST;
   const auto &E = Info.getConstraints().getVariables();
   bool SIChecked = SrcInt->isFullyChecked(E) && !(SrcInt->hasItype() || SrcInt->hasBoundsStr());
   bool SEChecked = SrcExt->isFullyChecked(E) || (SrcExt->hasItype() || SrcExt->hasBoundsStr());

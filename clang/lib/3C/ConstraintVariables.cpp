@@ -1289,6 +1289,10 @@ bool PointerVariableConstraint::solutionEqualTo(
           }
         }
       }
+    } else if (FV && vars.size() == 1) {
+      // If this a function pointer and we're comparing it to a FVConstraint,
+      // then solutions can still be equal.
+      Ret = FV->solutionEqualTo(CS, CV);
     }
   }
   return Ret;
@@ -1353,6 +1357,10 @@ bool FunctionVariableConstraint::solutionEqualTo(
             ThisRet->solutionEqualTo(CS, OtherRet);
       for (unsigned I = 0; I < numParams(); I++)
         Ret &= getParamVar(I)->solutionEqualTo(CS, OtherFV->getParamVar(I));
+    } else if (const auto *OtherPV = dyn_cast<PVConstraint>(CV)) {
+      // When comparing to a pointer variable, it might be that the pointer is a
+      // function pointer. This is handled by PVConstraint::solutionEqualTo.
+      return OtherPV->solutionEqualTo(CS, this);
     }
   }
   return Ret;
