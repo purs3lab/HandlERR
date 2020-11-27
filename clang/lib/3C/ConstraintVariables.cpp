@@ -1794,12 +1794,13 @@ void FunctionVariableConstraint::brainTransplant(ConstraintVariable *FromCV,
   // Transplant returns.
   ReturnVar.ArgumentsConstraint->brainTransplant(
     From->ReturnVar.ArgumentsConstraint, I);
+  ReturnVar.ParameterConstraint->brainTransplant(
+    From->ReturnVar.ParameterConstraint, I);
   // Transplant params.
   if (numParams() == From->numParams()) {
     for (unsigned J = 0; J < From->numParams(); J++) {
-      ConstraintVariable *FromVar = From->getParamVar(J);
-      ConstraintVariable *Var = getParamVar(J);
-      Var->brainTransplant(FromVar, I);
+      getParamVar(J)->brainTransplant(From->getParamVar(J), I);
+      getInternalParamVar(J)->brainTransplant(From->getInternalParamVar(J), I);
     }
   } else if (numParams() != 0 && From->numParams() == 0) {
     auto &CS = I.getConstraints();
@@ -1830,9 +1831,10 @@ void FunctionVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
   assert(From->getDeferredParams().size() == 0);
   // Transplant returns.
   // Our first sanity check is to ensure the function's returns type-check
-  // TODO: also do this for argument
   ReturnVar.ParameterConstraint->mergeDeclaration(
     From->ReturnVar.ParameterConstraint, I, ReasonFailed);
+  ReturnVar.ArgumentsConstraint->mergeDeclaration(
+    From->ReturnVar.ArgumentsConstraint, I, ReasonFailed);
   if (ReasonFailed != "") {
     ReasonFailed += "for return value";
     return;
@@ -1852,9 +1854,9 @@ void FunctionVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
       return;
     }
     for (unsigned J = 0; J < From->numParams(); J++) {
-      auto *FromVar = From->getParamVar(J);
-      auto *Var = getParamVar(J);
-      Var->mergeDeclaration(FromVar, I, ReasonFailed);
+      getParamVar(J)->mergeDeclaration(From->getParamVar(J), I, ReasonFailed);
+      getInternalParamVar(J)->mergeDeclaration(From->getInternalParamVar(J), I,
+                                               ReasonFailed);
       if (ReasonFailed != "") {
         ReasonFailed += "for parameter " + std::to_string(J);
         return;
