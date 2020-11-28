@@ -24,6 +24,7 @@ set( LLVM_LINK_COMPONENTS
           Constraints.cpp
           ConstraintsGraph.cpp
           ConstraintVariables.cpp
+          DeclJsonRewriter.cpp
           DeclRewriter.cpp
           IntermediateToolHook.cpp
           MappingVisitor.cpp

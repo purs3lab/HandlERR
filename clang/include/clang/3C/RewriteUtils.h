@@ -231,6 +231,20 @@ private:
   void emitRootCauseDiagnostics(ASTContext &Context);
 };
 
+
+class DeclToJsonConsumer : public ASTConsumer {
+public:
+  explicit DeclToJsonConsumer(ProgramInfo &I, std::string &OutputFile) :
+    Info(I), OutputF(OutputFile) {}
+
+  virtual void HandleTranslationUnit(ASTContext &C);
+
+private:
+  ProgramInfo &Info;
+  std::string &OutputF;
+};
+
+void DumpAnalysisResultsToJson(ProgramInfo &I, llvm::raw_ostream &O);
 bool canRewrite(Rewriter &R, SourceRange &SR);
 
 #endif //_REWRITEUTILS_H

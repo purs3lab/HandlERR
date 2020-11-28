@@ -103,7 +103,7 @@ static bool hasLengthKeyword(std::string VarName) {
 // Check if the provided constraint variable is an array and it needs bounds.
 static bool needArrayBounds(const ConstraintVariable *CV,
                             const EnvironmentMap &E) {
-  if (CV->hasArr(E, 0)) {
+  if (CV->hasPtyArr(E, 0)) {
     const PVConstraint *PV = dyn_cast<PVConstraint>(CV);
     return !PV || PV->isTopCvarUnsizedArr();
   }
@@ -112,7 +112,7 @@ static bool needArrayBounds(const ConstraintVariable *CV,
 
 static bool needNTArrayBounds(const ConstraintVariable *CV,
                               const EnvironmentMap &E) {
-  if (CV->hasNtArr(E, 0)) {
+  if (CV->hasPtyNtArr(E, 0)) {
     const PVConstraint *PV = dyn_cast<PVConstraint>(CV);
     return !PV || PV->isTopCvarUnsizedArr();
   }
@@ -926,22 +926,36 @@ void LengthVarInference::VisitArraySubscriptExpr(ArraySubscriptExpr *ASE) {
   auto &ABI = I.getABoundsInfo();
 
   // Get the bounds key of the base and index.
-  if (tryGetValidBoundsKey(BE, BasePtr, I, C) &&
-      tryGetValidBoundsKey(IdxExpr, IdxKey, I, C)) {
-    std::set<BoundsKey> PossibleLens;
-    PossibleLens.clear();
-    ComparisionVisitor CV(I, C, IdxKey, PossibleLens);
-    auto &CDNodes = CDG->getControlDependencies(CurBB);
-    if (!CDNodes.empty()) {
-      // Next try to find all the nodes that the CurBB is
-      // control dependent on.
-      // For each of the control dependent node, check if we are comparing the
-      // index variable with another variable.
-      for (auto &CDGNode : CDNodes) {
-        // Collect the possible length bounds keys.
-        CV.TraverseStmt(CDGNode->getTerminatorStmt());
+  if (tryGetValidBoundsKey(BE, BasePtr, I, C)) {
+    if (tryGetValidBoundsKey(IdxExpr, IdxKey, I, C)) {
+      std::set<BoundsKey> PossibleLens;
+      PossibleLens.clear();
+      ComparisionVisitor CV(I, C, IdxKey, PossibleLens);
+      auto &CDNodes = CDG->getControlDependencies(CurBB);
+      if (!CDNodes.empty()) {
+        // Next try to find all the nodes that the CurBB is
+        // control dependent on.
+        // For each of the control dependent node, check if we are comparing the
+        // index variable with another variable.
+        for (auto &CDGNode : CDNodes) {
+          // Collect the possible length bounds keys.
+          CV.TraverseStmt(CDGNode->getTerminatorStmt());
+        }
+        ABI.updatePotentialCountBounds(BasePtr, PossibleLens, true);
       }
-      ABI.updatePotentialCountBounds(BasePtr, PossibleLens);
+    } else if (!ABI.hasPotentialCountBounds(BasePtr)) {
+      // Here, we check for this pattern:
+      // p[l-1] = ... and make l to be the potential bound.
+      // only for parameters.
+      BinaryOperator *BOIdx = dyn_cast_or_null<BinaryOperator>(IdxExpr);
+      if (BOIdx != nullptr && BOIdx->getOpcode() == BinaryOperator::Opcode::BO_Sub) {
+        if (tryGetValidBoundsKey(BOIdx->getLHS(), IdxKey, I, C)) {
+          auto *PVar = ABI.getProgramVar(IdxKey);
+          if (PVar != nullptr && dyn_cast_or_null<FunctionParamScope>(PVar->getScope())) {
+            ABI.updatePotentialCountBounds(BasePtr, {IdxKey});
+          }
+        }
+      }
     }
   }
 

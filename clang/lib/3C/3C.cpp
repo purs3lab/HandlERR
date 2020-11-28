@@ -428,6 +428,29 @@ bool _3CInterface::WriteAllConvertedFilesToDisk() {
   return true;
 }
 
+bool
+_3CInterface::WriteArrayConversionAndBoundsToJson(
+  const std::string &JsonFile) {
+  ClangTool &Tool = getGlobalClangTool();
+
+  // Rewrite the input files
+  std::unique_ptr<ToolAction> RewriteTool =
+    newFrontendActionFactoryA<
+      RewriteAction<DeclToJsonConsumer, ProgramInfo>>(GlobalProgramInfo);
+  if (RewriteTool)
+    Tool.run(RewriteTool.get());
+  else
+    llvm_unreachable("No action");
+
+  std::error_code Ec;
+  llvm::raw_fd_ostream OutputJson(JsonFile, Ec);
+  if (!OutputJson.has_error()) {
+    DumpAnalysisResultsToJson(GlobalProgramInfo, OutputJson);
+    OutputJson.close();
+  }
+  return true;
+}
+
 ConstraintsInfo &_3CInterface::GetWILDPtrsInfo() {
   return GlobalProgramInfo.getInterimConstraintState();
 }

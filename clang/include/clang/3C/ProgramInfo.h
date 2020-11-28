@@ -85,6 +85,10 @@ protected:
 
 typedef std::pair<CVarSet, BKeySet> CSetBkeyPair;
 
+typedef std::tuple<std::string, bool, std::string> FuncKeyTy;
+typedef std::tuple<std::string, unsigned, std::string> BndsTy;
+typedef std::tuple<unsigned, std::string, std::set<unsigned>, BndsTy> ArrPtrInfoTy;
+
 class ProgramInfo : public ProgramVariableAdder {
 public:
   // This map holds similar information as the type variable map in
@@ -97,6 +101,13 @@ public:
 
   typedef std::map<std::string, FVConstraint *> ExternalFunctionMapType;
   typedef std::map<std::string, ExternalFunctionMapType> StaticFunctionMapType;
+
+  std::map<std::string, std::set<ArrPtrInfoTy>> StArrPtrs;
+  std::map<std::string, std::set<ArrPtrInfoTy>> StNtArrPtrs;
+  std::map<FuncKeyTy, std::set<ArrPtrInfoTy>> FnArrPtrs;
+  std::map<FuncKeyTy, std::set<ArrPtrInfoTy>> FnNtArrPtrs;
+  std::map<std::string, std::set<ArrPtrInfoTy>> GlobalArrPtrs;
+  std::map<std::string, std::set<ArrPtrInfoTy>> GlobalNtArrPtrs;
 
   ProgramInfo();
   void print(llvm::raw_ostream &O) const;

@@ -170,7 +170,9 @@ public:
   ABounds *getBounds(BoundsKey L,
                      BoundsPriority ReqP = Invalid,
                      BoundsPriority *RetP = nullptr);
-  bool updatePotentialCountBounds(BoundsKey BK, std::set<BoundsKey> &CntBK);
+  bool updatePotentialCountBounds(BoundsKey BK, const std::set<BoundsKey> &CntBK,
+                                  bool Replace = false);
+  bool hasPotentialCountBounds(BoundsKey BK);
 
   // Try and get BoundsKey, into R, for the given declaration. If the declaration
   // does not have a BoundsKey then return false.

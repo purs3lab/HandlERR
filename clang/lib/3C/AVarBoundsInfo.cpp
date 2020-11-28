@@ -365,8 +365,8 @@ bool AvarBoundsInference::predictBounds(BoundsKey K,
           }
         }
       }
-    } else if (IsFuncRet ||
-               (BKsFailedFlowInference.find(NBK) != BKsFailedFlowInference.end())) {
+    } else if (IsFuncRet /*||
+               (BKsFailedFlowInference.find(NBK) != BKsFailedFlowInference.end())*/) {
 
       // If this is a function return we should have bounds from all
       // neighbours.
@@ -636,12 +636,23 @@ ABounds *AVarBoundsInfo::getBounds(BoundsKey L, BoundsPriority ReqP,
 }
 
 bool AVarBoundsInfo::updatePotentialCountBounds(BoundsKey BK,
-                                                std::set<BoundsKey> &CntBK) {
+                                                const std::set<BoundsKey> &CntBK,
+                                                bool Replace) {
   bool RetVal = false;
   if (!CntBK.empty()) {
     auto &TmpK = PotentialCntBounds[BK];
+    if (Replace)
+      TmpK.clear();
     TmpK.insert(CntBK.begin(), CntBK.end());
     RetVal = true;
+  }
+  return RetVal;
+}
+
+bool AVarBoundsInfo::hasPotentialCountBounds(BoundsKey BK) {
+  bool RetVal = false;
+  if (PotentialCntBounds.find(BK) != PotentialCntBounds.end()) {
+    RetVal = !PotentialCntBounds[BK].empty();
   }
   return RetVal;
 }

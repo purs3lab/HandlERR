@@ -920,6 +920,16 @@ bool FunctionVariableConstraint::hasNtArr(const EnvironmentMap &E,
   return ReturnVar->hasNtArr(E, AIdx);
 }
 
+bool FunctionVariableConstraint::hasPtyArr(const EnvironmentMap &E,
+                                           int AIdx) const {
+  return ReturnVar->hasPtyArr(E, AIdx);
+}
+
+bool FunctionVariableConstraint::hasPtyNtArr(const EnvironmentMap &E,
+                                             int AIdx) const {
+  return ReturnVar->hasPtyNtArr(E, AIdx);
+}
+
 FVConstraint *FunctionVariableConstraint::getCopy(Constraints &CS) {
   return new FVConstraint(this, CS);
 }
@@ -1079,6 +1089,19 @@ PointerVariableConstraint::getSolution(const Atom *A,
   return CS;
 }
 
+const ConstAtom *
+PointerVariableConstraint::getPtySolution(const Atom *A,
+                                          const EnvironmentMap &E) const {
+  const ConstAtom *CS = nullptr;
+  if (const ConstAtom *CA = dyn_cast<ConstAtom>(A)) {
+    CS = CA;
+  } else if (const VarAtom *VA = dyn_cast<VarAtom>(A)) {
+    // If this is a VarAtom?, we need to fetch ptr solution.
+    CS = E.at(const_cast<VarAtom*>(VA)).second;
+  }
+  assert(CS != nullptr && "Atom should be either const or var");
+  return CS;
+}
 bool PointerVariableConstraint::hasWild(const EnvironmentMap &E,
                                         int AIdx) const {
   int VarIdx = 0;
@@ -1129,6 +1152,42 @@ bool PointerVariableConstraint::hasNtArr(const EnvironmentMap &E,
 
   if (FV)
     return FV->hasNtArr(E, AIdx);
+
+  return false;
+}
+
+bool PointerVariableConstraint::hasPtyArr(const EnvironmentMap &E,
+                                          int AIdx) const {
+  int VarIdx = 0;
+  for (const auto &C : vars) {
+    const ConstAtom *CS = getPtySolution(C, E);
+    if (isa<ArrAtom>(CS))
+      return true;
+    if (VarIdx == AIdx)
+      break;
+    VarIdx++;
+  }
+
+  if (FV)
+    return FV->hasPtyArr(E, AIdx);
+
+  return false;
+}
+
+bool PointerVariableConstraint::hasPtyNtArr(const EnvironmentMap &E,
+                                            int AIdx) const {
+  int VarIdx = 0;
+  for (const auto &C : vars) {
+    const ConstAtom *CS = getPtySolution(C, E);
+    if (isa<NTArrAtom>(CS))
+      return true;
+    if (VarIdx == AIdx)
+      break;
+    VarIdx++;
+  }
+
+  if (FV)
+    return FV->hasPtyNtArr(E, AIdx);
 
   return false;
 }

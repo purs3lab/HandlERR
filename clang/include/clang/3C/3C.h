@@ -108,6 +108,8 @@ public:
   bool WriteAllConvertedFilesToDisk();
   // Write the current converted state of the provided file.
   bool WriteConvertedFileToDisk(const std::string &FilePath);
+  // Write conversion results to json.
+  bool WriteArrayConversionAndBoundsToJson(const std::string &FilePath);
 
 private:
   // Are constraints already built?
