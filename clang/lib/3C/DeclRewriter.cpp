@@ -652,7 +652,7 @@ FunctionDeclBuilder::buildDeclVar(PVConstraint *ParamCV, PVConstraint *ArgCV,
 
 std::string FunctionDeclBuilder::getExistingIType(ConstraintVariable *DeclC) {
   auto *PVC = dyn_cast<PVConstraint>(DeclC);
-  if (PVC != nullptr && PVC->hasItype())
+  if (PVC != nullptr && !PVC->getItype().empty())
     return " : " + PVC->getItype();
   return "";
 }

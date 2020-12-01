@@ -349,7 +349,7 @@ std::string ArrayBoundsRewriter::getBoundsString(PVConstraint *PV, Decl *D,
         BString = Pfix + BString;
     }
   }
-  if (BString.empty() && PV->hasBoundsStr()) {
+  if (BString.empty() && PV->srcHasBounds()) {
     BString = Pfix + PV->getBoundsStr();
   }
   return BString;
@@ -359,7 +359,7 @@ bool ArrayBoundsRewriter::hasNewBoundsString(PVConstraint *PV, Decl *D,
                                              bool Isitype) {
   std::string BStr = getBoundsString(PV, D, Isitype);
   // There is a bounds string but has nothing declared?
-  return !BStr.empty() && !PV->hasBoundsStr();
+  return !BStr.empty() && !PV->srcHasBounds();
 }
 
 std::set<PersistentSourceLoc> RewriteConsumer::EmittedDiagnostics;

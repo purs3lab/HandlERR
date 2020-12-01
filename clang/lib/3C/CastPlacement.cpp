@@ -61,10 +61,9 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
         CVarSet ArgumentConstraints = CR.getExprConstraintVars(ArgExpr);
         ConstraintVariable *ParamInt = FV->getInternalParamVar(PIdx);
         ConstraintVariable *ParamExt = FV->getParamVar(PIdx);
-        for (auto *ArgumentC : ArgumentConstraints) {
-          if (needCasting(ArgumentC, ArgumentC, ParamInt, ParamExt) !=
-              NO_CAST) {
-            surroundByCast(ArgumentC, ArgumentC, ParamInt, ParamExt, A);
+        for (auto *ArgC : ArgumentConstraints) {
+          if (needCasting(ArgC, ArgC, ParamInt, ParamExt) != NO_CAST) {
+            surroundByCast(ArgC, ArgC, ParamInt, ParamExt, A);
             break;
           }
         }
@@ -77,12 +76,12 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
       CVarSet ArgumentConstraints = CR.getExprConstraintVars(CE);
       ConstraintVariable *RetInt = FV->getInternalReturnVar();
       ConstraintVariable *RetExt = FV->getReturnVar();
-      for (auto *ArgumentC : ArgumentConstraints) {
+      for (auto *ArgC : ArgumentConstraints) {
         // Order of ParameterC and ArgumentC is reversed from when inserting
         // parameter casts because assignment now goes from returned to its
         // local use.
-        if (needCasting(RetInt, RetExt, ArgumentC, ArgumentC) != NO_CAST) {
-          surroundByCast(RetInt, RetExt, ArgumentC, ArgumentC, CE);
+        if (needCasting(RetInt, RetExt, ArgC, ArgC) != NO_CAST) {
+          surroundByCast(RetInt, RetExt, ArgC, ArgC, CE);
           break;
         }
       }
@@ -100,11 +99,12 @@ CastPlacementVisitor::needCasting(const ConstraintVariable *SrcInt,
                                   const ConstraintVariable *DstExt) {
   if (SrcExt->solutionEqualTo(Info.getConstraints(), DstExt))
     return CastNeeded::NO_CAST;
+
   const auto &E = Info.getConstraints().getVariables();
-  bool SIChecked = SrcInt->isFullyChecked(E) && !(SrcInt->hasItype() || SrcInt->hasBoundsStr());
-  bool SEChecked = SrcExt->isFullyChecked(E) || (SrcExt->hasItype() || SrcExt->hasBoundsStr());
-  bool DIChecked = DstInt->isFullyChecked(E) && !(DstInt->hasItype() || DstInt->hasBoundsStr());
-  bool DEChecked = DstExt->isFullyChecked(E) || (DstExt->hasItype() || DstExt->hasBoundsStr());
+  bool SIChecked = SrcInt->isFullyChecked(E) && !SrcInt->srcHasItype();
+  bool SEChecked = SrcExt->isFullyChecked(E) || SrcExt->srcHasItype();
+  bool DIChecked = DstInt->isFullyChecked(E) && !DstInt->srcHasItype();
+  bool DEChecked = DstExt->isFullyChecked(E) || DstExt->srcHasItype();
 
   // Cast prefix is only the part of the cast to the left of the expression
   // being cast. It does not contain the required closing parenthesis.
@@ -112,12 +112,14 @@ CastPlacementVisitor::needCasting(const ConstraintVariable *SrcInt,
     // C-style cast to wild
     return CastNeeded::CAST_TO_WILD;
   } else if ( !SEChecked && DIChecked && DEChecked) {
-    std::string temp = DstExt->mkString(E, false);
-    if (temp.size() <= 7) {
-      llvm::errs() << temp << "\n";
-    }
     // _Assume_bounds_cast to checked
     return CastNeeded::CAST_TO_CHECKED;
+  }
+
+  // Casting requirements are stricter when the parameter is a function pointer.
+  if (isa<FVConstraint>(DstExt) || cast<PVConstraint>(DstExt)->getFV()) {
+    if (!DstExt->solutionEqualTo(Info.getConstraints(), SrcInt))
+      return CastNeeded::CAST_TO_WILD;
   }
   return CastNeeded::NO_CAST;
 }
@@ -133,7 +135,6 @@ CastPlacementVisitor::getCastString(const ConstraintVariable *SrcInt,
     case CAST_TO_WILD:
       return "((" + DstExt->getRewritableOriginalTy() + ")";
     case CAST_TO_CHECKED:
-      //assert(DstExt->mkString(E, false).size() > 7);
       return "_Assume_bounds_cast<" + DstExt->mkString(E, false) + ">(";
     default:
       llvm_unreachable("No casting needed");

@@ -587,8 +587,6 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
     for (unsigned I = 0; I < FD->getNumParams(); I++) {
       ParmVarDecl *PVD = FD->getParamDecl(I);
       const Type *Ty = PVD->getType().getTypePtr();
-      // TODO: this needs to be the internal representation for the parameter
-      //       constraint
       ConstraintVariable *PV = F->getInternalParamVar(I);
       unifyIfTypedef(Ty, *AstContext, PVD, dyn_cast<PVConstraint>(PV));
       PV->setValidDecl();
@@ -798,7 +796,6 @@ CVarOption ProgramInfo::getVariable(clang::Decl *D, clang::ASTContext *C) {
     // Get corresponding FVConstraint vars.
     FVConstraint *FunFVar = getFuncFVConstraint(FD, C);
     assert(FunFVar != nullptr && "Unable to find function constraints.");
-    // TODO: use internal constraint
     return CVarOption(*FunFVar->getInternalParamVar(PIdx));
 
   } else if (FunctionDecl *FD = dyn_cast<FunctionDecl>(D)) {

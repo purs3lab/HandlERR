@@ -230,8 +230,8 @@ public:
               Deferred.push_back(ArgumentConstraints);
             } else if (I < TargetFV->numParams()) {
               // constrain the arg CV to the param CV
-              // TODO: this needs to be the external constraint variable
               ConstraintVariable *ParameterDC = TargetFV->getParamVar(I);
+
               // Do not handle bounds key here because we will be
               // doing context-sensitive assignment next.
               constrainConsVarGeq(ParameterDC, ArgumentConstraints, CS, &PL,

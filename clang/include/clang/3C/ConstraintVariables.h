@@ -93,8 +93,9 @@ public:
   virtual void dump() const = 0;
   virtual void dumpJson(llvm::raw_ostream &O) const = 0;
 
-  virtual bool hasItype() const = 0;
-  virtual bool hasBoundsStr() const = 0;
+  virtual bool srcHasItype() const = 0;
+  virtual bool srcHasBounds() const = 0;
+
   bool hasBoundsKey() const { return ValidBoundsKey; }
   BoundsKey getBoundsKey() const {
     assert(ValidBoundsKey && "No valid Bkey");
@@ -295,7 +296,7 @@ public:
   // Constructor for when we know a CVars and a type string.
   PointerVariableConstraint(CAtoms V, std::string T, std::string Name,
                             FunctionVariableConstraint *F, bool IsArr,
-                            bool IsItype, std::string Is, bool Generic = false)
+                            std::string Is, bool Generic = false)
       : ConstraintVariable(PointerVariable, "" /*not used*/, Name), BaseType(T),
         Vars(V), FV(F), ArrPresent(IsArr), ItypeStr(Is),
         PartOfFuncPrototype(false), Parent(nullptr), BoundsAnnotationStr(""),
@@ -313,10 +314,12 @@ public:
 
   // Is an itype present for this constraint? If yes,
   // what is the text of that itype?
-  bool hasItype() const override { return ItypeStr.size() > 0; }
+  bool srcHasItype() const override {
+    return !ItypeStr.empty() || srcHasBounds();
+  }
   std::string getItype() const { return ItypeStr; }
   // Check if this variable has bounds annotation.
-  bool hasBoundsStr() const { return !BoundsAnnotationStr.empty(); }
+  bool srcHasBounds() const { return !BoundsAnnotationStr.empty(); }
   // Get bounds annotation.
   std::string getBoundsStr() const { return BoundsAnnotationStr; }
 
@@ -494,8 +497,8 @@ public:
     return ParamVars.at(I).ParameterConstraint;
   }
 
-  bool hasItype() const override;
-  bool hasBoundsStr() const override;
+  bool srcHasItype() const override;
+  bool srcHasBounds() const override;
   bool solutionEqualTo(Constraints &CS,
                        const ConstraintVariable *CV) const override;
 

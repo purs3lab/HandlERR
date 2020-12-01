@@ -63,11 +63,10 @@ CVarSet ConstraintResolver::handleDeref(CVarSet T) {
       CA.erase(CA.begin());
       if (CA.size() > 0) {
         bool A = PVC->getArrPresent();
-        bool C = PVC->hasItype();
         std::string D = PVC->getItype();
         FVConstraint *B = PVC->getFV();
         PVConstraint *TmpPV =
-            new PVConstraint(CA, PVC->getTy(), PVC->getName(), B, A, C, D);
+            new PVConstraint(CA, PVC->getTy(), PVC->getName(), B, A, D);
         Tmp.insert(TmpPV);
       }
     }
@@ -112,10 +111,9 @@ PVConstraint *ConstraintResolver::addAtom(PVConstraint *PVC, ConstAtom *PtrTyp,
   CA.insert(CA.begin(), NewA);
   bool A = PVC->getArrPresent();
   FVConstraint *B = PVC->getFV();
-  bool C = PVC->hasItype();
   std::string D = PVC->getItype();
   PVConstraint *TmpPV =
-      new PVConstraint(CA, PVC->getTy(), PVC->getName(), B, A, C, D);
+      new PVConstraint(CA, PVC->getTy(), PVC->getName(), B, A, D);
   TmpPV->constrainOuterTo(CS, PtrTyp, true);
   return TmpPV;
 }

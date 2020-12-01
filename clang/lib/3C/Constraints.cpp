@@ -463,7 +463,6 @@ bool Constraints::graphBasedSolve() {
     Env.doCheckedSolve(true);
     if (!AllTypes) {
       Rest = Env.resetSolution([&Env](VarAtom *VA) {
-        // TODO: This is ugly
         Env.doCheckedSolve(false);
         bool IsArrType = !isa<PtrAtom>(Env.getAssignment(VA));
         Env.doCheckedSolve(true);

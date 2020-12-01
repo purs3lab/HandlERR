@@ -50,7 +50,7 @@ PointerVariableConstraint *PointerVariableConstraint::getWildPVConstraint(
       CS.createFreshGEQ("wildvar", VarAtom::V_Other, CS.getWild(), Rsn, PSL);
   CAtoms NewAtoms = {VA};
   PVConstraint *WildPVC = new PVConstraint(NewAtoms, "unsigned", "wildvar",
-                                           nullptr, false, false, "");
+                                           nullptr, false, "");
   return WildPVC;
 }
 
@@ -61,7 +61,7 @@ PointerVariableConstraint::getPtrPVConstraint(Constraints &CS) {
     CAtoms NewVA;
     NewVA.push_back(CS.getPtr());
     GlobalPtrPV = new PVConstraint(NewVA, "unsigned", "ptrvar", nullptr, false,
-                                   false, "");
+                                   "");
   }
   return GlobalPtrPV;
 }
@@ -72,7 +72,7 @@ PointerVariableConstraint::getNonPtrPVConstraint(Constraints &CS) {
   if (GlobalNonPtrPV == nullptr) {
     CAtoms NewVA; // empty -- represents a base type
     GlobalNonPtrPV = new PVConstraint(NewVA, "unsigned", "basevar", nullptr,
-                                      false, false, "");
+                                      false, "");
   }
   return GlobalNonPtrPV;
 }
@@ -81,7 +81,7 @@ PointerVariableConstraint *
 PointerVariableConstraint::getNamedNonPtrPVConstraint(StringRef Name,
                                                       Constraints &CS) {
   CAtoms NewVA; // empty -- represents a base type
-  return new PVConstraint(NewVA, "unsigned", Name, nullptr, false, false, "");
+  return new PVConstraint(NewVA, "unsigned", Name, nullptr, false, "");
 }
 
 PointerVariableConstraint::PointerVariableConstraint(
@@ -924,8 +924,6 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
       }
       bool IsGeneric =
           ParmVD != nullptr && getTypeVariableType(ParmVD) != nullptr;
-      // TODO: construct separate internal and external representations and add
-      //       an invariant PType constraint between them.
       PVConstraint *Param = new PVConstraint(QT, ParmVD, PName, I, Ctx, &N,
                                              IsGeneric);
       PVConstraint *Arg = new PVConstraint(QT, ParmVD, PName, I, Ctx, &N,
@@ -962,9 +960,6 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
 
   // ConstraintVariable for the return
   bool IsGeneric = FD != nullptr && getTypeVariableType(FD) != nullptr;
-  // TODO: Code is duplicated from parameter code above
-  // TODO: Since I equate checked constraints for atoms > 0, I should really
-  //       only duplicate the first atom.
   auto *RetInternal = new PVConstraint(RT, D, RETVAR, I, Ctx, &N, IsGeneric);
   auto *RetExternal = new PVConstraint(RT, D, RETVAR, I, Ctx, &N, IsGeneric);
   ReturnVar = {RetInternal, RetExternal};
@@ -1289,7 +1284,7 @@ bool PointerVariableConstraint::solutionEqualTo(
           }
         }
       }
-    } else if (FV && vars.size() == 1) {
+    } else if (FV && Vars.size() == 1) {
       // If this a function pointer and we're comparing it to a FVConstraint,
       // then solutions can still be equal.
       Ret = FV->solutionEqualTo(CS, CV);
@@ -1338,12 +1333,12 @@ void FunctionVariableConstraint::dumpJson(raw_ostream &O) const {
   O << "}}";
 }
 
-bool FunctionVariableConstraint::hasItype() const {
-  return ReturnVar.ArgumentsConstraint->hasItype();
+bool FunctionVariableConstraint::srcHasItype() const {
+  return ReturnVar.ArgumentsConstraint->srcHasItype();
 }
 
-bool FunctionVariableConstraint::hasBoundsStr() const {
-  return ReturnVar.ArgumentsConstraint->hasItype();
+bool FunctionVariableConstraint::srcHasBounds() const {
+  return ReturnVar.ArgumentsConstraint->srcHasBounds();
 }
 
 bool FunctionVariableConstraint::solutionEqualTo(
@@ -1798,7 +1793,6 @@ void FunctionVariableConstraint::brainTransplant(ConstraintVariable *FromCV,
                                                  ProgramInfo &I) {
   FVConstraint *From = dyn_cast<FVConstraint>(FromCV);
   assert(From != nullptr);
-  // TODO: transplant internal constraints?
   // Transplant returns.
   ReturnVar.ArgumentsConstraint->brainTransplant(
     From->ReturnVar.ArgumentsConstraint, I);
@@ -1838,7 +1832,6 @@ void FunctionVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
   assert(From != nullptr);
   assert(From->getDeferredParams().size() == 0);
   // Transplant returns.
-  // Our first sanity check is to ensure the function's returns type-check
   ReturnVar.ParameterConstraint->mergeDeclaration(
     From->ReturnVar.ParameterConstraint, I, ReasonFailed);
   ReturnVar.ArgumentsConstraint->mergeDeclaration(
