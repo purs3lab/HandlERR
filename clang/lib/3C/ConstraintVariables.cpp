@@ -1619,7 +1619,7 @@ void constrainConsVarGeq(ConstraintVariable *LHS, ConstraintVariable *RHS,
                 createAtomGeq(CS, IAtom, JAtom, Rsn, PL, CA, DoEqType);
               else {
                 // Now constrain the inner ones as equal.
-                createAtomGeq(CS, IAtom, JAtom, Rsn, PL, CA, DoEqType);
+                createAtomGeq(CS, IAtom, JAtom, Rsn, PL, CA, true);
               }
             }
             // Unequal sizes means casting from (say) T** to T*; not safe.
