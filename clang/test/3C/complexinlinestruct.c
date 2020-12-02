@@ -6,7 +6,8 @@
 
  /* one decl; x rewrites to _Ptr<int> */
 struct foo { int *x; } *a;
-//CHECK: struct foo { _Ptr<int> x; } *a;
+//CHECK_NOALL: struct foo { _Ptr<int> x; } *a;
+//CHECK_ALL: _Ptr<struct foo> a = ((void *)0);
 
 struct baz { int *z; };
 struct baz *d;
@@ -15,11 +16,15 @@ struct baz *d;
 
 /* two decls, not one; y stays as int * */
 struct bad { int* y; } *b, *c; 
-//CHECK: struct bad { int* y; } *b, *c;
+//CHECK_NOALL: struct bad { int* y; } *b, *c;
+//CHECK_ALL: _Ptr<struct bad> b = ((void *)0); 
+//CHECK_ALL: _Ptr<struct bad> c = ((void *)0);
 
  /* two decls, y should be converted */
 struct bar { int* y; } *e, *f;
-//CHECK: struct bar { _Ptr<int> y; } *e, *f;
+//CHECK_NOALL: struct bar { _Ptr<int> y; } *e, *f;
+//CHECK_ALL: _Ptr<struct bar> e = ((void *)0);
+//CHECK_ALL: _Ptr<struct bar> f = ((void *)0);
 
 
 void foo(void) {

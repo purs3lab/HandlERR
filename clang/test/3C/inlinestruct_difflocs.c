@@ -14,6 +14,6 @@ array[] =
   { "mystery", &valuable }
 }; 
 
-//CHECK_ALL: _Ptr<const char> name;
+//CHECK_ALL: static struct foo array _Checked[1] =
 //CHECK_NOALL: const char* name;
-//CHECK: _Ptr<int> p_valuable;
+//CHECK_NOALL: _Ptr<int> p_valuable;

@@ -13,22 +13,23 @@ int valuable;
 static struct foo
 {
   const char* name;
-	//CHECK_NOALL: const char* name;
-	//CHECK_ALL:   _Ptr<const char> name;
   int* p_valuable;
-	//CHECK: _Ptr<int> p_valuable;
 }
 array[] =
 {
   { "mystery", &valuable }
 }; 
+//CHECK_ALL: static struct foo array _Checked[1] =
+//CHECK_NOALL: const char* name; 
+//CHECK_NOALL: _Ptr<int> p_valuable;
 
 /*This code is a series of more complex tests for inline structs*/
 /* a, b, c below all stay as WILD pointers; d can be a _Ptr<...>*/
 
  /* one decl; x rewrites to _Ptr<int> */
 struct foo1 { int *x; } *a;
-	//CHECK: struct foo1 { _Ptr<int> x; } *a;
+	//CHECK_NOALL: struct foo1 { _Ptr<int> x; } *a;
+	//CHECK_ALL: _Ptr<struct foo1> a = ((void *)0);
 
 struct baz { int *z; };
 	//CHECK: struct baz { _Ptr<int> z; };
@@ -36,11 +37,15 @@ struct baz *d;
 	//CHECK: _Ptr<struct baz> d = ((void *)0);
 
 struct bad { int* y; } *b, *c; 
-	//CHECK: struct bad { int* y; } *b, *c; 
+	//CHECK_NOALL: struct bad { int* y; } *b, *c; 
+	//CHECK_ALL: _Ptr<struct bad> b = ((void *)0);
+	//CHECK_ALL: _Ptr<struct bad> c = ((void *)0);
 
  /* two decls, y should be converted */
 struct bar { int* y; } *e, *f;
-	//CHECK: struct bar { _Ptr<int> y; } *e, *f; 
+	//CHECK_NOALL: struct bar { _Ptr<int> y; } *e, *f; 
+	//CHECK_ALL: _Ptr<struct bar> e = ((void *)0);
+	//CHECK_ALL: _Ptr<struct bar> f = ((void *)0);
 
 
 void foo(void) {
@@ -52,12 +57,12 @@ void foo(void) {
 /*This code tests anonymous structs */
 struct { 
 	/*the fields of the anonymous struct are free to be marked checked*/
-    int *data; 
-	//CHECK_NOALL: int *data; 
-	//CHECK_ALL: _Array_ptr<int> data : count(4); 
+    int *data;
 
 /* but the actual pointer can't be */
-} *x; 
+} *x;  
+//CHECK_ALL: _Ptr<struct> x = ((void *)0); 
+//CHECK_NOALL: int *data;
 
 /*ensure trivial conversion*/
 void foo1(int *w) { 
@@ -76,11 +81,12 @@ struct alpha *al[4];
 	//CHECK_NOALL: struct alpha *al[4];
 	//CHECK_ALL: _Ptr<struct alpha> al _Checked[4] = {((void *)0)};
 
-/*be should be made wild, whereas a should be converted*/
+/*be should be made wild in the nonalltypes case, whereas a should be converted*/
 struct {
   int *a;
-	//CHECK: _Ptr<int> a;
-} *be[4]; 
+} *be[4];
+//CHECK_NOALL: _Ptr<int> a; 
+//CHECK_ALL: _Ptr<struct> be _Checked[4] = {((void *)0)}; 
 
 /*this code checks inline structs withiin functions*/
 void foo2(int *x) {

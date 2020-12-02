@@ -16,5 +16,5 @@ struct alpha *al[4];
 struct {
   int *a;
 } *be[4];  
-//CHECK: _Ptr<int> a;
-//CHECK: } *be[4]; 
+//CHECK_NOALL: _Ptr<int> a;
+//CHECK_ALL: _Ptr<struct> be _Checked[4] = {((void *)0)};

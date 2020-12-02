@@ -419,7 +419,26 @@ public:
       unsigned int EndLoc = G->getEndLoc().getRawEncoding();
       if (LastRecordLocation >= BeginLoc && LastRecordLocation <= EndLoc) {
         CVarOption CV = Info.getVariable(G, Context);
-        CB.constraintCVarToWild(CV, "Inline struct encountered.");
+        if(!AllTypes)
+          CB.constraintCVarToWild(CV, "Inline struct encountered.");
+        else {
+          clang::DiagnosticsEngine &DE = Context->getDiagnostics();
+          unsigned InlineStructWarning = DE.getCustomDiagID(
+              DiagnosticsEngine::Warning, "\n Rewriting failed"
+                                          "for %q0 because an inline "
+                                          "or anonymous struct instance "
+                                          "was detected.\n Consider manually "
+                                          "rewriting by inserting the struct "
+                                          "definition inside the _Ptr "
+                                          "annotation.\n "
+                                          "EX. struct {int *a; int *b;} x; "
+                                          "_Ptr<struct {int *a; _Ptr<int> b;}>;");
+          const auto Pointer = reinterpret_cast<intptr_t>(G);
+          const auto Kind =
+              clang::DiagnosticsEngine::ArgumentKind::ak_nameddecl;
+          auto DiagBuilder = DE.Report(G->getLocation(), InlineStructWarning);
+          DiagBuilder.AddTaggedVal(Pointer, Kind);
+        }
       }
     }
 

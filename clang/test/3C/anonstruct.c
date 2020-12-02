@@ -5,8 +5,8 @@
 struct { 
     int *data; 
 } *x; 
-//CHECK: _Ptr<int> data;
-//CHECK: } *x;
+//CHECK_NOALL: _Ptr<int> data;
+//CHECK_ALL: _Ptr<struct> x = ((void *)0);
 
 /*ensure trivial conversion*/
 void foo(int *x) { 
