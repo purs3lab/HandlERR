@@ -97,7 +97,8 @@ CastPlacementVisitor::needCasting(const ConstraintVariable *SrcInt,
                                   const ConstraintVariable *SrcExt,
                                   const ConstraintVariable *DstInt,
                                   const ConstraintVariable *DstExt) {
-  if (SrcExt->solutionEqualTo(Info.getConstraints(), DstExt))
+  if (isa<FVConstraint>(SrcExt) &&
+      SrcExt->solutionEqualTo(Info.getConstraints(), DstExt))
     return CastNeeded::NO_CAST;
 
   const auto &E = Info.getConstraints().getVariables();
@@ -116,6 +117,16 @@ CastPlacementVisitor::needCasting(const ConstraintVariable *SrcInt,
     return CastNeeded::CAST_TO_CHECKED;
   }
 
+  if (!SIChecked && DEChecked && DIChecked) {
+    if (auto *DstPVC = dyn_cast<PVConstraint>(DstExt)) {
+      assert("Checked cast not to a pointer" && !DstPVC->getCvars().empty());
+      ConstAtom *CA = Info.getConstraints().getAssignment(
+        DstPVC->getCvars().at(0));
+      if (isa<NTArrAtom>(CA))
+        return CAST_TO_CHECKED;
+    }
+  }
+
   // Casting requirements are stricter when the parameter is a function pointer.
   if (isa<FVConstraint>(DstExt) || cast<PVConstraint>(DstExt)->getFV()) {
     if (!DstExt->solutionEqualTo(Info.getConstraints(), SrcInt))
@@ -124,7 +135,7 @@ CastPlacementVisitor::needCasting(const ConstraintVariable *SrcInt,
   return CastNeeded::NO_CAST;
 }
 
-std::string
+std::pair<std::string, std::string>
 CastPlacementVisitor::getCastString(const ConstraintVariable *SrcInt,
                                     const ConstraintVariable *SrcExt,
                                     const ConstraintVariable *DstInt,
@@ -133,9 +144,29 @@ CastPlacementVisitor::getCastString(const ConstraintVariable *SrcInt,
   const auto &E = Info.getConstraints().getVariables();
   switch (CastType) {
     case CAST_TO_WILD:
-      return "((" + DstExt->getRewritableOriginalTy() + ")";
-    case CAST_TO_CHECKED:
-      return "_Assume_bounds_cast<" + DstExt->mkString(E, false) + ">(";
+      return std::make_pair("((" + DstExt->getRewritableOriginalTy() + ")",
+                            ")");
+    case CAST_TO_CHECKED: {
+      std::string Suffix = ")";
+      if (const auto *DstPVC = dyn_cast<PVConstraint>(DstExt)) {
+        assert("Checked cast not to a pointer" && !DstPVC->getCvars().empty());
+        ConstAtom *CA = Info.getConstraints().getAssignment(
+          DstPVC->getCvars().at(0));
+        if (isa<ArrAtom>(CA) || isa<NTArrAtom>(CA)) {
+          std::string Bounds = "";
+          if (DstPVC->srcHasBounds())
+            Bounds = DstPVC->getBoundsStr();
+          else if (DstPVC->hasBoundsKey())
+            Bounds = ABRewriter.getBoundsString(DstPVC, nullptr, true);
+          if (Bounds.empty())
+            Bounds = "count(0)";
+
+          Suffix = ", " + Bounds + ")";
+        }
+      }
+      return std::make_pair(
+        "_Assume_bounds_cast<" + DstExt->mkString(E, false) + ">(", Suffix);
+    }
     default:
       llvm_unreachable("No casting needed");
   }
@@ -147,7 +178,7 @@ void CastPlacementVisitor::surroundByCast(const ConstraintVariable *SrcInt,
                                           const ConstraintVariable *DstInt,
                                           const ConstraintVariable *DstExt,
                                           Expr *E) {
-  std::string CastPrefix = getCastString(SrcInt, SrcExt, DstInt, DstExt);
+  auto CastStrs = getCastString(SrcInt, SrcExt, DstInt, DstExt);
 
   // TODO: Is this spacial handling for casts-on-casts still required?
   // If E is already a cast expression, we will try to rewrite the cast instead
@@ -159,8 +190,8 @@ void CastPlacementVisitor::surroundByCast(const ConstraintVariable *SrcInt,
     bool FrontRewritable = Writer.isRewritable(E->getBeginLoc());
     bool EndRewritable = Writer.isRewritable(E->getEndLoc());
     if (FrontRewritable && EndRewritable) {
-      bool BFail = Writer.InsertTextBefore(E->getBeginLoc(), CastPrefix);
-      bool EFail = Writer.InsertTextAfterToken(E->getEndLoc(), ")");
+      bool BFail = Writer.InsertTextBefore(E->getBeginLoc(), CastStrs.first);
+      bool EFail = Writer.InsertTextAfterToken(E->getEndLoc(), CastStrs.second);
       assert("Locations were rewritable, fail should not be possible." &&
              !BFail && !EFail);
     } else {
@@ -174,7 +205,7 @@ void CastPlacementVisitor::surroundByCast(const ConstraintVariable *SrcInt,
       std::string SrcText = clang::tooling::getText(CRA, *Context);
       assert("Cannot insert cast! Perhaps something funny with macros?" &&
              !SrcText.empty());
-      Writer.ReplaceText(NewCRA, CastPrefix + SrcText + ")");
+      Writer.ReplaceText(NewCRA, CastStrs.first + SrcText + CastStrs.second);
     }
   //}
 }

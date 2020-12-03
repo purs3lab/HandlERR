@@ -323,8 +323,9 @@ private:
   }
 };
 
-std::string ArrayBoundsRewriter::getBoundsString(PVConstraint *PV, Decl *D,
-                                                 bool Isitype) {
+std::string
+ArrayBoundsRewriter::getBoundsString(const PVConstraint *PV, Decl *D,
+                                     bool Isitype) {
   auto &ABInfo = Info.getABoundsInfo();
 
   // Try to find a bounds key for the constraint variable. If we can't,
@@ -355,7 +356,7 @@ std::string ArrayBoundsRewriter::getBoundsString(PVConstraint *PV, Decl *D,
   return BString;
 }
 
-bool ArrayBoundsRewriter::hasNewBoundsString(PVConstraint *PV, Decl *D,
+bool ArrayBoundsRewriter::hasNewBoundsString(const PVConstraint *PV, Decl *D,
                                              bool Isitype) {
   std::string BStr = getBoundsString(PV, D, Isitype);
   // There is a bounds string but has nothing declared?

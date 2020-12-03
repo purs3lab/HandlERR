@@ -14,11 +14,12 @@
 
 #include "clang/3C/ConstraintResolver.h"
 #include "clang/AST/RecursiveASTVisitor.h"
+#include "RewriteUtils.h"
 
 class CastPlacementVisitor : public RecursiveASTVisitor<CastPlacementVisitor> {
 public:
   explicit CastPlacementVisitor(ASTContext *C, ProgramInfo &I, Rewriter &R)
-      : Context(C), Info(I), Writer(R), CR(Info, Context) {}
+      : Context(C), Info(I), Writer(R), CR(Info, Context), ABRewriter(C, I) {}
 
   bool VisitCallExpr(CallExpr *C);
 
@@ -27,6 +28,7 @@ private:
   ProgramInfo &Info;
   Rewriter &Writer;
   ConstraintResolver CR;
+  ArrayBoundsRewriter ABRewriter;
 
   enum CastNeeded { NO_CAST = 0, CAST_TO_CHECKED, CAST_TO_WILD };
 
@@ -35,10 +37,12 @@ private:
                          const ConstraintVariable *DstInt,
                          const ConstraintVariable *DstExt);
 
-  std::string getCastString(const ConstraintVariable *SrcInt,
-                            const ConstraintVariable *SrcExt,
-                            const ConstraintVariable *DstInt,
-                            const ConstraintVariable *DstExt);
+
+  std::pair<std::string, std::string>
+  getCastString(const ConstraintVariable *SrcInt,
+                const ConstraintVariable *SrcExt,
+                const ConstraintVariable *DstInt,
+                const ConstraintVariable *DstExt);
 
   void surroundByCast(const ConstraintVariable *SrcInt,
                       const ConstraintVariable *SrcExt,
