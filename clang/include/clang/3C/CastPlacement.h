@@ -16,10 +16,27 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "RewriteUtils.h"
 
+class CastLocatorVisitor : public RecursiveASTVisitor<CastLocatorVisitor> {
+public:
+  explicit CastLocatorVisitor(ASTContext *C) : Context(C) {}
+
+  bool VisitCastExpr(CastExpr *C);
+
+  bool exprHasCast(Expr *E) const;
+
+private:
+  ASTContext *Context;
+  std::set<Expr *> ExprsWithCast;
+
+  static Expr *ignoreCheckedCImplicit(Expr *E);
+};
+
 class CastPlacementVisitor : public RecursiveASTVisitor<CastPlacementVisitor> {
 public:
-  explicit CastPlacementVisitor(ASTContext *C, ProgramInfo &I, Rewriter &R)
-      : Context(C), Info(I), Writer(R), CR(Info, Context), ABRewriter(C, I) {}
+  explicit CastPlacementVisitor
+    (ASTContext *C, ProgramInfo &I, Rewriter &R, CastLocatorVisitor &L)
+    : Context(C), Info(I), Writer(R), CR(Info, Context), ABRewriter(C, I),
+      Locator(L) {}
 
   bool VisitCallExpr(CallExpr *C);
 
@@ -29,6 +46,7 @@ private:
   Rewriter &Writer;
   ConstraintResolver CR;
   ArrayBoundsRewriter ABRewriter;
+  CastLocatorVisitor &Locator;
 
   enum CastNeeded { NO_CAST = 0, CAST_TO_CHECKED, CAST_TO_WILD };
 

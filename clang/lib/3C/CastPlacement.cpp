@@ -80,7 +80,8 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
         // Order of ParameterC and ArgumentC is reversed from when inserting
         // parameter casts because assignment now goes from returned to its
         // local use.
-        if (needCasting(RetInt, RetExt, ArgC, ArgC) != NO_CAST) {
+        if (!Locator.exprHasCast(CE) &&
+            needCasting(RetInt, RetExt, ArgC, ArgC) != NO_CAST) {
           surroundByCast(RetInt, RetExt, ArgC, ArgC, CE);
           break;
         }
@@ -159,7 +160,7 @@ CastPlacementVisitor::getCastString(const ConstraintVariable *SrcInt,
           else if (DstPVC->hasBoundsKey())
             Bounds = ABRewriter.getBoundsString(DstPVC, nullptr, true);
           if (Bounds.empty())
-            Bounds = "count(0)";
+            Bounds = "byte_count(0)";
 
           Suffix = ", " + Bounds + ")";
         }
@@ -208,4 +209,26 @@ void CastPlacementVisitor::surroundByCast(const ConstraintVariable *SrcInt,
       Writer.ReplaceText(NewCRA, CastStrs.first + SrcText + CastStrs.second);
     }
   //}
+}
+
+bool CastLocatorVisitor::exprHasCast(Expr *E) const {
+  return isa<CastExpr>(E) || ExprsWithCast.find(E) != ExprsWithCast.end();
+}
+
+bool CastLocatorVisitor::VisitCastExpr(CastExpr *C) {
+  if (!isa<ImplicitCastExpr>(C)) {
+    Expr *Sub = ignoreCheckedCImplicit(C->getSubExpr());
+    ExprsWithCast.insert(Sub);
+  }
+  return true;
+}
+
+Expr *CastLocatorVisitor::ignoreCheckedCImplicit(Expr *E) {
+  Expr *Old = nullptr;
+  Expr *New = E;
+  while (Old != New) {
+    Old = New;
+    New = Old->IgnoreExprTmp()->IgnoreImplicit();
+  }
+  return New;
 }

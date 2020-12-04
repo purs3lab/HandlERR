@@ -417,7 +417,8 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   std::map<llvm::FoldingSetNodeID, AnnotationNeeded> NodeMap;
   CheckedRegionFinder CRF(&Context, R, Info, Seen, NodeMap, WarnRootCause);
   CheckedRegionAdder CRA(&Context, R, NodeMap);
-  CastPlacementVisitor ECPV(&Context, Info, R);
+  CastLocatorVisitor CLV(&Context);
+  CastPlacementVisitor ECPV(&Context, Info, R, CLV);
   TypeExprRewriter TER(&Context, Info, R);
   TypeArgumentAdder TPA(&Context, Info, R);
   TranslationUnitDecl *TUD = Context.getTranslationUnitDecl();
@@ -433,6 +434,7 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
     // Cast placement must happen after type expression rewriting (i.e. cast and
     // compound literal) so that casts to unchecked pointer on itype function
     // calls can override rewritings of casts to checked types.
+    CLV.TraverseDecl(D);
     ECPV.TraverseDecl(D);
     TPA.TraverseDecl(D);
   }
