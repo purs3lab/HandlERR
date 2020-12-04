@@ -111,6 +111,7 @@ PointerVariableConstraint::PointerVariableConstraint(
   this->IsZeroWidthArray = Ot->IsZeroWidthArray;
   this->BaseType = Ot->BaseType;
   this->HasSrcItype = Ot->HasSrcItype;
+  this->IsVoidPtr = Ot->IsVoidPtr;
   // We need not initialize other members.
 }
 
@@ -406,10 +407,11 @@ PointerVariableConstraint::PointerVariableConstraint(
   // Get a string representing the type without pointer and array indirection.
   BaseType = extractBaseType(D, QT, Ty, C);
 
-  bool IsWild = !IsGeneric && (isVarArgType(BaseType) || isTypeHasVoid(QT));
+  IsVoidPtr = isTypeHasVoid(QT);
+  bool IsWild = !IsGeneric && (isVarArgType(BaseType) || IsVoidPtr);
   if (IsWild) {
-    std::string Rsn =
-        isTypeHasVoid(QT) ? "Default void* type" : "Default Var arg list type";
+    std::string Rsn = IsVoidPtr ? "Default void* type"
+                                : "Default Var arg list type";
     // TODO: Github issue #61: improve handling of types for variable arguments.
     for (const auto &V : Vars)
       if (VarAtom *VA = dyn_cast<VarAtom>(V))

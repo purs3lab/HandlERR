@@ -98,6 +98,10 @@ CastPlacementVisitor::needCasting(const ConstraintVariable *SrcInt,
                                   const ConstraintVariable *SrcExt,
                                   const ConstraintVariable *DstInt,
                                   const ConstraintVariable *DstExt) {
+
+  if (isa<PVConstraint>(DstExt) && cast<PVConstraint>(DstExt)->isVoidPtr())
+    return CastNeeded::NO_CAST;
+
   if (isa<FVConstraint>(SrcExt) &&
       SrcExt->solutionEqualTo(Info.getConstraints(), DstExt))
     return CastNeeded::NO_CAST;

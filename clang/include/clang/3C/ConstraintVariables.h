@@ -297,6 +297,9 @@ private:
   // Does the type internally contain a typedef, and if so: at what level and what is it's name?
   struct InternalTypedefInfo typedeflevelinfo;
 
+  // Is this a pointer to void? Possibly with multiple levels of indirection.
+  bool IsVoidPtr;
+
 public:
   // Constructor for when we know a CVars and a type string.
   PointerVariableConstraint(CAtoms V, std::string T, std::string Name,
@@ -305,7 +308,8 @@ public:
       : ConstraintVariable(PointerVariable, "" /*not used*/, Name), BaseType(T),
         Vars(V), FV(F), ArrPresent(IsArr), HasSrcItype(!Is.empty()),
         ItypeStr(Is), PartOfFuncPrototype(false), Parent(nullptr),
-        BoundsAnnotationStr(""), IsGeneric(Generic), IsZeroWidthArray(false) {}
+        BoundsAnnotationStr(""), IsGeneric(Generic), IsZeroWidthArray(false),
+        IsVoidPtr(false) {}
 
   std::string getTy() const { return BaseType; }
   bool getArrPresent() const { return ArrPresent; }
@@ -336,6 +340,8 @@ public:
   bool getIsOriginallyChecked() const override {
     return llvm::any_of(Vars, [](Atom *A) { return isa<ConstAtom>(A); });
   }
+
+  bool isVoidPtr() const { return IsVoidPtr; }
 
   bool solutionEqualTo(Constraints &CS,
                        const ConstraintVariable *CV) const override;

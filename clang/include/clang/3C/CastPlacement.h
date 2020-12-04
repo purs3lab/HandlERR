@@ -35,7 +35,7 @@ class CastPlacementVisitor : public RecursiveASTVisitor<CastPlacementVisitor> {
 public:
   explicit CastPlacementVisitor
     (ASTContext *C, ProgramInfo &I, Rewriter &R, CastLocatorVisitor &L)
-    : Context(C), Info(I), Writer(R), CR(Info, Context), ABRewriter(C, I),
+    : Context(C), Info(I), Writer(R), CR(Info, Context), ABRewriter(I),
       Locator(L) {}
 
   bool VisitCallExpr(CallExpr *C);
