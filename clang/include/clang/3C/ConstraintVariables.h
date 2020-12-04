@@ -234,9 +234,14 @@ private:
   // If for all U in arrSizes, any U -> (a,b) where a = O_SizedArray or
   // O_UnSizedArray, arrPresent is true.
   bool ArrPresent;
-  // Is there an itype associated with this constraint? If there is, how was it
-  // originally stored in the program?
+
+  // True if this variable has an itype in the original source code.
+  bool HasSrcItype;
+  // The string representation of the itype of in the original source. This
+  // string is empty if the variable did not have an itype OR if the itype was
+  // implicitly declared by a bounds declaration on an unchecked pointer.
   std::string ItypeStr;
+
   // Get the qualifier string (e.g., const, etc) for the provided
   // pointer type into the provided string stream (ss).
   void getQualString(uint32_t TypeIdx, std::ostringstream &Ss) const;
@@ -298,9 +303,9 @@ public:
                             FunctionVariableConstraint *F, bool IsArr,
                             std::string Is, bool Generic = false)
       : ConstraintVariable(PointerVariable, "" /*not used*/, Name), BaseType(T),
-        Vars(V), FV(F), ArrPresent(IsArr), ItypeStr(Is),
-        PartOfFuncPrototype(false), Parent(nullptr), BoundsAnnotationStr(""),
-        IsGeneric(Generic), IsZeroWidthArray(false) {}
+        Vars(V), FV(F), ArrPresent(IsArr), HasSrcItype(!Is.empty()),
+        ItypeStr(Is), PartOfFuncPrototype(false), Parent(nullptr),
+        BoundsAnnotationStr(""), IsGeneric(Generic), IsZeroWidthArray(false) {}
 
   std::string getTy() const { return BaseType; }
   bool getArrPresent() const { return ArrPresent; }
@@ -315,11 +320,14 @@ public:
   // Is an itype present for this constraint? If yes,
   // what is the text of that itype?
   bool srcHasItype() const override {
-    return !ItypeStr.empty() || srcHasBounds();
+    assert(!HasSrcItype || !ItypeStr.empty() || !BoundsAnnotationStr.empty());
+    return HasSrcItype;
   }
-  std::string getItype() const { return ItypeStr; }
+  std::string getItype() const {
+    return ItypeStr;
+  }
   // Check if this variable has bounds annotation.
-  bool srcHasBounds() const { return !BoundsAnnotationStr.empty(); }
+  bool srcHasBounds() const override { return !BoundsAnnotationStr.empty(); }
   // Get bounds annotation.
   std::string getBoundsStr() const { return BoundsAnnotationStr; }
 
