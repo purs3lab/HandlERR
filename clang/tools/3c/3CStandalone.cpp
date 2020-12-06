@@ -108,6 +108,13 @@ static cl::opt<bool> OptDiableCCTypeChecker("disccty",
                               cl::cat(_3CCategory));
 
 static cl::opt<std::string>
+  Opt3cOutputJson("cccoutput",
+                   cl::desc("Path to the file where all the results "
+                            " will be dumped as json"),
+                   cl::init("3CResults.json"),
+                   cl::cat(_3CCategory));
+
+static cl::opt<std::string>
     OptBaseDir("base-dir",
             cl::desc("Base directory for the code we're translating"),
             cl::init(""), cl::cat(_3CCategory));
@@ -217,9 +224,9 @@ int main(int argc, const char **argv) {
     errs() << "Trying to rewrite the converted files back.\n";
   }
 
-  // Write all the converted files back.
-  if (!_3CInterface.WriteAllConvertedFilesToDisk()) {
-    errs() << "Failure occurred while trying to rewrite converted files back."
+  // Write json file back.
+  if (!_3CInterface.WriteArrayConversionAndBoundsToJson(Opt3cOutputJson)) {
+    errs() << "Failure occurred while trying to write json files back."
               "Exiting.\n";
     return 1;
   }
