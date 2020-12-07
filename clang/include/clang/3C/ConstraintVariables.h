@@ -371,7 +371,8 @@ public:
                             std::string N, ProgramInfo &I,
                             const clang::ASTContext &C,
                             std::string *InFunc = nullptr,
-                            bool IsGeneric = false);
+                            bool IsGeneric = false,
+                            bool VarAtomForChecked = false);
 
   const CAtoms &getCvars() const { return Vars; }
 

@@ -172,7 +172,8 @@ class TypedefLevelFinder : public RecursiveASTVisitor<TypedefLevelFinder> {
 
 PointerVariableConstraint::PointerVariableConstraint(
     const QualType &QT, DeclaratorDecl *D, std::string N, ProgramInfo &I,
-    const ASTContext &C, std::string *InFunc, bool Generic)
+    const ASTContext &C, std::string *InFunc, bool Generic,
+    bool VarAtomForChecked)
     : ConstraintVariable(ConstraintVariable::PointerVariable,
                          tyToStr(QT.getTypePtr()), N),
       FV(nullptr), HasSrcItype(false), PartOfFuncPrototype(InFunc != nullptr),
@@ -294,7 +295,13 @@ PointerVariableConstraint::PointerVariableConstraint(
       VarCreated = true;
       assert(CAtom != nullptr && "Unable to find the type "
                                  "of the checked pointer.");
-      Vars.push_back(CAtom);
+      if (VarAtomForChecked) {
+        VarAtom *VA = CS.getFreshVar(Npre + N, VK);
+        CS.addConstraint(CS.createGeq(VA, CAtom, false));
+        Vars.push_back(VA);
+      } else {
+        Vars.push_back(CAtom);
+      }
     }
 
     if (Ty->isArrayType() || Ty->isIncompleteArrayType()) {
@@ -928,10 +935,11 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
       }
       bool IsGeneric =
           ParmVD != nullptr && getTypeVariableType(ParmVD) != nullptr;
-      PVConstraint *Param = new PVConstraint(QT, ParmVD, PName, I, Ctx, &N,
-                                             IsGeneric);
+
       PVConstraint *Arg = new PVConstraint(QT, ParmVD, PName, I, Ctx, &N,
                                            IsGeneric);
+      PVConstraint *Param = new PVConstraint(QT, ParmVD, PName, I, Ctx, &N,
+                                             IsGeneric, true);
       ParamArgPair Pair = {Param, Arg};
       for (unsigned J = 0; J < Param->getCvars().size(); J++) {
         Atom *ParamA = Pair.ParameterConstraint->getCvars()[J];
@@ -964,7 +972,8 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
 
   // ConstraintVariable for the return
   bool IsGeneric = FD != nullptr && getTypeVariableType(FD) != nullptr;
-  auto *RetInternal = new PVConstraint(RT, D, RETVAR, I, Ctx, &N, IsGeneric);
+  auto *RetInternal = new PVConstraint(RT, D, RETVAR, I, Ctx, &N, IsGeneric,
+                                       true);
   auto *RetExternal = new PVConstraint(RT, D, RETVAR, I, Ctx, &N, IsGeneric);
   ReturnVar = {RetInternal, RetExternal};
   for (unsigned J = 0; J < RetInternal->getCvars().size(); J++) {
