@@ -54,7 +54,7 @@ Node * createnode(int data){
 	//CHECK: Node *createnode(int data) : itype(_Ptr<Node>){
 
   Node * newNode = malloc(sizeof(Node));
-	//CHECK: _Ptr<Node> newNode =  malloc<Node>(sizeof(Node));
+	//CHECK: _Ptr<Node> newNode = malloc<Node>(sizeof(Node));
 
   if (!newNode) {
 
@@ -76,7 +76,7 @@ List * makelist(){
 	//CHECK: _Ptr<List> makelist(void){
 
   List * list = malloc(sizeof(List));
-	//CHECK: _Ptr<List> list =  malloc<List>(sizeof(List));
+	//CHECK: _Ptr<List> list = malloc<List>(sizeof(List));
 
   if (!list) {
 

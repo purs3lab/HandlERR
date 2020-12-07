@@ -70,7 +70,7 @@ struct np *sus(struct r *x, struct r *y) {
 	//CHECK: struct np *sus(struct r *x : itype(_Ptr<struct r>), struct r *y : itype(_Ptr<struct r>)) : itype(_Ptr<struct np>) {
   x->next += 1;
   struct np *z = malloc(sizeof(struct np));
-	//CHECK: _Ptr<struct np> z =  malloc<struct np>(sizeof(struct np));
+	//CHECK: _Ptr<struct np> z = malloc<struct np>(sizeof(struct np));
   z->x = 1;
   z->y = 0;
   return z;

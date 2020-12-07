@@ -29,7 +29,7 @@ char* foo() {
   int *x = &sx;
 	//CHECK: int *x = &sx;
   int *y = &sy;
-	//CHECK: _Ptr<int> y =  &sy;
+	//CHECK: _Ptr<int> y = &sy;
   char *z = (int *) sus(x, y);
 	//CHECK: char *z = (int *) sus(x, y);
   *z = *z + 1;
@@ -42,7 +42,7 @@ int* bar() {
   int *x = &sx;
 	//CHECK: int *x = &sx;
   int *y = &sy;
-	//CHECK: _Ptr<int> y =  &sy;
+	//CHECK: _Ptr<int> y = &sy;
   int *z = (char *) (sus(x, y));
 	//CHECK: int *z = (char *) (sus(x, y));
   return z;

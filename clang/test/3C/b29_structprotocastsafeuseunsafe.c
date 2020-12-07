@@ -75,7 +75,7 @@ struct r *sus(struct r *x, struct r *y) {
 	//CHECK_ALL: struct r *sus(struct r *x : itype(_Ptr<struct r>), struct r *y : itype(_Ptr<struct r>)) {
   x->next += 1;
   struct r *z = malloc(sizeof(struct r));
-	//CHECK_NOALL: _Ptr<struct r> z =  malloc<struct r>(sizeof(struct r));
+	//CHECK_NOALL: _Ptr<struct r> z = malloc<struct r>(sizeof(struct r));
 	//CHECK_ALL:   struct r *z = malloc<struct r>(sizeof(struct r));
   z->data = 1;
   z->next = 0;

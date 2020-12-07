@@ -23,9 +23,9 @@ int* foo() {
   int *x = &sx;
 	//CHECK: int *x = &sx;
   int *y = &sy;
-	//CHECK: _Ptr<int> y =  &sy;
+	//CHECK: _Ptr<int> y = &sy;
   int *z = sus(x, y);
-	//CHECK_NOALL: _Ptr<int> z =  sus(x, y);
+	//CHECK_NOALL: _Ptr<int> z = sus(x, y);
 	//CHECK_ALL:   int *z = sus(x, y);
   *z = *z + 1;
   return z;
@@ -37,7 +37,7 @@ int* bar() {
   int *x = &sx;
 	//CHECK: int *x = &sx;
   int *y = &sy;
-	//CHECK: _Ptr<int> y =  &sy;
+	//CHECK: _Ptr<int> y = &sy;
   int *z = (sus(x, y));
 	//CHECK: int *z = (sus(x, y));
   z += 2;
@@ -48,7 +48,7 @@ int *sus(int *x, int*y) {
 	//CHECK_NOALL: int *sus(int *x, _Ptr<int> y) : itype(_Ptr<int>) {
 	//CHECK_ALL: int *sus(int *x : itype(_Array_ptr<int>), _Ptr<int> y) {
   int *z = malloc(sizeof(int));
-	//CHECK_NOALL: _Ptr<int> z =  malloc<int>(sizeof(int));
+	//CHECK_NOALL: _Ptr<int> z = malloc<int>(sizeof(int));
 	//CHECK_ALL:   int *z = malloc<int>(sizeof(int));
   *z = 1;
   x++;

@@ -37,7 +37,7 @@ struct np *sus(struct p x, struct p y) {
 	//CHECK_NOALL: struct np *sus(struct p x, struct p y) : itype(_Ptr<struct np>) {
 	//CHECK_ALL: struct np *sus(struct p x, struct p y) {
   struct np *z = malloc(sizeof(struct np));
-	//CHECK_NOALL: _Ptr<struct np> z =  malloc<struct np>(sizeof(struct np));
+	//CHECK_NOALL: _Ptr<struct np> z = malloc<struct np>(sizeof(struct np));
 	//CHECK_ALL:   struct np *z = malloc<struct np>(sizeof(struct np));
   z->x = 1;
   z->x = 2;

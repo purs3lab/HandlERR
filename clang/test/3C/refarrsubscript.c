@@ -18,7 +18,7 @@ int **bar(struct foo *p) {
 	//CHECK_NOALL: int **bar(_Ptr<struct foo> p) {
 	//CHECK_ALL: _Array_ptr<_Ptr<int>> bar(_Ptr<struct foo> p) _Checked {
   int *n = &p->n;
-	//CHECK: _Ptr<int> n =  &p->n;
+	//CHECK: _Ptr<int> n = &p->n;
   return &(p->b[1]);
 }
 

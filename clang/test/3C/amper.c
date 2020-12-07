@@ -10,7 +10,7 @@ void foo(int *x) {
   x = (int *)5;
 	//CHECK: x = (int *)5;
   int **y = &x;
-	//CHECK: _Ptr<int *> y =  &x;
+	//CHECK: _Ptr<int *> y = &x;
 }
 
 void bar(int *x) {
@@ -33,9 +33,9 @@ int f(int *x) {
 
 void baz(void) {
   int (*fp)(int *) = f;
-	//CHECK: _Ptr<int (_Ptr<int> )> fp =  f;
+	//CHECK: _Ptr<int (_Ptr<int> )> fp = f;
   int (*fp2)(int *) = &f;
-	//CHECK: _Ptr<int (_Ptr<int> )> fp2 =  &f;
+	//CHECK: _Ptr<int (_Ptr<int> )> fp2 = &f;
   f((void*)0);
 }
 
@@ -50,9 +50,9 @@ void addrof(void){
 void bif(int **x) {
 	//CHECK: void bif(_Ptr<_Ptr<int>> x) _Checked {
   int **w = 0;
-	//CHECK: _Ptr<_Ptr<int>> w =  0;
+	//CHECK: _Ptr<_Ptr<int>> w = 0;
   int *y = *(x = w);
-	//CHECK: _Ptr<int> y =  *(x = w);
+	//CHECK: _Ptr<int> y = *(x = w);
   w = &y;
 }
 

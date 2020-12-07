@@ -77,7 +77,7 @@ struct p *sus(struct p *x, struct p *y) {
 	//CHECK_ALL: struct p *sus(_Ptr<struct p> x, _Ptr<struct p> y) {
   x->y += 1;
   struct p *z = malloc(sizeof(struct p));
-	//CHECK_NOALL: _Ptr<struct p> z =  malloc<struct p>(sizeof(struct p));
+	//CHECK_NOALL: _Ptr<struct p> z = malloc<struct p>(sizeof(struct p));
 	//CHECK_ALL:   struct p *z = malloc<struct p>(sizeof(struct p));
   return z;
 }

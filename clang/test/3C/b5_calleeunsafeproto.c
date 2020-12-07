@@ -22,7 +22,7 @@ int* foo() {
   int *x = &sx;
 	//CHECK: int *x = &sx;
   int *y = &sy;
-	//CHECK: _Ptr<int> y =  &sy;
+	//CHECK: _Ptr<int> y = &sy;
   int *z = sus(x, y);
 	//CHECK: int *z = sus(x, y);
   *z = *z + 1;

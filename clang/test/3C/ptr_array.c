@@ -17,7 +17,7 @@ void test0(int *a) {
 
   int *b[1] = {a};
 	//CHECK_NOALL: int *b[1] = {a};
-	//CHECK_ALL:   _Ptr<int> b _Checked[1] =  {a};
+	//CHECK_ALL:   _Ptr<int> b _Checked[1] = {a};
 }
 
 /* An unchecked pointer should cause the array to be unchecked. */
@@ -29,7 +29,7 @@ void test1(int *a) {
 
   int *b[1] = {a};
 	//CHECK_NOALL: int *b[1] = {a};
-	//CHECK_ALL:   int * b _Checked[1] =  {a};
+	//CHECK_ALL:   int * b _Checked[1] = {a};
 }
 
 /* Example from from the issue */
@@ -41,7 +41,7 @@ int *foo() {
   int z = 3;
   int *ptrs[4] = { &x, &y, &z, (int *)5 };
 	//CHECK_NOALL: int *ptrs[4] = { &x, &y, &z, (int *)5 };
-	//CHECK_ALL:   int * ptrs _Checked[4] =  { &x, &y, &z, (int *)5 };
+	//CHECK_ALL:   int * ptrs _Checked[4] = { &x, &y, &z, (int *)5 };
   int *ret;
 	//CHECK: int *ret;
   for (int i = 0; i < 4; i++) {
@@ -61,7 +61,7 @@ int *foo2() {
   int z = 3;
   int *ptrs[4] = { &x, &y, &z, &x};
 	//CHECK_NOALL: int *ptrs[4] = { &x, &y, &z, &x};
-	//CHECK_ALL:   _Ptr<int> ptrs _Checked[4] =  { &x, &y, &z, &x};
+	//CHECK_ALL:   _Ptr<int> ptrs _Checked[4] = { &x, &y, &z, &x};
   int *ret;
 	//CHECK_NOALL: int *ret;
 	//CHECK_ALL:   _Ptr<int> ret = ((void *)0);

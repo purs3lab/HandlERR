@@ -18,7 +18,7 @@ void bar() {
 	//CHECK_ALL: void bar() _Checked {
   int *x = 0;
 	//CHECK_NOALL: int *x = 0;
-	//CHECK_ALL:   _Nt_array_ptr<int> x =  0;
+	//CHECK_ALL:   _Nt_array_ptr<int> x = 0;
   foo(x);
 }
 void baz() {

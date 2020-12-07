@@ -44,7 +44,7 @@ int * g1(int *y) {
 void foo1(int *z) {
 	//CHECK: void foo1(_Ptr<int> z) _Checked {
   int *w = (0 ? f1 : g1)(z);
-	//CHECK: _Ptr<int> w =  (0 ? f1 : g1)(z);
+	//CHECK: _Ptr<int> w = (0 ? f1 : g1)(z);
 }
 
 
@@ -82,5 +82,5 @@ void bar() {
   int *x = a();
 	//CHECK: int *x = a();
   int *y = i();
-	//CHECK: _Ptr<int> y =  i();
+	//CHECK: _Ptr<int> y = i();
 }

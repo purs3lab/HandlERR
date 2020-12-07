@@ -19,7 +19,7 @@ int *g(int *x) {
 }
 void h() {
   int *(*fp)(int *) = g;
-	//CHECK: _Ptr<int * (int *)> fp =  g;
+	//CHECK: _Ptr<int * (int *)> fp = g;
   f(g);
   f(g2);
   int *x = (int *)5;

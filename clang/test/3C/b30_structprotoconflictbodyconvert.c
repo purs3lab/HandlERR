@@ -70,7 +70,7 @@ struct np *bar() {
   x->next = y;
   y->next = x;
   struct np *z = sus(x, y);
-	//CHECK: _Ptr<struct np> z =  sus(x, y);
+	//CHECK: _Ptr<struct np> z = sus(x, y);
   return z;
 }
 
@@ -79,7 +79,7 @@ struct np *sus(struct r *x, struct r *y) {
 	//CHECK_ALL: struct np *sus(_Ptr<struct r> x, _Ptr<struct r> y) : itype(_Ptr<struct np>) {
   x->next += 1;
   struct np *z = malloc(sizeof(struct np));
-	//CHECK: _Ptr<struct np> z =  malloc<struct np>(sizeof(struct np));
+	//CHECK: _Ptr<struct np> z = malloc<struct np>(sizeof(struct np));
   z->x = 1;
   z->y = 0;
   return z;

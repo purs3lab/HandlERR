@@ -31,7 +31,7 @@ void bar(void) {
 	//CHECK: y = (int *)5;
   int *z = foo(y);
 	//CHECK_NOALL: int *z = foo(y);
-	//CHECK_ALL:   _Ptr<int> z =  foo(y);
+	//CHECK_ALL:   _Ptr<int> z = foo(y);
 } 
 
 void force(int *x){}
