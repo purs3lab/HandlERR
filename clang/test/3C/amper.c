@@ -6,7 +6,7 @@
 // RUN: rm %S/amper.checked.c
 
 void foo(int *x) {
-	//CHECK: void foo(int *x) {
+	//CHECK: void foo(int *x : itype(_Ptr<int>)) {
   x = (int *)5;
 	//CHECK: x = (int *)5;
   int **y = &x;
@@ -14,7 +14,7 @@ void foo(int *x) {
 }
 
 void bar(int *x) {
-	//CHECK: void bar(int *x) {
+	//CHECK: void bar(int *x : itype(_Ptr<int>)) {
   x = (int *)5;
 	//CHECK: x = (int *)5;
   int *y = *(&x);

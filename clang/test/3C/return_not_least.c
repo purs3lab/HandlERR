@@ -6,7 +6,7 @@
 // RUN: rm %S/return_not_least.checked.c
 
 int *a() {
-	//CHECK_NOALL: int *a(void) {
+	//CHECK_NOALL: int *a(void) : itype(_Ptr<int>) {
 	//CHECK_ALL: _Array_ptr<int> a(void) _Checked {
   int *a = 0;
 	//CHECK_NOALL: int *a = 0;
@@ -22,7 +22,7 @@ int *dumb(int *a){
 }
 
 int *f(void) {
-	//CHECK_NOALL: int *f(void) {
+	//CHECK_NOALL: int *f(void) : itype(_Ptr<int>) {
 	//CHECK_ALL: _Array_ptr<int> f(void) {
   int *p = (int*)0;
 	//CHECK_NOALL: int *p = (int*)0;
@@ -32,10 +32,10 @@ int *f(void) {
 }
 
 int *foo(void) {
-	//CHECK_NOALL: int *foo(void) {
+	//CHECK_NOALL: _Ptr<int> foo(void) _Checked {
 	//CHECK_ALL: _Array_ptr<int> foo(void) _Checked {
   int *q = f();
-	//CHECK_NOALL: int *q = f();
+	//CHECK_NOALL: _Ptr<int> q = f();
 	//CHECK_ALL:   _Array_ptr<int> q = f();
   return q;
 }
@@ -44,7 +44,7 @@ int *foo(void) {
 extern _Itype_for_any(T) void *calloc(size_t nmemb, size_t size) : itype(_Array_ptr<T>) byte_count(nmemb * size);
 
 int *bar() {
-	//CHECK_NOALL: int *bar(void) {
+	//CHECK_NOALL: int *bar(void) : itype(_Ptr<int>) {
 	//CHECK_ALL: _Array_ptr<int> bar(void) {
   int *z = calloc(2, sizeof(int));
 	//CHECK_NOALL: int *z = calloc<int>(2, sizeof(int));
@@ -54,7 +54,7 @@ int *bar() {
 }
 
 int *baz(int *a) {
-	//CHECK_NOALL: int *baz(int *a) {
+	//CHECK_NOALL: int *baz(int *a : itype(_Ptr<int>)) : itype(_Ptr<int>) {
 	//CHECK_ALL: _Array_ptr<int> baz(_Array_ptr<int> a) {
   a++;
 
@@ -71,7 +71,7 @@ int *baz(int *a) {
 }
 
 int *buz(int *a) {
-	//CHECK_NOALL: int *buz(int *a) {
+	//CHECK_NOALL: int *buz(int *a : itype(_Ptr<int>)) : itype(_Ptr<int>) {
 	//CHECK_ALL: _Ptr<int> buz(_Array_ptr<int> a) {
   a++;
 

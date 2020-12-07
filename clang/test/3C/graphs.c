@@ -36,8 +36,7 @@ struct node
 /*Some declarations*/
 
 struct node* createNode(int v);
-	//CHECK_NOALL: struct node *createNode(int v) : itype(_Ptr<struct node>);
-	//CHECK_ALL: _Ptr<struct node>  createNode(int v);
+	//CHECK: _Ptr<struct node>  createNode(int v);
 
 struct Graph
 
@@ -248,8 +247,7 @@ void topologicalSort(struct Graph* graph)
 /*Allocate memory for a node*/
 
 struct node* createNode(int v)
-	//CHECK_NOALL: struct node *createNode(int v) : itype(_Ptr<struct node>)
-	//CHECK_ALL: _Ptr<struct node>  createNode(int v)
+	//CHECK: _Ptr<struct node>  createNode(int v)
 
 {
 
@@ -311,7 +309,7 @@ void addEdge(struct Graph* graph, int src, int dest)
     /* Add edge from src to dest*/
 
     struct node* newNode = createNode(dest);
-	//CHECK_NOALL: struct node* newNode = createNode(dest);
+	//CHECK_NOALL: struct node* newNode = ((struct node *)createNode(dest));
 	//CHECK_ALL:     _Ptr<struct node> newNode = createNode(dest);
 
     newNode->next = graph->adjLists[src];

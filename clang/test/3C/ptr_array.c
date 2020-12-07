@@ -12,7 +12,7 @@
 
 /* A checked pointer should allow the array to be checked. */
 void test0(int *a) {
-	//CHECK_NOALL: void test0(int *a) {
+	//CHECK_NOALL: void test0(int *a : itype(_Ptr<int>)) {
 	//CHECK_ALL: void test0(_Ptr<int> a) _Checked {
 
   int *b[1] = {a};
@@ -22,7 +22,7 @@ void test0(int *a) {
 
 /* An unchecked pointer should cause the array to be unchecked. */
 void test1(int *a) {
-	//CHECK: void test1(int *a) {
+	//CHECK: void test1(int *a : itype(_Ptr<int>)) {
 
   a = (int*) 4;
 	//CHECK: a = (int*) 4;
@@ -34,7 +34,7 @@ void test1(int *a) {
 
 /* Example from from the issue */
 int *foo() {
-	//CHECK: int *foo(void) {
+	//CHECK: int *foo(void) : itype(_Ptr<int>) {
 
   int x = 1;
   int y = 2;
@@ -53,7 +53,7 @@ int *foo() {
 
 /* Example from the issue, but everthing should check */
 int *foo2() {
-	//CHECK_NOALL: int *foo2(void) {
+	//CHECK_NOALL: int *foo2(void) : itype(_Ptr<int>) {
 	//CHECK_ALL: _Ptr<int> foo2(void) _Checked {
 
   int x = 1;
