@@ -340,11 +340,15 @@ bool ProgramInfo::link() {
       std::string Rsn =
           "Unchecked pointer in parameter or return of external function " +
           FuncName;
-      if (!G->getReturnVar()->getIsGeneric())
+      if (!G->getReturnVar()->getIsGeneric()) {
         G->getReturnVar()->constrainToWild(CS, Rsn);
+        G->getInternalReturnVar()->constrainToWild(CS, Rsn);
+      }
       for (unsigned I = 0; I < G->numParams(); I++)
-        if (!G->getParamVar(I)->getIsGeneric())
+        if (!G->getParamVar(I)->getIsGeneric()) {
           G->getParamVar(I)->constrainToWild(CS, Rsn);
+          G->getInternalParamVar(I)->constrainToWild(CS, Rsn);
+        }
     }
   }
   // repeat for static functions
