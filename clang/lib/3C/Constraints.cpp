@@ -462,12 +462,13 @@ bool Constraints::graphBasedSolve() {
     std::set<VarAtom *> Rest;
     Env.doCheckedSolve(true);
     if (!AllTypes) {
-      Rest = Env.resetSolution([&Env](VarAtom *VA) {
-        Env.doCheckedSolve(false);
-        bool IsArrType = !isa<PtrAtom>(Env.getAssignment(VA));
-        Env.doCheckedSolve(true);
-        return IsArrType;
-      }, getWild());
+      Env.doCheckedSolve(false);
+      Rest = Env.filterAtoms(
+        [&Env](VarAtom *VA) { return !isa<PtrAtom>(Env.getAssignment(VA)); });
+      Env.doCheckedSolve(true);
+      Env.resetSolution(
+        [&Rest](VarAtom *VA) { return Rest.find(VA) != Rest.end(); },
+        getWild());
     }
 
     // If PtrType solving (partly) failed, make the affected VarAtoms wild.
