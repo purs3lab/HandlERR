@@ -916,13 +916,26 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
     // Is this a function?
     const FunctionProtoType *FT = Ty->getAs<FunctionProtoType>();
     assert(FT != nullptr);
-    RT = FT->getReturnType();
+    // If we don't have a function declaration, but the return does have an
+    // itype, then use the itype as the return type. This is so that we don't
+    // drop itype annotation on function pointer return types.
+    if (!FD && FT->getReturnAnnots().getInteropTypeExpr())
+      RT = FT->getReturnAnnots().getInteropTypeExpr()->getType();
+    else
+      RT = FT->getReturnType();
 
     // Extract the types for the parameters to this function. If the parameter
     // has a bounds expression associated with it, substitute the type of that
     // bounds expression for the other type.
     for (unsigned J = 0; J < FT->getNumParams(); J++) {
-      QualType QT = FT->getParamType(J);
+      // Same conditional as we had for the return type. If we don't have a
+      // function declaration then the itype for the parameter is used as if it
+      // were the parameters primary type.
+      QualType QT;
+      if (!FD && FT->getParamAnnots(J).getInteropTypeExpr())
+        QT = FT->getParamAnnots(J).getInteropTypeExpr()->getType();
+      else
+        QT = FT->getParamType(J);
 
       std::string PName = "";
       DeclaratorDecl *ParmVD = nullptr;
