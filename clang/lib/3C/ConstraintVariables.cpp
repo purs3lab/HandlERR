@@ -1018,6 +1018,14 @@ void FunctionVariableConstraint::constrainToWild(
     V.ParameterConstraint->constrainToWild(CS, Rsn, PL);
 }
 
+void FunctionVariableConstraint::constrainExternalWild
+    (Constraints &CS, const std::string &Rsn, PersistentSourceLoc *PL) const {
+  constrainToWild(CS, Rsn, PL);
+
+  ReturnVar.ArgumentsConstraint->constrainToWild(CS, Rsn, PL);
+  for (const auto &V : ParamVars)
+    V.ArgumentsConstraint->constrainToWild(CS, Rsn, PL);
+}
 bool FunctionVariableConstraint::anyChanges(const EnvironmentMap &E) const {
   return ReturnVar.ArgumentsConstraint->anyChanges(E) ||
          llvm::any_of(ParamVars, [&E](ParamArgPair CV) {
