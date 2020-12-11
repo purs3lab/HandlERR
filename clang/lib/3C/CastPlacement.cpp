@@ -45,7 +45,7 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
     // Cast on arguments
     unsigned PIdx = 0;
     for (const auto &A : CE->arguments()) {
-      if (PIdx < FV->numParams()) {
+      if (PIdx < FV->numParams() && (!FD || PIdx < FD->getNumParams())) {
         // Avoid adding incorrect casts to generic function arguments by
         // removing implicit casts when on arguments with a consistently
         // used generic type.
