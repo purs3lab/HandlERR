@@ -391,7 +391,7 @@ bool Constraints::graphBasedSolve() {
       doSolve(SolChkCG, SavedImplies, Env, this, true, nullptr, Conflicts);
 
   // Now solve PtrType constraints
-  if (Res) {
+  if (AllTypes && Res) {
     Env.doCheckedSolve(false);
 
     // Step 1: Greatest solution
@@ -457,37 +457,24 @@ bool Constraints::graphBasedSolve() {
       }
     }
 
-    // If we're not doing the all types solution, make any atoms with array or
-    // nt_array solution WILD.
-    std::set<VarAtom *> Rest;
-    Env.doCheckedSolve(true);
-    if (!AllTypes) {
-      Env.doCheckedSolve(false);
-      Rest = Env.filterAtoms(
-        [&Env](VarAtom *VA) { return !isa<PtrAtom>(Env.getAssignment(VA)); });
-      Env.doCheckedSolve(true);
-      Env.resetSolution(
-        [&Rest](VarAtom *VA) { return Rest.find(VA) != Rest.end(); },
-        getWild());
-    }
-
     // If PtrType solving (partly) failed, make the affected VarAtoms wild.
     if (!Res) {
       Env.doCheckedSolve(true);
+      std::set<VarAtom *> Changed;
       for (VarAtom *VA : Conflicts) {
         assert(VA != nullptr);
         std::string Rsn = "Bad pointer type solution";
         Geq *ConflictConstraint = createGeq(VA, getWild(), Rsn);
         addConstraint(ConflictConstraint);
         SolChkCG.addConstraint(ConflictConstraint, *this);
-        Rest.insert(VA);
+        Changed.insert(VA);
       }
       Conflicts.clear();
+      // Re-run checked solving step if atoms were affected by the last step.
+      if (!Changed.empty())
+        Res = doSolve(SolChkCG, SavedImplies, Env, this, true, &Changed,
+                      Conflicts);
     }
-
-    // Re-run checked solving step if atoms were affected by the last two steps.
-    if (!Rest.empty())
-      Res = doSolve(SolChkCG, SavedImplies, Env, this, true, &Rest, Conflicts);
 
     // Final Step: Merge ptyp solution with checked solution.
     Env.mergePtrTypes();
