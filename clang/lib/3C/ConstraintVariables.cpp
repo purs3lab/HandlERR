@@ -907,6 +907,7 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
     IsFunctionPtr = false;
   }
 
+  bool ReturnHasItype = false;
   // ConstraintVariables for the parameters
   Constraints &CS = I.getConstraints();
   if (Ty->isFunctionPointerType()) {
@@ -919,7 +920,8 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
     // If we don't have a function declaration, but the return does have an
     // itype, then use the itype as the return type. This is so that we don't
     // drop itype annotation on function pointer return types.
-    if (!FD && FT->getReturnAnnots().getInteropTypeExpr())
+    ReturnHasItype = FT->getReturnAnnots().getInteropTypeExpr();
+    if (!FD && ReturnHasItype)
       RT = FT->getReturnAnnots().getInteropTypeExpr()->getType();
     else
       RT = FT->getReturnType();
@@ -932,7 +934,8 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
       // function declaration then the itype for the parameter is used as if it
       // were the parameters primary type.
       QualType QT;
-      if (!FD && FT->getParamAnnots(J).getInteropTypeExpr())
+      bool ParamHasItype = FT->getParamAnnots(J).getInteropTypeExpr();
+      if (!FD && ParamHasItype)
         QT = FT->getParamAnnots(J).getInteropTypeExpr()->getType();
       else
         QT = FT->getParamType(J);
@@ -952,7 +955,7 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
       PVConstraint *Arg = new PVConstraint(QT, ParmVD, PName, I, Ctx, &N,
                                            IsGeneric);
       PVConstraint *Param = new PVConstraint(QT, ParmVD, PName, I, Ctx, &N,
-                                             IsGeneric, true);
+                                             IsGeneric, ParamHasItype);
       ParamArgPair Pair = {Param, Arg};
       for (unsigned J = 0; J < Param->getCvars().size(); J++) {
         Atom *ParamA = Pair.ParameterConstraint->getCvars()[J];
@@ -987,7 +990,7 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
   // ConstraintVariable for the return
   bool IsGeneric = FD != nullptr && getTypeVariableType(FD) != nullptr;
   auto *RetInternal = new PVConstraint(RT, D, RETVAR, I, Ctx, &N, IsGeneric,
-                                       true);
+                                       ReturnHasItype);
   auto *RetExternal = new PVConstraint(RT, D, RETVAR, I, Ctx, &N, IsGeneric);
   ReturnVar = {RetInternal, RetExternal};
   for (unsigned J = 0; J < RetInternal->getCvars().size(); J++) {

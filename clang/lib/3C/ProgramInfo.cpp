@@ -332,7 +332,8 @@ bool ProgramInfo::link() {
     // everything about it.
     // Some global symbols we don't need to constrain to wild, like
     // malloc and free. Check those here and skip if we find them.
-    if (!G->hasBody() && !isExternOkay(FuncName)) {
+    if (!llvm::is_contained(DefinedExternalFunction, FuncName) &&
+        !isExternOkay(FuncName)) {
 
       // If there was a checked type on a variable in the input program, it
       // should stay that way. Otherwise, we shouldn't be adding a checked type

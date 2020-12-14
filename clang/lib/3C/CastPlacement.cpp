@@ -132,8 +132,14 @@ CastPlacementVisitor::needCasting(const ConstraintVariable *SrcInt,
     }
   }
 
-  // Casting requirements are stricter when the parameter is a function pointer.
-  if (isa<FVConstraint>(DstExt) || cast<PVConstraint>(DstExt)->getFV()) {
+  // Casting requirements are stricter when the parameter is a function pointer
+  // or an itype.
+  bool UncheckedItypeCall = DstExt->srcHasItype() && !SEChecked;
+  bool FptrCall =
+    isa<FVConstraint>(DstExt) || cast<PVConstraint>(DstExt)->getFV();
+  // This is also conditioned on if the src is checked to avoid adding casts to
+  // WILD on top of a wild expression.
+  if (SrcInt->isChecked(E) && (UncheckedItypeCall || FptrCall)) {
     if (!DstExt->solutionEqualTo(Info.getConstraints(), SrcInt))
       return CastNeeded::CAST_TO_WILD;
   }
