@@ -561,9 +561,11 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
     // Function Decls have FVConstraints.
     FVConstraint *F = new FVConstraint(D, *this, *AstContext);
     F->setValidDecl();
-    auto *Ret_PV = dyn_cast<PVConstraint>(F->getReturnVar());
+    PVConstraint *RetExternal = F->getReturnVar();
+    PVConstraint *RetInternal = F->getInternalReturnVar();
     auto Ret_Ty = FD->getReturnType();
-    unifyIfTypedef(Ret_Ty.getTypePtr(), *AstContext, FD, Ret_PV);
+    unifyIfTypedef(Ret_Ty.getTypePtr(), *AstContext, FD, RetExternal);
+    unifyIfTypedef(Ret_Ty.getTypePtr(), *AstContext, FD, RetInternal);
 
 
     // Handling of PSL collision for functions is different since we need to
@@ -591,19 +593,21 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
     for (unsigned I = 0; I < FD->getNumParams(); I++) {
       ParmVarDecl *PVD = FD->getParamDecl(I);
       const Type *Ty = PVD->getType().getTypePtr();
-      ConstraintVariable *PV = F->getInternalParamVar(I);
-      unifyIfTypedef(Ty, *AstContext, PVD, dyn_cast<PVConstraint>(PV));
-      PV->setValidDecl();
+      PVConstraint *PVInternal = F->getInternalParamVar(I);
+      PVConstraint *PVExternal = F->getParamVar(I);
+      unifyIfTypedef(Ty, *AstContext, PVD, PVInternal);
+      unifyIfTypedef(Ty, *AstContext, PVD, PVExternal);
+      PVInternal->setValidDecl();
       PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(PVD, *AstContext);
       // Constraint variable is stored on the parent function, so we need to
       // constrain to WILD even if we don't end up storing this in the map.
-      constrainWildIfMacro(PV, PVD->getLocation());
-      constrainWildIfMacro(F->getParamVar(I), PVD->getLocation());
+      constrainWildIfMacro(PVInternal, PVD->getLocation());
+      constrainWildIfMacro(PVExternal, PVD->getLocation());
       specialCaseVarIntros(PVD, AstContext);
       // It is possible to have a parameter delc in a macro when function is not
       if (Variables.find(PSL) != Variables.end())
         continue;
-      Variables[PSL] = PV;
+      Variables[PSL] = PVInternal;
     }
 
   } else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
