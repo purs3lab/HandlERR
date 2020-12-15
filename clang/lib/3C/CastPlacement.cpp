@@ -191,13 +191,12 @@ void CastPlacementVisitor::surroundByCast(const ConstraintVariable *SrcInt,
                                           Expr *E) {
   auto CastStrs = getCastString(SrcInt, SrcExt, DstInt, DstExt);
 
-  // TODO: Is this spacial handling for casts-on-casts still required?
   // If E is already a cast expression, we will try to rewrite the cast instead
   // of adding a new expression.
-  //if (auto *CE = dyn_cast<CStyleCastExpr>(E->IgnoreParens())) {
-  //  SourceRange CastTypeRange(CE->getLParenLoc(), CE->getRParenLoc());
-  //  Writer.ReplaceText(CastTypeRange, CastString);
-  //} else {
+  if (auto *CE = dyn_cast<CStyleCastExpr>(E->IgnoreParens())) {
+    SourceRange CastTypeRange(CE->getLParenLoc(), CE->getRParenLoc());
+    Writer.ReplaceText(CastTypeRange, CastStrs.first.substr(1));
+  } else {
     bool FrontRewritable = Writer.isRewritable(E->getBeginLoc());
     bool EndRewritable = Writer.isRewritable(E->getEndLoc());
     if (FrontRewritable && EndRewritable) {
@@ -218,7 +217,7 @@ void CastPlacementVisitor::surroundByCast(const ConstraintVariable *SrcInt,
              !SrcText.empty());
       Writer.ReplaceText(NewCRA, CastStrs.first + SrcText + CastStrs.second);
     }
-  //}
+  }
 }
 
 bool CastLocatorVisitor::exprHasCast(Expr *E) const {
