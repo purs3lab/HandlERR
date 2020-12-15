@@ -1,59 +1,52 @@
 #!/usr/bin/env python
 #
-# Usage: 3c-regtest -t TMPNAME [options...] SRC_FILE
+# 3c-regtest.py: Run a 3C regression test using a standard RUN script.
 #
-# TMPNAME corresponds to %t and SRC_FILE corresponds to %s. Both are required.
+# 3c-regtest.py is intended to be invoked by a single RUN command in the test
+# file. The canonical form is:
 #
-# --subst can be used for things such as %clang, for example (assuming single
-# --quotes are removed by the shell):
+# // RUN: %S/3c-regtest.py TEST_TYPE_FLAGS %s -t %t --clang '%clang'
 #
-# --subst %clang 'clang -some-flag'
+# 3c-regtest.py generates a RUN script based on the TEST_TYPE_FLAGS (using
+# script_generator.py) and runs it using code from `lit`.
 #
-# (Note: A literal % has to be represented as %% in a RUN line. If we instead
-# established the convention of automatically prepending the % here, then the
-# RUN line would trip the "Do not use 'clang' in tests, use '%clang'." error.)
-#
-# Example RUN line:
-#
-# // RUN: %S/3c-regtest.py -t %t --subst %%clang '%clang' %s
-#
-# Soon, we'll add options for different kinds of 3C regression tests.
+# The -t and --clang flags are used to pass substitution values from the outer
+# `lit` configuration so that 3c-regtest.py knows what to substitute for
+# occurrences of %t and %clang in its script. We'll add flags like this for all
+# % codes that appear in the scripts.
 
-# TODO: Add Windows compatibility code once we have an easy way to test on Windows.
+# TODO: Add Windows compatibility code once we have an easy way to test on
+# Windows.
 
 import sys
 import os
 import platform
 import argparse
 
+import script_generator
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) +
                 '/../../../llvm/utils/lit')
 import lit.TestRunner
 
-print "NOTICE: cwd is %s" % os.getcwd()
+parser = argparse.ArgumentParser(description='Run a 3C regression test.',
+                                 parents=[script_generator.parser])
+# Substitution arguments. The test file name is already in
+# script_generator.parser.
+parser.add_argument('-t')
+parser.add_argument('--clang')
 
-def die(msg):
-    sys.stderr.write('Error: %s\n' % msg)
-    sys.exit(1)
+argobj = parser.parse_args()
 
-parser = argparse.ArgumentParser(description='Run a 3C regression test.')
-# TODO: Add help
-parser.add_argument('test_file')
-parser.add_argument('-t', required=True)
-parser.add_argument('--subst', action='append', nargs=2, default=[])
-args = parser.parse_args()
+test_dir = os.path.dirname(os.path.abspath(argobj.test_file))
 
-test_dir = os.path.dirname(args.test_file)
-if test_dir == '':
-    test_dir = '.'
+tmpName = argobj.t
+tmpBase = script_generator.remove_suffix(tmpName, '.tmp')
+if tmpBase is None:
+    sys.exit('-t argument %s does not end with .tmp' % tmpName)
 
-tmpName = args.t
-tmpNameSuffix = '.tmp'
-if tmpName.endswith(tmpNameSuffix):
-    tmpBase = tmpName[:-len(tmpNameSuffix)]
-else:
-    die('-t argument %s does not end with %s' % (tmpName, tmpNameSuffix))
-
+# `lit` supports more substitutions, but these are the only ones needed by the
+# tests that use 3c-regtest.py so far.
 substitutions = [
     # #_MARKER_# is a hack copied from getDefaultSubstitutions in
     # llvm/utils/lit/lit/TestRunner.py. To explain it a bit more fully:
@@ -66,23 +59,14 @@ substitutions = [
     # over the input from left to right, replacing codes as they are found, but
     # apparently that wasn't worth the extra code in `lit`.
     ('%%', '#_MARKER_#'),
-    ('%s', args.test_file),
+    ('%s', argobj.test_file),
     ('%S', test_dir),
     ('%t', tmpName),
+    ('%clang', argobj.clang),
+    ('#_MARKER_#', '%')
 ]
-substitutions.extend(args.subst)
-substitutions.append(('#_MARKER_#', '%'))
 
-# Starting with processor.py because it's always the same.
-commands = [
-    # FIXME: 'foo.c' + 'hecked.c' is a terrible hack; find the right way to do this.
-    '3c -alltypes -addcr %s -- | FileCheck -match-full-lines -check-prefixes="CHECK_ALL","CHECK" %s',
-    '3c -addcr %s -- | FileCheck -match-full-lines -check-prefixes="CHECK_NOALL","CHECK" %s',
-    '3c -addcr %s -- | %clang -c -fcheckedc-extension -x c -o /dev/null -',
-    '3c -output-postfix=checked -alltypes %s',
-    '3c -alltypes %shecked.c -- | count 0',
-    'rm %shecked.c',
-]
+commands = script_generator.generate_commands(argobj)
 commands = lit.TestRunner.applySubstitutions(commands, substitutions)
 
 class FakeTestConfig:
