@@ -107,7 +107,7 @@ protected:
   std::string getExistingIType(ConstraintVariable *DeclC);
 
   virtual void
-  buildDeclVar(PVConstraint *ParamCV, PVConstraint *ArgCV, DeclaratorDecl *Decl,
+  buildDeclVar(PVConstraint *IntCV, PVConstraint *ExtCV, DeclaratorDecl *Decl,
                std::string &Type, std::string &IType, bool &RewriteParm,
                bool &RewriteRet);
   void buildCheckedDecl(PVConstraint *Defn, DeclaratorDecl *Decl,

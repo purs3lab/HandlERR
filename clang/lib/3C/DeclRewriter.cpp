@@ -543,7 +543,6 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
 
   // Get rewritten return variable
   std::string ReturnVar, ItypeStr;
-  // FIXME: need to split internal/external CV for return
   this->buildDeclVar(Defnc->getInternalReturn(), Defnc->getExternalReturn(), FD,
                      ReturnVar, ItypeStr, RewriteParams, RewriteReturn);
 
@@ -622,21 +621,25 @@ void FunctionDeclBuilder::buildItypeDecl(PVConstraint *Defn,
 }
 
 void
-FunctionDeclBuilder::buildDeclVar(PVConstraint *ParamCV, PVConstraint *ArgCV,
+FunctionDeclBuilder::buildDeclVar(PVConstraint *IntCV, PVConstraint *ExtCV,
                                   DeclaratorDecl *Decl, std::string &Type,
                                   std::string &IType, bool &RewriteParm,
                                   bool &RewriteRet) {
   const auto &Env = Info.getConstraints().getVariables();
-  if (isAValidPVConstraint(ArgCV) && ArgCV->isChecked(Env)) {
-    bool AnyChanges = ArgCV->anyChanges(Env);
-    if (AnyChanges && ParamCV->solutionEqualTo(Info.getConstraints(), ArgCV)) {
-      buildCheckedDecl(ArgCV, Decl, Type, IType, RewriteParm, RewriteRet);
-      return;
-    }
-    if (AnyChanges) {
-      buildItypeDecl(ArgCV, Decl, Type, IType, RewriteParm, RewriteRet);
-      return;
-    }
+  // If the external constraint variable is checked, then the parameter should
+  // be advertised as checked to callers. This requires adding either an itype
+  // or a checked type. If the constraint variable type did not change, then
+  // the type does not need to be rewritten. The type in the source is correct.
+  if (isAValidPVConstraint(ExtCV) && ExtCV->isChecked(Env) &&
+      ExtCV->anyChanges(Env)) {
+    // If the internal and external constraint variables solve to the same type,
+    // then they are both checked and we can use a _Ptr type. Otherwise, an
+    // itype is used.
+    if (IntCV->solutionEqualTo(Info.getConstraints(), ExtCV))
+      buildCheckedDecl(ExtCV, Decl, Type, IType, RewriteParm, RewriteRet);
+    else
+      buildItypeDecl(ExtCV, Decl, Type, IType, RewriteParm, RewriteRet);
+    return;
   }
   // Variables that do not need to be rewritten fall through to here. Type
   // strings are taken unchanged from the original source.
@@ -644,9 +647,9 @@ FunctionDeclBuilder::buildDeclVar(PVConstraint *ParamCV, PVConstraint *ArgCV,
     Type = getSourceText(Decl->getSourceRange(), *Context);
     IType = "";
   } else {
-    Type = ArgCV->getOriginalTy() + " ";
+    Type = ExtCV->getOriginalTy() + " ";
     IType =
-      getExistingIType(ArgCV) + ABRewriter.getBoundsString(ArgCV, Decl, false);
+      getExistingIType(ExtCV) + ABRewriter.getBoundsString(ExtCV, Decl, false);
   }
 }
 
