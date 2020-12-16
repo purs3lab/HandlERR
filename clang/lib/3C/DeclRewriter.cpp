@@ -524,11 +524,11 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   // Get rewritten parameter variable declarations
   std::vector<std::string> ParmStrs;
   for (unsigned I = 0; I < Defnc->numParams(); ++I) {
-    PVConstraint *ArgCV = Defnc->getParamVar(I);
-    PVConstraint *ParamCV = Defnc->getInternalParamVar(I);
+    PVConstraint *ExtCV = Defnc->getExternalParam(I);
+    PVConstraint *IntCV = Defnc->getInternalParam(I);
     ParmVarDecl *PVDecl = Definition->getParamDecl(I);
     std::string Type, IType;
-    this->buildDeclVar(ParamCV, ArgCV, PVDecl, Type, IType, RewriteParams,
+    this->buildDeclVar(IntCV, ExtCV, PVDecl, Type, IType, RewriteParams,
                        RewriteReturn);
     ParmStrs.push_back(Type + IType);
   }
@@ -544,7 +544,7 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   // Get rewritten return variable
   std::string ReturnVar, ItypeStr;
   // FIXME: need to split internal/external CV for return
-  this->buildDeclVar(Defnc->getInternalReturnVar(), Defnc->getReturnVar(), FD,
+  this->buildDeclVar(Defnc->getInternalReturn(), Defnc->getExternalReturn(), FD,
                      ReturnVar, ItypeStr, RewriteParams, RewriteReturn);
 
   // If the return is a function pointer, we need to rewrite the whole

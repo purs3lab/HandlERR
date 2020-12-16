@@ -200,7 +200,7 @@ bool CheckedRegionFinder::VisitCallExpr(CallExpr *C) {
           containsUncheckedPtr(Type);
       auto *FV = Info.getFuncConstraint(FD, Context);
       for (unsigned I = 0; I < FV->numParams(); I++)
-        Wild |= isWild(*FV->getParamVar(I));
+        Wild |= isWild(*FV->getExternalParam(I));
     }
     handleChildren(C->children());
     Map[ID] = Wild ? IS_UNCHECKED : IS_CHECKED;
@@ -246,7 +246,7 @@ bool CheckedRegionFinder::VisitDeclRefExpr(DeclRefExpr *DR) {
     auto *FV = Info.getFuncConstraint(FD, Context);
     IW |= FV->hasWild(Info.getConstraints().getVariables());
     for (unsigned I = 0; I < FV->numParams(); I++) {
-      PVConstraint *ParamCV = FV->getParamVar(I);
+      PVConstraint *ParamCV = FV->getExternalParam(I);
       IW |= isWild(*ParamCV);
     }
   }

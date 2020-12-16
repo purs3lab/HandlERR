@@ -439,16 +439,16 @@ typedef struct {
 class FunctionVariableConstraint : public ConstraintVariable {
 private:
   FunctionVariableConstraint(FunctionVariableConstraint *Ot, Constraints &CS);
-  struct ParamArgPair {
-    PVConstraint *ParameterConstraint;
-    PVConstraint *ArgumentsConstraint;
+  struct InternalExternalPair {
+    PVConstraint *InternalConstraint;
+    PVConstraint *ExternalConstraint;
   };
 
   // N constraints on the return value of the function.
-  ParamArgPair ReturnVar;
+  InternalExternalPair ReturnVar;
   // A vector of K sets of N constraints on the parameter values, for
   // K parameters accepted by the function.
-  std::vector<ParamArgPair> ParamVars;
+  std::vector<InternalExternalPair> ParamVars;
 
   // Storing of parameters in the case of untyped prototypes
   std::vector<ParamDeferment> DeferredParams;
@@ -475,10 +475,12 @@ public:
                              std::string N, ProgramInfo &I,
                              const clang::ASTContext &C);
 
-  PVConstraint *getReturnVar() const { return ReturnVar.ArgumentsConstraint; }
+  PVConstraint *getExternalReturn() const {
+    return ReturnVar.ExternalConstraint;
+  }
 
-  PVConstraint *getInternalReturnVar() const {
-    return ReturnVar.ParameterConstraint;
+  PVConstraint *getInternalReturn() const {
+    return ReturnVar.InternalConstraint;
   }
 
   const std::vector<ParamDeferment> &getDeferredParams() const {
@@ -501,15 +503,14 @@ public:
   void mergeDeclaration(ConstraintVariable *FromCV, ProgramInfo &I,
                         std::string &ReasonFailed) override;
 
-  // TODO: naming
-  PVConstraint *getParamVar(unsigned I) const {
+  PVConstraint *getExternalParam(unsigned I) const {
     assert(I < ParamVars.size());
-    return ParamVars.at(I).ArgumentsConstraint;
+    return ParamVars.at(I).ExternalConstraint;
   }
 
-  PVConstraint *getInternalParamVar(unsigned I) const {
+  PVConstraint *getInternalParam(unsigned I) const {
     assert(I < ParamVars.size());
-    return ParamVars.at(I).ParameterConstraint;
+    return ParamVars.at(I).InternalConstraint;
   }
 
   bool srcHasItype() const override;

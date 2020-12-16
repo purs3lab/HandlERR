@@ -139,10 +139,10 @@ static void getVarsFromConstraint(ConstraintVariable *V, CAtoms &R) {
     if (FVConstraint *FVC = PVC->getFV())
       getVarsFromConstraint(FVC, R);
   } else if (auto *FVC = dyn_cast<FVConstraint>(V)) {
-    if (FVC->getReturnVar())
-      getVarsFromConstraint(FVC->getReturnVar(), R);
+    if (FVC->getExternalReturn())
+      getVarsFromConstraint(FVC->getExternalReturn(), R);
     for (unsigned I = 0; I < FVC->numParams(); I++)
-      getVarsFromConstraint(FVC->getParamVar(I), R);
+      getVarsFromConstraint(FVC->getExternalParam(I), R);
   }
 }
 
@@ -341,14 +341,14 @@ bool ProgramInfo::link() {
       std::string Rsn =
           "Unchecked pointer in parameter or return of external function " +
           FuncName;
-      if (!G->getReturnVar()->getIsGeneric()) {
-        G->getReturnVar()->constrainToWild(CS, Rsn);
-        G->getInternalReturnVar()->constrainToWild(CS, Rsn);
+      if (!G->getExternalReturn()->getIsGeneric()) {
+        G->getExternalReturn()->constrainToWild(CS, Rsn);
+        G->getInternalReturn()->constrainToWild(CS, Rsn);
       }
       for (unsigned I = 0; I < G->numParams(); I++)
-        if (!G->getParamVar(I)->getIsGeneric()) {
-          G->getParamVar(I)->constrainToWild(CS, Rsn);
-          G->getInternalParamVar(I)->constrainToWild(CS, Rsn);
+        if (!G->getExternalParam(I)->getIsGeneric()) {
+          G->getExternalParam(I)->constrainToWild(CS, Rsn);
+          G->getInternalParam(I)->constrainToWild(CS, Rsn);
         }
     }
   }
@@ -369,11 +369,11 @@ bool ProgramInfo::link() {
         std::string Rsn =
             "Unchecked pointer in parameter or return of static function " +
             FuncName + " in " + FileName;
-        if (!G->getReturnVar()->getIsGeneric())
-          G->getReturnVar()->constrainToWild(CS, Rsn);
+        if (!G->getExternalReturn()->getIsGeneric())
+          G->getExternalReturn()->constrainToWild(CS, Rsn);
         for (unsigned I = 0; I < G->numParams(); I++)
-          if (!G->getParamVar(I)->getIsGeneric())
-            G->getParamVar(I)->constrainToWild(CS, Rsn);
+          if (!G->getExternalParam(I)->getIsGeneric())
+            G->getExternalParam(I)->constrainToWild(CS, Rsn);
       }
     }
   }
@@ -562,8 +562,8 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
     // Function Decls have FVConstraints.
     FVConstraint *F = new FVConstraint(D, *this, *AstContext);
     F->setValidDecl();
-    PVConstraint *RetExternal = F->getReturnVar();
-    PVConstraint *RetInternal = F->getInternalReturnVar();
+    PVConstraint *RetExternal = F->getExternalReturn();
+    PVConstraint *RetInternal = F->getInternalReturn();
     auto Ret_Ty = FD->getReturnType();
     unifyIfTypedef(Ret_Ty.getTypePtr(), *AstContext, FD, RetExternal);
     unifyIfTypedef(Ret_Ty.getTypePtr(), *AstContext, FD, RetInternal);
@@ -594,8 +594,8 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
     for (unsigned I = 0; I < FD->getNumParams(); I++) {
       ParmVarDecl *PVD = FD->getParamDecl(I);
       const Type *Ty = PVD->getType().getTypePtr();
-      PVConstraint *PVInternal = F->getInternalParamVar(I);
-      PVConstraint *PVExternal = F->getParamVar(I);
+      PVConstraint *PVInternal = F->getInternalParam(I);
+      PVConstraint *PVExternal = F->getExternalParam(I);
       unifyIfTypedef(Ty, *AstContext, PVD, PVInternal);
       unifyIfTypedef(Ty, *AstContext, PVD, PVExternal);
       PVInternal->setValidDecl();
@@ -809,7 +809,7 @@ CVarOption ProgramInfo::getVariable(clang::Decl *D, clang::ASTContext *C) {
     // Get corresponding FVConstraint vars.
     FVConstraint *FunFVar = getFuncFVConstraint(FD, C);
     assert(FunFVar != nullptr && "Unable to find function constraints.");
-    return CVarOption(*FunFVar->getInternalParamVar(PIdx));
+    return CVarOption(*FunFVar->getInternalParam(PIdx));
 
   } else if (FunctionDecl *FD = dyn_cast<FunctionDecl>(D)) {
     FVConstraint *FunFVar = getFuncFVConstraint(FD, C);
@@ -972,12 +972,12 @@ void ProgramInfo::insertIntoPtrSourceMap(const PersistentSourceLoc *PSL,
     // If the PVConstraint is a function pointer, create mappings for parameter
     // and return variables.
     if (auto *FV = PV->getFV()) {
-      insertIntoPtrSourceMap(PSL, FV->getReturnVar());
+      insertIntoPtrSourceMap(PSL, FV->getExternalReturn());
       for (unsigned int I = 0; I < FV->numParams(); I++)
-        insertIntoPtrSourceMap(PSL, FV->getParamVar(I));
+        insertIntoPtrSourceMap(PSL, FV->getExternalParam(I));
     }
   } else if (auto *FV = dyn_cast<FVConstraint>(CV)) {
-    insertIntoPtrSourceMap(PSL, FV->getReturnVar());
+    insertIntoPtrSourceMap(PSL, FV->getExternalReturn());
   }
 }
 
@@ -996,9 +996,9 @@ void ProgramInfo::insertCVAtoms(
     if (FVConstraint *FVC = PVC->getFV())
       insertCVAtoms(FVC, AtomMap);
   } else if (auto *FVC = dyn_cast<FVConstraint>(CV)) {
-    insertCVAtoms(FVC->getReturnVar(), AtomMap);
+    insertCVAtoms(FVC->getExternalReturn(), AtomMap);
     for (unsigned I = 0; I < FVC->numParams(); I++)
-      insertCVAtoms(FVC->getParamVar(I), AtomMap);
+      insertCVAtoms(FVC->getExternalParam(I), AtomMap);
   } else {
     llvm_unreachable("Unknown kind of constraint variable.");
   }

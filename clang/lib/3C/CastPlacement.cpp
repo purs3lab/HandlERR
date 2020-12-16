@@ -59,8 +59,8 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
         }
 
         CVarSet ArgumentConstraints = CR.getExprConstraintVars(ArgExpr);
-        ConstraintVariable *ParamInt = FV->getInternalParamVar(PIdx);
-        ConstraintVariable *ParamExt = FV->getParamVar(PIdx);
+        ConstraintVariable *ParamInt = FV->getInternalParam(PIdx);
+        ConstraintVariable *ParamExt = FV->getExternalParam(PIdx);
         for (auto *ArgC : ArgumentConstraints) {
           if (needCasting(ArgC, ArgC, ParamInt, ParamExt) != NO_CAST) {
             surroundByCast(ArgC, ArgC, ParamInt, ParamExt, A);
@@ -74,8 +74,8 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
     // Cast on return
     if (Info.hasPersistentConstraints(CE, Context)) {
       CVarSet ArgumentConstraints = CR.getExprConstraintVars(CE);
-      ConstraintVariable *RetInt = FV->getInternalReturnVar();
-      ConstraintVariable *RetExt = FV->getReturnVar();
+      ConstraintVariable *RetInt = FV->getInternalReturn();
+      ConstraintVariable *RetExt = FV->getExternalReturn();
       for (auto *ArgC : ArgumentConstraints) {
         // Order of ParameterC and ArgumentC is reversed from when inserting
         // parameter casts because assignment now goes from returned to its

@@ -429,10 +429,10 @@ CVarSet ConstraintResolver::getExprConstraintVars(Expr *E) {
 
         for (ConstraintVariable *C : Tmp) {
           if (FVConstraint *FV = dyn_cast<FVConstraint>(C)) {
-            ReturnCVs.insert(FV->getReturnVar());
+            ReturnCVs.insert(FV->getExternalReturn());
           } else if (PVConstraint *PV = dyn_cast<PVConstraint>(C)) {
             if (FVConstraint *FV = PV->getFV())
-              ReturnCVs.insert(FV->getReturnVar());
+              ReturnCVs.insert(FV->getExternalReturn());
           }
         }
       } else if (DeclaratorDecl *FD = dyn_cast<DeclaratorDecl>(D)) {
@@ -475,13 +475,13 @@ CVarSet ConstraintResolver::getExprConstraintVars(Expr *E) {
           assert(CV.hasValue() && "Function without constraint variable.");
           /* Direct function call */
           if (FVConstraint *FVC = dyn_cast<FVConstraint>(&CV.getValue()))
-            ReturnCVs.insert(FVC->getReturnVar());
+            ReturnCVs.insert(FVC->getExternalReturn());
           /* Call via function pointer */
           else {
             PVConstraint *Tmp = dyn_cast<PVConstraint>(&CV.getValue());
             assert(Tmp != nullptr);
             if (FVConstraint *FVC = Tmp->getFV())
-              ReturnCVs.insert(FVC->getReturnVar());
+              ReturnCVs.insert(FVC->getExternalReturn());
             else {
               // No FVConstraint -- make WILD
               auto *TmpFV = new FVConstraint();
