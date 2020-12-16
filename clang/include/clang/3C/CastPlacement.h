@@ -16,6 +16,8 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "RewriteUtils.h"
 
+// Locates expressions which are children of explicit cast expressions after
+// ignoring any intermediate implicit expressions introduced in the clang AST.
 class CastLocatorVisitor : public RecursiveASTVisitor<CastLocatorVisitor> {
 public:
   explicit CastLocatorVisitor(ASTContext *C) : Context(C) {}
@@ -48,7 +50,12 @@ private:
   ArrayBoundsRewriter ABRewriter;
   CastLocatorVisitor &Locator;
 
-  enum CastNeeded { NO_CAST = 0, CAST_TO_CHECKED, CAST_TO_WILD };
+  // Enumeration indicating what type of cast is required at a call site
+  enum CastNeeded {
+    NO_CAST = 0,     // No casting required
+    CAST_TO_CHECKED, // A CheckedC bounds cast required (wild -> checked)
+    CAST_TO_WILD     // A standard C explicit cast required (checked -> wild)
+  };
 
   CastNeeded needCasting(const ConstraintVariable *SrcInt,
                          const ConstraintVariable *SrcExt,

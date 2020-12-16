@@ -92,7 +92,8 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
 }
 
 // Check whether an explicit casting is needed when the pointer represented
-// by src variable is assigned to dst.
+// by src variable is assigned to dst. The return value specifies exactly the
+// type of cast required.
 CastPlacementVisitor::CastNeeded
 CastPlacementVisitor::needCasting(const ConstraintVariable *SrcInt,
                                   const ConstraintVariable *SrcExt,
@@ -112,17 +113,21 @@ CastPlacementVisitor::needCasting(const ConstraintVariable *SrcInt,
   bool DIChecked = DstInt->isFullyChecked(E) && !DstInt->srcHasItype();
   bool DEChecked = DstExt->isFullyChecked(E) || DstExt->srcHasItype();
 
-  // Cast prefix is only the part of the cast to the left of the expression
-  // being cast. It does not contain the required closing parenthesis.
-  if (SEChecked && SIChecked && !DEChecked) {
-    // C-style cast to wild
+  // The source is checked internally and externally (i.e., it's not an itype),
+  // but the destination is not checked. The checked source needs to be cast to
+  // wild.
+  if (SEChecked && SIChecked && !DEChecked)
     return CastNeeded::CAST_TO_WILD;
-  } else if ( !SEChecked && DIChecked && DEChecked) {
-    // _Assume_bounds_cast to checked
-    return CastNeeded::CAST_TO_CHECKED;
-  }
 
-  if (!SIChecked && DEChecked && DIChecked) {
+  // The reverse of the above case. A fully checked destination without a
+  // checked source, so the source must be cast to checked.
+  if (!SEChecked && DIChecked && DEChecked)
+    return CastNeeded::CAST_TO_CHECKED;
+
+  // In this case, the source is internally unchecked (i.e., it has an itype).
+  // Typically, no casting is required, but CheckedC does not allow implicit
+  // casts from WILD to NT_ARR even at itype calls sites.
+  if (!SIChecked && DIChecked && DEChecked) {
     if (auto *DstPVC = dyn_cast<PVConstraint>(DstExt)) {
       assert("Checked cast not to a pointer" && !DstPVC->getCvars().empty());
       ConstAtom *CA = Info.getConstraints().getAssignment(
@@ -139,13 +144,17 @@ CastPlacementVisitor::needCasting(const ConstraintVariable *SrcInt,
     isa<FVConstraint>(DstExt) || cast<PVConstraint>(DstExt)->getFV();
   // This is also conditioned on if the src is checked to avoid adding casts to
   // WILD on top of a wild expression.
-  if (SrcInt->isChecked(E) && (UncheckedItypeCall || FptrCall)) {
-    if (!DstExt->solutionEqualTo(Info.getConstraints(), SrcInt))
-      return CastNeeded::CAST_TO_WILD;
-  }
+  if (SrcInt->isChecked(E) && (UncheckedItypeCall || FptrCall) &&
+      !DstExt->solutionEqualTo(Info.getConstraints(), SrcInt))
+    return CastNeeded::CAST_TO_WILD;
+
+  // If nothing above returned, then no casting is required.
   return CastNeeded::NO_CAST;
 }
 
+// Get the string representation of the cast required  at all call. The return
+// is a pair of strings: a prefix and suffix string that for the complete cast
+// when placed around the expression being cast.
 std::pair<std::string, std::string>
 CastPlacementVisitor::getCastString(const ConstraintVariable *SrcInt,
                                     const ConstraintVariable *SrcExt,
@@ -163,6 +172,11 @@ CastPlacementVisitor::getCastString(const ConstraintVariable *SrcInt,
         assert("Checked cast not to a pointer" && !DstPVC->getCvars().empty());
         ConstAtom *CA = Info.getConstraints().getAssignment(
           DstPVC->getCvars().at(0));
+
+        // Writing an _Assume_bounds_cast to an array type requires inserting
+        // the bounds for destination array. These can come from the source
+        // code or the infered bounds. If neither source is available, use empty
+        // bounds.
         if (isa<ArrAtom>(CA) || isa<NTArrAtom>(CA)) {
           std::string Bounds = "";
           if (DstPVC->srcHasBounds())
@@ -197,6 +211,8 @@ void CastPlacementVisitor::surroundByCast(const ConstraintVariable *SrcInt,
     SourceRange CastTypeRange(CE->getLParenLoc(), CE->getRParenLoc());
     Writer.ReplaceText(CastTypeRange, CastStrs.first.substr(1));
   } else {
+    // First try to insert the cast prefix and suffix around the extression in
+    // the source code.
     bool FrontRewritable = Writer.isRewritable(E->getBeginLoc());
     bool EndRewritable = Writer.isRewritable(E->getEndLoc());
     if (FrontRewritable && EndRewritable) {
@@ -205,16 +221,17 @@ void CastPlacementVisitor::surroundByCast(const ConstraintVariable *SrcInt,
       assert("Locations were rewritable, fail should not be possible." &&
              !BFail && !EFail);
     } else {
-      // This means we failed to insert the text at the end of the RHS.
-      // This can happen because of Macro expansion.
-      // We will see if this is a single expression statement?
-      // If yes, then we will use parent statement to add ")"
+      // Sometimes we can't insert the cast around the expression due to macros
+      // getting in the way. In these cases, we can sometimes replace the entire
+      // expression source with a new string containing the orginal expression
+      // and the cast.
       auto CRA = CharSourceRange::getTokenRange(E->getSourceRange());
       auto NewCRA = clang::Lexer::makeFileCharRange(
           CRA, Context->getSourceManager(), Context->getLangOpts());
       std::string SrcText = clang::tooling::getText(CRA, *Context);
-      // If SrcText is empty, then we're inside a macro and can't do any
-      // rewriting. This is unfortunate, but there isn't much we can do.
+      // This doesn't always work either. We can't rewrite if the cast needs to
+      // be placed fully inside a macro rather than around a macro or on an
+      // argument to the macro.
       if (!SrcText.empty())
         Writer.ReplaceText(NewCRA, CastStrs.first + SrcText + CastStrs.second);
     }
