@@ -66,7 +66,7 @@ substitutions = [
     ('#_MARKER_#', '%')
 ]
 
-commands = script_generator.generate_commands(argobj)
+commands = [cmd for cmd in script_generator.generate_commands(argobj) if cmd != '']
 commands = lit.TestRunner.applySubstitutions(commands, substitutions)
 
 class FakeTestConfig:

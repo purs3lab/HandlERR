@@ -30,18 +30,25 @@ argobj = parser.parse_args()
 with open(argobj.test_file) as f:
     lines = f.readlines()
 
-m = re.search(r"\A// RUN: %S/3c-regtest\.py (.*) %s -t %t --clang '%clang'\n\Z", lines[0])
-if m is None:
-    sys.exit('The first line of %s is not a canonical 3c-regtest.py RUN line.' % argobj.test_file)
-test_type_flags_joined = m.group(1)
+new_lines = []
+for l in lines:
+    if '3c-regtest' in l:
+        m = re.search(r"\A// RUN: %S/3c-regtest\.py (.*) %s -t %t --clang '%clang'\n\Z", l)
+        if m is None:
+            sys.exit('Non-canonical 3c-regtest RUN line: %s' % l)  # XXX Trailing newline
+        test_type_flags_joined = m.group(1)
 
-# FUTURE: Will we need to handle quoting?
-test_type_flags = test_type_flags_joined.split(' ')
-# XXX: This just exits on error. We'd like to add a more meaningful message, but
-# the default Python version on gamera (2.7.18) is too old to support
-# exit_on_error=False.
-test_type_argobj = script_generator.parser.parse_args(test_type_flags + [argobj.test_file])
+        # FUTURE: Will we need to handle quoting?
+        test_type_flags = test_type_flags_joined.split(' ')
+        # XXX: This just exits on error. We'd like to add a more meaningful message, but
+        # the default Python version on gamera (2.7.18) is too old to support
+        # exit_on_error=False.
+        test_type_argobj = script_generator.parser.parse_args(test_type_flags + [argobj.test_file])
 
-run_lines = ['// RUN: %s\n' % cmd for cmd in script_generator.generate_commands(test_type_argobj)]
-new_lines = run_lines + lines[1:]
+        run_lines = [('// RUN: %s\n' % cmd if cmd != '' else '\n')
+                     for cmd in script_generator.generate_commands(test_type_argobj)]
+        new_lines.extend(run_lines)
+    else:
+        new_lines.append(l)
+
 sys.stdout.write(''.join(new_lines))
