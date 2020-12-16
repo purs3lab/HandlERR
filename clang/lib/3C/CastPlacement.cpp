@@ -35,7 +35,7 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
     }
   }
 
-  if (FV && Rewriter::isRewritable(CE->getExprLoc())) {
+  if (FV) {
     // Now we need to check the type of the arguments and corresponding
     // parameters to see if any explicit casting is needed.
     ProgramInfo::CallTypeParamBindingsT TypeVars;
@@ -213,9 +213,10 @@ void CastPlacementVisitor::surroundByCast(const ConstraintVariable *SrcInt,
       auto NewCRA = clang::Lexer::makeFileCharRange(
           CRA, Context->getSourceManager(), Context->getLangOpts());
       std::string SrcText = clang::tooling::getText(CRA, *Context);
-      assert("Cannot insert cast! Perhaps something funny with macros?" &&
-             !SrcText.empty());
-      Writer.ReplaceText(NewCRA, CastStrs.first + SrcText + CastStrs.second);
+      // If SrcText is empty, then we're inside a macro and can't do any
+      // rewriting. This is unfortunate, but there isn't much we can do.
+      if (!SrcText.empty())
+        Writer.ReplaceText(NewCRA, CastStrs.first + SrcText + CastStrs.second);
     }
   }
 }

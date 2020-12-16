@@ -965,12 +965,17 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
           // variables.
           CS.addConstraint(CS.createGeq(ParamA, ArgA, false));
           CS.addConstraint(CS.createGeq(ArgA, ParamA, false));
+          // Constrain Internal >= External. If external solves to wild, then so
+          // does the internal. Not that this doesn't mean any unsafe external
+          // use causes the internal variable to be wild because the external
+          // variable solves to WILD only when there is an unsafe use that
+          // cannot be resolved by inserting casts.
+          CS.addConstraint(CS.createGeq(ParamA, ArgA, true));
           // For void pointers and function pointers, also equate checked
           // constraints. This causes the external constraint variable to solve
           // to WILD if the internal is WILD, so itypes will not be added.
           if (!isa<ConstAtom>(ArgA) &&
               (QT->isVoidPointerType() || QT->isFunctionPointerType())) {
-            CS.addConstraint(CS.createGeq(ParamA, ArgA, true));
             CS.addConstraint(CS.createGeq(ArgA, ParamA, true));
           }
         }
@@ -999,12 +1004,11 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
     if (isa<VarAtom>(InternalA) || isa<VarAtom>(ExternalA)) {
       CS.addConstraint(CS.createGeq(InternalA, ExternalA, false));
       CS.addConstraint(CS.createGeq(ExternalA, InternalA, false));
+      CS.addConstraint(CS.createGeq(InternalA, ExternalA, true));
     }
     if (!isa<ConstAtom>(ExternalA) &&
-        (J > 0 || RT->isVoidPointerType() || RT->isFunctionPointerType())) {
-      CS.addConstraint(CS.createGeq(InternalA, ExternalA, true));
+        (J > 0 || RT->isVoidPointerType() || RT->isFunctionPointerType()))
       CS.addConstraint(CS.createGeq(ExternalA, InternalA, true));
-    }
   }
 }
 
