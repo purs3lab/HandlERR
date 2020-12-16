@@ -957,29 +957,7 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
       PVConstraint *ParamInt = new PVConstraint(QT, ParmVD, PName, I, Ctx, &N,
                                                 IsGeneric, ParamHasItype);
       InternalExternalPair ParamPair = {ParamInt, ParamExt};
-      for (unsigned J = 0; J < ParamInt->getCvars().size(); J++) {
-        Atom *InternalA = ParamPair.InternalConstraint->getCvars()[J];
-        Atom *External = ParamPair.ExternalConstraint->getCvars()[J];
-        if (isa<VarAtom>(InternalA) || isa<VarAtom>(External)) {
-          // Equate pointer types for internal and external parameter constraint
-          // variables.
-          CS.addConstraint(CS.createGeq(InternalA, External, false));
-          CS.addConstraint(CS.createGeq(External, InternalA, false));
-          // Constrain Internal >= External. If external solves to wild, then so
-          // does the internal. Not that this doesn't mean any unsafe external
-          // use causes the internal variable to be wild because the external
-          // variable solves to WILD only when there is an unsafe use that
-          // cannot be resolved by inserting casts.
-          CS.addConstraint(CS.createGeq(InternalA, External, true));
-          // For void pointers and function pointers, also equate checked
-          // constraints. This causes the external constraint variable to solve
-          // to WILD if the internal is WILD, so itypes will not be added.
-          if (!isa<ConstAtom>(External) &&
-              (QT->isVoidPointerType() || QT->isFunctionPointerType())) {
-            CS.addConstraint(CS.createGeq(External, InternalA, true));
-          }
-        }
-      }
+      linkInternalExternalPair(CS, QT, false, ParamPair);
       ParamVars.push_back(ParamPair);
     }
 
@@ -998,17 +976,35 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
   auto *RetInternal = new PVConstraint(RT, D, RETVAR, I, Ctx, &N, IsGeneric,
                                        ReturnHasItype);
   ReturnVar = {RetInternal, RetExternal};
-  for (unsigned J = 0; J < RetInternal->getCvars().size(); J++) {
-    Atom *InternalA = RetInternal->getCvars()[J];
-    Atom *ExternalA = RetExternal->getCvars()[J];
+  linkInternalExternalPair(CS, RT, true, ReturnVar);
+}
+
+void FunctionVariableConstraint::linkInternalExternalPair(
+  Constraints &CS, QualType QT, bool IsReturn, InternalExternalPair Pair) {
+  assert(Pair.InternalConstraint->getCvars().size() ==
+         Pair.ExternalConstraint->getCvars().size());
+  for (unsigned J = 0; J < Pair.InternalConstraint->getCvars().size(); J++) {
+    Atom *InternalA = Pair.InternalConstraint->getCvars()[J];
+    Atom *ExternalA = Pair.ExternalConstraint->getCvars()[J];
     if (isa<VarAtom>(InternalA) || isa<VarAtom>(ExternalA)) {
+      // Equate pointer types for internal and external parameter constraint
+      // variables.
       CS.addConstraint(CS.createGeq(InternalA, ExternalA, false));
       CS.addConstraint(CS.createGeq(ExternalA, InternalA, false));
+      // Constrain Internal >= External. If external solves to wild, then so
+      // does the internal. Not that this doesn't mean any unsafe external
+      // use causes the internal variable to be wild because the external
+      // variable solves to WILD only when there is an unsafe use that
+      // cannot be resolved by inserting casts.
       CS.addConstraint(CS.createGeq(InternalA, ExternalA, true));
+      // For void pointers and function pointers, also equate checked
+      // constraints. This causes the external constraint variable to solve
+      // to WILD if the internal is WILD, so itypes will not be added.
+      if (!isa<ConstAtom>(ExternalA) &&
+          ((IsReturn && J > 0) || QT->isVoidPointerType() ||
+           QT->isFunctionPointerType()))
+        CS.addConstraint(CS.createGeq(ExternalA, InternalA, true));
     }
-    if (!isa<ConstAtom>(ExternalA) &&
-        (J > 0 || RT->isVoidPointerType() || RT->isFunctionPointerType()))
-      CS.addConstraint(CS.createGeq(ExternalA, InternalA, true));
   }
 }
 

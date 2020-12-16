@@ -463,6 +463,9 @@ private:
 
   void equateFVConstraintVars(ConstraintVariable *CV, ProgramInfo &Info) const;
 
+  void linkInternalExternalPair(Constraints &CS, QualType QT, bool IsReturn,
+                                InternalExternalPair Pair);
+
 public:
   FunctionVariableConstraint()
       : ConstraintVariable(FunctionVariable, "", ""), FileName(""),
