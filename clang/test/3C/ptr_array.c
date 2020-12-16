@@ -1,4 +1,4 @@
-// RUN: %S/3c-regtest.py --predefined-script common-diff-w %s -t %t --clang '%clang'
+// RUN: %S/3c-regtest.py --predefined-script common %s -t %t --clang '%clang'
 
 /* Tests for issue 60. Array initialization had not been implemented, so wild
  pointer inside and array initializer did not cause the array to be an array

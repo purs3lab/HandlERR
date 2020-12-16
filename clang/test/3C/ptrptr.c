@@ -1,4 +1,4 @@
-// RUN: %S/3c-regtest.py --predefined-script common-diff-w %s -t %t --clang '%clang'
+// RUN: %S/3c-regtest.py --predefined-script common %s -t %t --clang '%clang'
 
 #include <stddef.h>
 #include <stddef.h>

@@ -108,6 +108,7 @@ manual_tests = ['3d-allocation.c',
  'funcptr3.c',
  'funcptr4.c',
  'graphs.c',
+ 'graphs.c',
  'graphs2.c',
  'gvar.c',
  'i1.c',
@@ -115,6 +116,8 @@ manual_tests = ['3d-allocation.c',
  'i3.c',
  'linkedlist.c',
  'malloc_array.c',
+ 'ptr_array.c',
+ 'ptrptr.c',
  'realloc.c',
  'realloc_complex.c',
  'refarrsubscript.c',
@@ -126,10 +129,7 @@ manual_tests = ['3d-allocation.c',
  'valist.c',
  'cast.c'] 
 
-need_diff = ['compound_literal.c', 
-'graphs.c',
-'ptr_array.c',
-'ptrptr.c'] 
+need_diff = ['compound_literal.c']
 
 b_tests = ['b10_allsafepointerstruct.c',
  'b11_calleestructnp.c',
