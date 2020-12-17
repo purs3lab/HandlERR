@@ -61,15 +61,21 @@ void Constraints::editConstraintHook(Constraint *C) {
       if (!E->constraintIsChecked()) {
         VarAtom *LHSA = dyn_cast<VarAtom>(E->getLHS());
         VarAtom *RHSA = dyn_cast<VarAtom>(E->getRHS());
-        assert((LHSA || RHSA) && "Adding constraint between constants?!");
         if (LHSA != nullptr && RHSA != nullptr) {
           return;
         }
         // Make this checked only if the const atom is other than Ptr.
-        if (RHSA && !isa<PtrAtom>(E->getLHS())) {
-          addConstraint(createGeq(RHSA, getWild(), POINTER_IS_ARRAY_REASON));
-        } else if (LHSA && !isa<PtrAtom>(E->getRHS())) {
-          addConstraint(createGeq(LHSA, getWild(), POINTER_IS_ARRAY_REASON));
+        if (RHSA) {
+          if (!dyn_cast<PtrAtom>(E->getLHS())) {
+            E->setChecked(getWild());
+            E->setReason(POINTER_IS_ARRAY_REASON);
+          }
+        } else {
+          assert(LHSA && "Adding constraint between constants?!");
+          if (!dyn_cast<PtrAtom>(E->getRHS())) {
+            E->setChecked(getWild());
+            E->setReason(POINTER_IS_ARRAY_REASON);
+          }
         }
       }
     }
@@ -391,7 +397,7 @@ bool Constraints::graphBasedSolve() {
       doSolve(SolChkCG, SavedImplies, Env, this, true, nullptr, Conflicts);
 
   // Now solve PtrType constraints
-  if (AllTypes && Res) {
+  if (Res && AllTypes) {
     Env.doCheckedSolve(false);
 
     // Step 1: Greatest solution
@@ -456,26 +462,22 @@ bool Constraints::graphBasedSolve() {
         Res = doSolve(SolPtrTypCG, Empty, Env, this, false, &Rest, Conflicts);
       }
     }
-
     // If PtrType solving (partly) failed, make the affected VarAtoms wild.
     if (!Res) {
+      std::set<VarAtom *> Rest;
       Env.doCheckedSolve(true);
-      std::set<VarAtom *> Changed;
       for (VarAtom *VA : Conflicts) {
         assert(VA != nullptr);
         std::string Rsn = "Bad pointer type solution";
         Geq *ConflictConstraint = createGeq(VA, getWild(), Rsn);
         addConstraint(ConflictConstraint);
         SolChkCG.addConstraint(ConflictConstraint, *this);
-        Changed.insert(VA);
+        Rest.insert(VA);
       }
       Conflicts.clear();
-      // Re-run checked solving step if atoms were affected by the last step.
-      if (!Changed.empty())
-        Res = doSolve(SolChkCG, SavedImplies, Env, this, true, &Changed,
-                      Conflicts);
+      /* FIXME: Should we propagate the old res? */
+      Res = doSolve(SolChkCG, SavedImplies, Env, this, true, &Rest, Conflicts);
     }
-
     // Final Step: Merge ptyp solution with checked solution.
     Env.mergePtrTypes();
   }
