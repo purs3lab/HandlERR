@@ -466,6 +466,11 @@ private:
   void linkInternalExternalPair(Constraints &CS, QualType QT, bool IsReturn,
                                 InternalExternalPair Pair);
 
+  InternalExternalPair
+  allocateParamPair(const clang::QualType &QT, clang::DeclaratorDecl *D,
+                    std::string N, ProgramInfo &I, const clang::ASTContext &C,
+                    std::string *InFunc, bool VarAtomForChecked);
+
 public:
   FunctionVariableConstraint()
       : ConstraintVariable(FunctionVariable, "", ""), FileName(""),

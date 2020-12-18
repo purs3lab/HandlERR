@@ -949,16 +949,9 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
           PName = PVD->getName();
         }
       }
-      bool IsGeneric =
-          ParmVD != nullptr && getTypeVariableType(ParmVD) != nullptr;
-
-      PVConstraint *ParamExt = new PVConstraint(QT, ParmVD, PName, I, Ctx, &N,
-                                                IsGeneric);
-      PVConstraint *ParamInt = new PVConstraint(QT, ParmVD, PName, I, Ctx, &N,
-                                                IsGeneric, ParamHasItype);
-      InternalExternalPair ParamPair = {ParamInt, ParamExt};
-      linkInternalExternalPair(CS, QT, false, ParamPair);
-      ParamVars.push_back(ParamPair);
+      InternalExternalPair Pair = allocateParamPair(QT, ParmVD, PName, I, Ctx,
+                                                    &N, ParamHasItype);
+      ParamVars.push_back(Pair);
     }
 
     Hasproto = true;
@@ -971,12 +964,23 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
   }
 
   // ConstraintVariable for the return
-  bool IsGeneric = FD != nullptr && getTypeVariableType(FD) != nullptr;
-  auto *RetExternal = new PVConstraint(RT, D, RETVAR, I, Ctx, &N, IsGeneric);
-  auto *RetInternal = new PVConstraint(RT, D, RETVAR, I, Ctx, &N, IsGeneric,
-                                       ReturnHasItype);
-  ReturnVar = {RetInternal, RetExternal};
-  linkInternalExternalPair(CS, RT, true, ReturnVar);
+  ReturnVar = allocateParamPair(RT, D, RETVAR, I, Ctx, &N, ReturnHasItype);
+}
+
+FunctionVariableConstraint::InternalExternalPair
+FunctionVariableConstraint::allocateParamPair(const clang::QualType &QT,
+                                              clang::DeclaratorDecl *D,
+                                              std::string N, ProgramInfo &I,
+                                              const clang::ASTContext &C,
+                                              std::string *InFunc,
+                                              bool VarAtomForChecked) {
+  bool IsGeneric = D && getTypeVariableType(D);
+  PVConstraint *PVInt = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric,
+                                         VarAtomForChecked);
+  PVConstraint *PVExt = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric);
+  InternalExternalPair Pair = {PVInt, PVExt};
+  linkInternalExternalPair(I.getConstraints(), QT, N == RETVAR, Pair);
+  return Pair;
 }
 
 void FunctionVariableConstraint::linkInternalExternalPair(
