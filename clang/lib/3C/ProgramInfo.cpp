@@ -602,7 +602,6 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(PVD, *AstContext);
       // Constraint variable is stored on the parent function, so we need to
       // constrain to WILD even if we don't end up storing this in the map.
-      constrainWildIfMacro(PVInternal, PVD->getLocation());
       constrainWildIfMacro(PVExternal, PVD->getLocation());
       specialCaseVarIntros(PVD, AstContext);
       // It is possible to have a parameter delc in a macro when function is not
@@ -724,11 +723,8 @@ void ProgramInfo::constrainWildIfMacro(ConstraintVariable *CV,
                                        SourceLocation Location,
                                        PersistentSourceLoc *PSL) {
   std::string Rsn = "Pointer in Macro declaration.";
-  if (!Rewriter::isRewritable(Location)) {
+  if (!Rewriter::isRewritable(Location))
     CV->constrainToWild(CS, Rsn, PSL);
-    if (auto *FV = dyn_cast<FVConstraint>(CV))
-      FV->constrainExternalWild(CS, Rsn, PSL);
-  }
 }
 
 //std::string ProgramInfo::getUniqueDeclKey(Decl *D, ASTContext *C) {

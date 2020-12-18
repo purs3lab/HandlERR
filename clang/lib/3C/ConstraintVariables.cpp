@@ -1019,20 +1019,8 @@ void FunctionVariableConstraint::constrainToWild(Constraints &CS,
 
 void FunctionVariableConstraint::constrainToWild(
     Constraints &CS, const std::string &Rsn, PersistentSourceLoc *PL) const {
-  ReturnVar.InternalConstraint->constrainToWild(CS, Rsn, PL);
   ReturnVar.ExternalConstraint->constrainToWild(CS, Rsn, PL);
 
-  for (const auto &V : ParamVars) {
-    V.InternalConstraint->constrainToWild(CS, Rsn, PL);
-    V.ExternalConstraint->constrainToWild(CS, Rsn, PL);
-  }
-}
-
-void FunctionVariableConstraint::constrainExternalWild
-    (Constraints &CS, const std::string &Rsn, PersistentSourceLoc *PL) const {
-  constrainToWild(CS, Rsn, PL);
-
-  ReturnVar.ExternalConstraint->constrainToWild(CS, Rsn, PL);
   for (const auto &V : ParamVars)
     V.ExternalConstraint->constrainToWild(CS, Rsn, PL);
 }

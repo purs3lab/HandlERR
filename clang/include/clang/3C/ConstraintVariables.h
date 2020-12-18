@@ -535,8 +535,6 @@ public:
   void dump() const override { print(llvm::errs()); }
   void dumpJson(llvm::raw_ostream &O) const override;
 
-  void constrainExternalWild(Constraints &CS, const std::string &Rsn,
-                             PersistentSourceLoc *PL) const;
   void constrainToWild(Constraints &CS, const std::string &Rsn) const override;
   void constrainToWild(Constraints &CS, const std::string &Rsn,
                        PersistentSourceLoc *PL) const override;
