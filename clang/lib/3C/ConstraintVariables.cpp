@@ -909,7 +909,6 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
 
   bool ReturnHasItype = false;
   // ConstraintVariables for the parameters
-  Constraints &CS = I.getConstraints();
   if (Ty->isFunctionPointerType()) {
     // Is this a function pointer definition?
     llvm_unreachable("should not hit this case");
@@ -975,9 +974,13 @@ FunctionVariableConstraint::allocateParamPair(const clang::QualType &QT,
                                               std::string *InFunc,
                                               bool VarAtomForChecked) {
   bool IsGeneric = D && getTypeVariableType(D);
+  PVConstraint *PVExt = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric);
+  // For void pointers and function pointers, internal and external would need
+  // to be equated, so can we avoid allocating extra constraints.
+  if (QT->isVoidPointerType() || QT->isFunctionPointerType())
+    return {PVExt, PVExt};
   PVConstraint *PVInt = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric,
                                          VarAtomForChecked);
-  PVConstraint *PVExt = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric);
   InternalExternalPair Pair = {PVInt, PVExt};
   linkInternalExternalPair(I.getConstraints(), QT, N == RETVAR, Pair);
   return Pair;
@@ -987,6 +990,7 @@ void FunctionVariableConstraint::linkInternalExternalPair(
   Constraints &CS, QualType QT, bool IsReturn, InternalExternalPair Pair) {
   assert(Pair.InternalConstraint->getCvars().size() ==
          Pair.ExternalConstraint->getCvars().size());
+  assert(!(QT->isVoidPointerType() || QT->isFunctionPointerType()));
   for (unsigned J = 0; J < Pair.InternalConstraint->getCvars().size(); J++) {
     Atom *InternalA = Pair.InternalConstraint->getCvars()[J];
     Atom *ExternalA = Pair.ExternalConstraint->getCvars()[J];
@@ -1001,12 +1005,8 @@ void FunctionVariableConstraint::linkInternalExternalPair(
       // variable solves to WILD only when there is an unsafe use that
       // cannot be resolved by inserting casts.
       CS.addConstraint(CS.createGeq(InternalA, ExternalA, true));
-      // For void pointers and function pointers, also equate checked
-      // constraints. This causes the external constraint variable to solve
-      // to WILD if the internal is WILD, so itypes will not be added.
-      if (!isa<ConstAtom>(ExternalA) &&
-          ((IsReturn && J > 0) || QT->isVoidPointerType() ||
-           QT->isFunctionPointerType()))
+
+      if (!isa<ConstAtom>(ExternalA) && IsReturn && J > 0)
         CS.addConstraint(CS.createGeq(ExternalA, InternalA, true));
     }
   }

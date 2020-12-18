@@ -12,7 +12,7 @@ void f(int *(*fp)(int *)) {
   int *z = (int *)5;
 	//CHECK: int *z = (int *)5;
   z = fp(x);
-	//CHECK: z = ((int *)fp(_Assume_bounds_cast<_Ptr<int>>(x)));
+	//CHECK: z = fp(x);
 }
 int *g2(int *x) {
 	//CHECK: int *g2(int *x : itype(_Ptr<int>)) : itype(_Ptr<int>) {
