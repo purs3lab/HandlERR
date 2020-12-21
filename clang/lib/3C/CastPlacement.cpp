@@ -82,7 +82,8 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
         // parameter casts because assignment now goes from returned to its
         // local use.
         InternalExternalPair<ConstraintVariable> Dst = {ArgC, ArgC};
-        if (!Locator.exprHasCast(CE) && needCasting(Src, Dst) != NO_CAST) {
+        if (ExprsWithCast.find(CE) == ExprsWithCast.end() &&
+            needCasting(Src, Dst) != NO_CAST) {
           surroundByCast(Src, Dst, CE);
           break;
         }
@@ -239,11 +240,8 @@ void CastPlacementVisitor::surroundByCast(
   }
 }
 
-bool CastLocatorVisitor::exprHasCast(Expr *E) const {
-  return isa<CastExpr>(E) || ExprsWithCast.find(E) != ExprsWithCast.end();
-}
-
 bool CastLocatorVisitor::VisitCastExpr(CastExpr *C) {
+  ExprsWithCast.insert(C);
   if (!isa<ImplicitCastExpr>(C)) {
     Expr *Sub = ignoreCheckedCImplicit(C->getSubExpr());
     ExprsWithCast.insert(Sub);

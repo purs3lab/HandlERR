@@ -418,7 +418,7 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   CheckedRegionFinder CRF(&Context, R, Info, Seen, NodeMap, WarnRootCause);
   CheckedRegionAdder CRA(&Context, R, NodeMap);
   CastLocatorVisitor CLV(&Context);
-  CastPlacementVisitor ECPV(&Context, Info, R, CLV);
+  CastPlacementVisitor ECPV(&Context, Info, R, CLV.getExprsWithCast());
   TypeExprRewriter TER(&Context, Info, R);
   TypeArgumentAdder TPA(&Context, Info, R);
   TranslationUnitDecl *TUD = Context.getTranslationUnitDecl();
@@ -434,6 +434,8 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
     // Cast placement must happen after type expression rewriting (i.e. cast and
     // compound literal) so that casts to unchecked pointer on itype function
     // calls can override rewritings of casts to checked types.
+    // The cast locator must also run before the cast placement visitor so that
+    // the cast placement visitor is aware of all existing cast expressions.
     CLV.TraverseDecl(D);
     ECPV.TraverseDecl(D);
     TPA.TraverseDecl(D);
