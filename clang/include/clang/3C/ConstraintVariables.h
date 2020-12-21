@@ -236,7 +236,7 @@ private:
   bool ArrPresent;
 
   // True if this variable has an itype in the original source code.
-  bool HasSrcItype;
+  bool SrcHasItype;
   // The string representation of the itype of in the original source. This
   // string is empty if the variable did not have an itype OR if the itype was
   // implicitly declared by a bounds declaration on an unchecked pointer.
@@ -306,7 +306,7 @@ public:
                             FunctionVariableConstraint *F, bool IsArr,
                             std::string Is, bool Generic = false)
       : ConstraintVariable(PointerVariable, "" /*not used*/, Name), BaseType(T),
-        Vars(V), FV(F), ArrPresent(IsArr), HasSrcItype(!Is.empty()),
+        Vars(V), FV(F), ArrPresent(IsArr), SrcHasItype(!Is.empty()),
         ItypeStr(Is), PartOfFuncPrototype(false), Parent(nullptr),
         BoundsAnnotationStr(""), IsGeneric(Generic), IsZeroWidthArray(false),
         IsVoidPtr(false) {}
@@ -321,12 +321,15 @@ public:
   bool isTypedef(void);
   void setTypedef(TypedefNameDecl *TypedefType, std::string);
 
-  // Is an itype present for this constraint? If yes,
-  // what is the text of that itype?
+  // Return true if this constraint had an itype in the original source code.
   bool srcHasItype() const override {
-    assert(!HasSrcItype || !ItypeStr.empty() || !BoundsAnnotationStr.empty());
-    return HasSrcItype;
+    assert(!SrcHasItype || !ItypeStr.empty() || !BoundsAnnotationStr.empty());
+    return SrcHasItype;
   }
+
+  // Return the string representation of the itype for this constraint if an
+  // itype was present in the original source code. Returns empty string
+  // otherwise.
   std::string getItype() const {
     return ItypeStr;
   }

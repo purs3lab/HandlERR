@@ -110,7 +110,7 @@ PointerVariableConstraint::PointerVariableConstraint(
   this->IsGeneric = Ot->IsGeneric;
   this->IsZeroWidthArray = Ot->IsZeroWidthArray;
   this->BaseType = Ot->BaseType;
-  this->HasSrcItype = Ot->HasSrcItype;
+  this->SrcHasItype = Ot->SrcHasItype;
   this->IsVoidPtr = Ot->IsVoidPtr;
   // We need not initialize other members.
 }
@@ -176,7 +176,7 @@ PointerVariableConstraint::PointerVariableConstraint(
     bool VarAtomForChecked)
     : ConstraintVariable(ConstraintVariable::PointerVariable,
                          tyToStr(QT.getTypePtr()), N),
-      FV(nullptr), HasSrcItype(false), PartOfFuncPrototype(InFunc != nullptr),
+      FV(nullptr), SrcHasItype(false), PartOfFuncPrototype(InFunc != nullptr),
       Parent(nullptr), IsGeneric(Generic) {
   QualType QTy = QT;
   const Type *Ty = QTy.getTypePtr();
@@ -247,7 +247,7 @@ PointerVariableConstraint::PointerVariableConstraint(
         QualType InteropType = ITE->getTypeAsWritten();
         QTy = InteropType;
         Ty = QTy.getTypePtr();
-        HasSrcItype = true;
+        SrcHasItype = true;
 
         SourceRange R = ITE->getSourceRange();
         if (R.isValid()) {
@@ -1791,7 +1791,7 @@ void PointerVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
   }
   assert(Vars.size() == NewVatoms.size() && "Merging Failed");
   Vars = NewVatoms;
-  HasSrcItype = HasSrcItype || From->HasSrcItype;
+  SrcHasItype = SrcHasItype || From->SrcHasItype;
   if (!From->ItypeStr.empty())
     ItypeStr = From->ItypeStr;
   if (!From->BoundsAnnotationStr.empty())
