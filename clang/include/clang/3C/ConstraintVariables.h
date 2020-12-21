@@ -434,21 +434,23 @@ typedef struct {
   std::vector<CVarSet> PS;
 } ParamDeferment;
 
+template<typename CV>
+struct InternalExternalPair {
+  CV *InternalConstraint;
+  CV *ExternalConstraint;
+};
+
 // Constraints on a function type. Also contains a 'name' parameter for
 // when a re-write of a function pointer is needed.
 class FunctionVariableConstraint : public ConstraintVariable {
 private:
   FunctionVariableConstraint(FunctionVariableConstraint *Ot, Constraints &CS);
-  struct InternalExternalPair {
-    PVConstraint *InternalConstraint;
-    PVConstraint *ExternalConstraint;
-  };
 
   // N constraints on the return value of the function.
-  InternalExternalPair ReturnVar;
+  InternalExternalPair<PVConstraint> ReturnVar;
   // A vector of K sets of N constraints on the parameter values, for
   // K parameters accepted by the function.
-  std::vector<InternalExternalPair> ParamVars;
+  std::vector<InternalExternalPair<PVConstraint>> ParamVars;
 
   // Storing of parameters in the case of untyped prototypes
   std::vector<ParamDeferment> DeferredParams;
@@ -464,9 +466,9 @@ private:
   void equateFVConstraintVars(ConstraintVariable *CV, ProgramInfo &Info) const;
 
   void linkInternalExternalPair(Constraints &CS, QualType QT, bool IsReturn,
-                                InternalExternalPair Pair);
+                                InternalExternalPair<PVConstraint> Pair);
 
-  InternalExternalPair
+  InternalExternalPair<PVConstraint>
   allocateParamPair(const clang::QualType &QT, clang::DeclaratorDecl *D,
                     std::string N, ProgramInfo &I, const clang::ASTContext &C,
                     std::string *InFunc, bool VarAtomForChecked);

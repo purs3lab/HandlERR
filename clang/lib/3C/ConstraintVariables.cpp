@@ -855,8 +855,9 @@ FunctionVariableConstraint::FunctionVariableConstraint(
   this->ReturnVar = Ot->ReturnVar;
   // Make copy of ParameterCVs too.
   for (auto &ParmPv : Ot->ParamVars) {
-    InternalExternalPair Copy = {ParmPv.InternalConstraint->getCopy(CS),
-                                 ParmPv.ExternalConstraint->getCopy(CS)};
+    InternalExternalPair<PVConstraint> Copy = {
+      ParmPv.InternalConstraint->getCopy(CS),
+      ParmPv.ExternalConstraint->getCopy(CS)};
     this->ParamVars.push_back(Copy);
   }
   this->Parent = Ot;
@@ -948,8 +949,8 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
           PName = PVD->getName();
         }
       }
-      InternalExternalPair Pair = allocateParamPair(QT, ParmVD, PName, I, Ctx,
-                                                    &N, ParamHasItype);
+      auto Pair = allocateParamPair(QT, ParmVD, PName, I, Ctx, &N,
+                                    ParamHasItype);
       ParamVars.push_back(Pair);
     }
 
@@ -966,7 +967,7 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
   ReturnVar = allocateParamPair(RT, D, RETVAR, I, Ctx, &N, ReturnHasItype);
 }
 
-FunctionVariableConstraint::InternalExternalPair
+InternalExternalPair<PVConstraint>
 FunctionVariableConstraint::allocateParamPair(const clang::QualType &QT,
                                               clang::DeclaratorDecl *D,
                                               std::string N, ProgramInfo &I,
@@ -981,13 +982,14 @@ FunctionVariableConstraint::allocateParamPair(const clang::QualType &QT,
     return {PVExt, PVExt};
   PVConstraint *PVInt = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric,
                                          VarAtomForChecked);
-  InternalExternalPair Pair = {PVInt, PVExt};
+  InternalExternalPair<PVConstraint> Pair = {PVInt, PVExt};
   linkInternalExternalPair(I.getConstraints(), QT, N == RETVAR, Pair);
   return Pair;
 }
 
-void FunctionVariableConstraint::linkInternalExternalPair(
-  Constraints &CS, QualType QT, bool IsReturn, InternalExternalPair Pair) {
+void FunctionVariableConstraint::linkInternalExternalPair
+  (Constraints &CS, QualType QT, bool IsReturn,
+   InternalExternalPair<PVConstraint> Pair) {
   assert(Pair.InternalConstraint->getCvars().size() ==
          Pair.ExternalConstraint->getCvars().size());
   assert(!(QT->isVoidPointerType() || QT->isFunctionPointerType()));
@@ -1026,7 +1028,7 @@ void FunctionVariableConstraint::constrainToWild(
 }
 bool FunctionVariableConstraint::anyChanges(const EnvironmentMap &E) const {
   return ReturnVar.ExternalConstraint->anyChanges(E) ||
-         llvm::any_of(ParamVars, [&E](InternalExternalPair CV) {
+         llvm::any_of(ParamVars, [&E](InternalExternalPair<PVConstraint> CV) {
            return CV.ExternalConstraint->anyChanges(E);
          });
 }
@@ -1918,7 +1920,7 @@ bool FunctionVariableConstraint::getIsOriginallyChecked() const {
 
 bool FunctionVariableConstraint::isFullyChecked(const EnvironmentMap &E) const {
   return ReturnVar.ExternalConstraint->isFullyChecked(E) &&
-         llvm::all_of(ParamVars, [&E](InternalExternalPair P) {
+         llvm::all_of(ParamVars, [&E](InternalExternalPair<PVConstraint> P) {
            return P.ExternalConstraint->isFullyChecked(E);
          });
 }
