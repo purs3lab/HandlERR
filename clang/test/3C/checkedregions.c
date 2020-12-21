@@ -78,3 +78,10 @@ void baz(void) {
     bad();
   }
 }
+
+int* g() { 
+	//CHECK: int *g(void) : itype(_Ptr<int>) _Checked {
+	return 1;
+}
+
+
