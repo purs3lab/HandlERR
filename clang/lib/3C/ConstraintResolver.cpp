@@ -689,6 +689,20 @@ CVarSet ConstraintResolver::getBaseVarPVConstraint(DeclRefExpr *Decl) {
   return Ret;
 }
 
+CVarSet ConstraintResolver::getCalleeConstraintVars(CallExpr *CE) {
+  CVarSet FVCons;
+  Decl *D = CE->getCalleeDecl();
+  if (isa_and_nonnull<FunctionDecl>(D) || isa_and_nonnull<DeclaratorDecl>(D)) {
+    CVarOption CV = Info.getVariable(D, Context);
+    if (CV.hasValue())
+      FVCons.insert(&CV.getValue());
+  } else {
+    Expr *CalledExpr = CE->getCallee();
+    FVCons = getExprConstraintVars(CalledExpr);
+  }
+  return FVCons;
+}
+
 // Construct a PVConstraint for an expression that can safely be used when
 // rewriting the expression later on. This is done by making the constraint WILD
 // if the expression is inside a macro.

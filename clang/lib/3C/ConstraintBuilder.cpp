@@ -149,39 +149,24 @@ public:
 
   // e(e1,e2,...)
   bool VisitCallExpr(CallExpr *E) {
-    Decl *D = E->getCalleeDecl();
     PersistentSourceLoc PL = PersistentSourceLoc::mkPSL(E, *Context);
     auto &CS = Info.getConstraints();
-    CVarSet FVCons;
-    std::string FuncName = "";
-    FunctionDecl *TFD = nullptr;
+    CVarSet FVCons = CB.getCalleeConstraintVars(E);
 
-    // figure out who we are calling
-    if (D == nullptr) {
-      // If the callee declaration could not be found, then we're doing some
-      // sort of indirect call through an array or conditional.
-      Expr *CalledExpr = E->getCallee();
-      FVCons = CB.getExprConstraintVars(CalledExpr);
-      // When multiple function variables are used in the same expression, they
-      // must have the same type.
-      if (FVCons.size() > 1) {
-        PersistentSourceLoc PL =
-            PersistentSourceLoc::mkPSL(CalledExpr, *Context);
-        constrainConsVarGeq(FVCons, FVCons, Info.getConstraints(), &PL,
-                            Same_to_Same, false, &Info);
-      }
-    } else if (FunctionDecl *FD = dyn_cast<FunctionDecl>(D)) {
-      FuncName = FD->getNameAsString();
-      TFD = FD;
-      CVarOption CV = Info.getVariable(FD, Context);
-      if (CV.hasValue())
-        FVCons.insert(&CV.getValue());
-    } else if (DeclaratorDecl *DD = dyn_cast<DeclaratorDecl>(D)) {
-      FuncName = DD->getNameAsString();
-      CVarOption CV = Info.getVariable(DD, Context);
-      if (CV.hasValue())
-        FVCons.insert(&CV.getValue());
+    // When multiple function variables are used in the same expression, they
+    // must have the same type.
+    if (FVCons.size() > 1) {
+      PersistentSourceLoc PL =
+        PersistentSourceLoc::mkPSL(E->getCallee(), *Context);
+      constrainConsVarGeq(FVCons, FVCons, Info.getConstraints(), &PL,
+                          Same_to_Same, false, &Info);
     }
+
+    Decl *D = E->getCalleeDecl();
+    FunctionDecl *TFD = dyn_cast_or_null<FunctionDecl>(D);
+    std::string FuncName = "";
+    if (auto *DD = dyn_cast_or_null<DeclaratorDecl>(D))
+      FuncName = DD->getNameAsString();
 
     // Collect type parameters for this function call that are
     // consistently instantiated as single type in this function call.

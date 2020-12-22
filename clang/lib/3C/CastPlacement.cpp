@@ -20,75 +20,78 @@ using namespace clang;
 bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
   // Get the constraint variable for the function.
   Decl *CalleeDecl = CE->getCalleeDecl();
-  FVConstraint *FV = nullptr;
   FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(CalleeDecl);
-  if (FD) {
-    FV = Info.getFuncConstraint(FD, Context);
-    assert("Function has no definition" && FV != nullptr);
-  } else if (isa_and_nonnull<VarDecl>(CalleeDecl)) {
-    CVarOption Opt = Info.getVariable(cast<VarDecl>(CalleeDecl), Context);
-    if (Opt.hasValue()) {
-      if (isa<PVConstraint>(Opt.getValue()))
-        FV = cast<PVConstraint>(Opt.getValue()).getFV();
-      else
-        FV = dyn_cast<FVConstraint>(&Opt.getValue());
-    }
+
+  // Find a FVConstraint for this call. If there is more than one, then they
+  // will have been unified during constraint generation, so we can use any of
+  // them.
+  FVConstraint *FV = nullptr;
+  for (auto *CV : CR.getCalleeConstraintVars(CE)) {
+    if (isa<FVConstraint>(CV))
+      FV = cast<FVConstraint>(CV);
+    else if (isa<PVConstraint>(CV) && cast<PVConstraint>(CV)->getFV())
+      FV = cast<PVConstraint>(CV)->getFV();
+    if (FV)
+      break;
   }
 
-  if (FV) {
-    // Now we need to check the type of the arguments and corresponding
-    // parameters to see if any explicit casting is needed.
-    ProgramInfo::CallTypeParamBindingsT TypeVars;
-    if (Info.hasTypeParamBindings(CE, Context))
-      TypeVars = Info.getTypeParamBindings(CE, Context);
+  // Note: I'm not entirely sure that this will always hold. The previous
+  // implementation just returned early if FV was null, but I don't think that
+  // can ever actually happen.
+  assert("Could not find function constraint variable!" && FV != nullptr);
 
-    // Cast on arguments
-    unsigned PIdx = 0;
-    for (const auto &A : CE->arguments()) {
-      if (PIdx < FV->numParams() && (!FD || PIdx < FD->getNumParams())) {
-        // Avoid adding incorrect casts to generic function arguments by
-        // removing implicit casts when on arguments with a consistently
-        // used generic type.
-        Expr *ArgExpr = A;
-        if (FD) {
-          const TypeVariableType *TyVar =
-            getTypeVariableType(FD->getParamDecl(PIdx));
-          if (TyVar && TypeVars.find(TyVar->GetIndex()) != TypeVars.end() &&
-              TypeVars[TyVar->GetIndex()] != nullptr)
-            ArgExpr = ArgExpr->IgnoreImpCasts();
-        }
+  // Now we need to check the type of the arguments and corresponding
+  // parameters to see if any explicit casting is needed.
+  ProgramInfo::CallTypeParamBindingsT TypeVars;
+  if (Info.hasTypeParamBindings(CE, Context))
+    TypeVars = Info.getTypeParamBindings(CE, Context);
 
-        CVarSet ArgumentConstraints = CR.getExprConstraintVars(ArgExpr);
-        InternalExternalPair<ConstraintVariable> Dst = {
-          FV->getInternalParam(PIdx), FV->getExternalParam(PIdx)};
-        for (auto *ArgC : ArgumentConstraints) {
-          InternalExternalPair<ConstraintVariable> Src = {ArgC, ArgC};
-          if (needCasting(Src, Dst) != NO_CAST) {
-            surroundByCast(Src, Dst, A);
-            break;
-          }
-        }
+  // Cast on arguments
+  unsigned PIdx = 0;
+  for (const auto &A : CE->arguments()) {
+    if (PIdx < FV->numParams() && (!FD || PIdx < FD->getNumParams())) {
+      // Avoid adding incorrect casts to generic function arguments by
+      // removing implicit casts when on arguments with a consistently
+      // used generic type.
+      Expr *ArgExpr = A;
+      if (FD) {
+        const TypeVariableType *TyVar =
+          getTypeVariableType(FD->getParamDecl(PIdx));
+        if (TyVar && TypeVars.find(TyVar->GetIndex()) != TypeVars.end() &&
+            TypeVars[TyVar->GetIndex()] != nullptr)
+          ArgExpr = ArgExpr->IgnoreImpCasts();
       }
-      PIdx++;
-    }
 
-    // Cast on return. Be sure not to place casts when the result is not used,
-    // otherwise an externaly unsafe function whose result is not used would end
-    // up with a bounds cast around it.
-    if (isResultUsed(CE)) {
-      CVarSet ArgumentConstraints = CR.getExprConstraintVars(CE);
-      InternalExternalPair<ConstraintVariable> Src = {FV->getInternalReturn(),
-                                                      FV->getExternalReturn()};
+      CVarSet ArgumentConstraints = CR.getExprConstraintVars(ArgExpr);
+      InternalExternalPair<ConstraintVariable> Dst = {
+        FV->getInternalParam(PIdx), FV->getExternalParam(PIdx)};
       for (auto *ArgC : ArgumentConstraints) {
-        // Order of ParameterC and ArgumentC is reversed from when inserting
-        // parameter casts because assignment now goes from returned to its
-        // local use.
-        InternalExternalPair<ConstraintVariable> Dst = {ArgC, ArgC};
-        if (ExprsWithCast.find(CE) == ExprsWithCast.end() &&
-            needCasting(Src, Dst) != NO_CAST) {
-          surroundByCast(Src, Dst, CE);
+        InternalExternalPair<ConstraintVariable> Src = {ArgC, ArgC};
+        if (needCasting(Src, Dst) != NO_CAST) {
+          surroundByCast(Src, Dst, A);
           break;
         }
+      }
+    }
+    PIdx++;
+  }
+
+  // Cast on return. Be sure not to place casts when the result is not used,
+  // otherwise an externaly unsafe function whose result is not used would end
+  // up with a bounds cast around it.
+  if (isResultUsed(CE)) {
+    CVarSet ArgumentConstraints = CR.getExprConstraintVars(CE);
+    InternalExternalPair<ConstraintVariable> Src = {FV->getInternalReturn(),
+                                                    FV->getExternalReturn()};
+    for (auto *ArgC : ArgumentConstraints) {
+      // Order of ParameterC and ArgumentC is reversed from when inserting
+      // parameter casts because assignment now goes from returned to its
+      // local use.
+      InternalExternalPair<ConstraintVariable> Dst = {ArgC, ArgC};
+      if (ExprsWithCast.find(CE) == ExprsWithCast.end() &&
+          needCasting(Src, Dst) != NO_CAST) {
+        surroundByCast(Src, Dst, CE);
+        break;
       }
     }
   }
