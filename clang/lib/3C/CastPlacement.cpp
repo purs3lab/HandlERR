@@ -260,13 +260,3 @@ bool CastLocatorVisitor::VisitCastExpr(CastExpr *C) {
   }
   return true;
 }
-
-Expr *CastLocatorVisitor::ignoreCheckedCImplicit(Expr *E) {
-  Expr *Old = nullptr;
-  Expr *New = E;
-  while (Old != New) {
-    Old = New;
-    New = Old->IgnoreExprTmp()->IgnoreImplicit();
-  }
-  return New;
-}

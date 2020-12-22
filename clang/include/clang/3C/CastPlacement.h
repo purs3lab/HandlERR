@@ -29,8 +29,6 @@ public:
 private:
   ASTContext *Context;
   std::set<Expr *> ExprsWithCast;
-
-  static Expr *ignoreCheckedCImplicit(Expr *E);
 };
 
 class CastPlacementVisitor : public RecursiveASTVisitor<CastPlacementVisitor> {

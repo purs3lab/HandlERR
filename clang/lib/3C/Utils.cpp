@@ -423,3 +423,13 @@ TypeLoc getBaseTypeLoc(TypeLoc T) {
     T = T.getNextTypeLoc();
   return T;
 }
+
+Expr *ignoreCheckedCImplicit(Expr *E) {
+  Expr *Old = nullptr;
+  Expr *New = E;
+  while (Old != New) {
+    Old = New;
+    New = Old->IgnoreExprTmp()->IgnoreImplicit();
+  }
+  return New;
+}
