@@ -62,11 +62,11 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
           ArgExpr = ArgExpr->IgnoreImpCasts();
       }
 
-      CVarSet ArgumentConstraints = CR.getExprConstraintVars(ArgExpr);
+      CVarSet DestinationConstraints = CR.getExprConstraintVars(ArgExpr);
       InternalExternalPair<ConstraintVariable> Dst = {
         FV->getInternalParam(PIdx), FV->getExternalParam(PIdx)};
-      for (auto *ArgC : ArgumentConstraints) {
-        InternalExternalPair<ConstraintVariable> Src = {ArgC, ArgC};
+      for (auto *DstC : DestinationConstraints) {
+        InternalExternalPair<ConstraintVariable> Src = {DstC, DstC};
         if (needCasting(Src, Dst) != NO_CAST) {
           surroundByCast(Src, Dst, A);
           break;
@@ -80,14 +80,14 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
   // otherwise an externaly unsafe function whose result is not used would end
   // up with a bounds cast around it.
   if (isResultUsed(CE)) {
-    CVarSet ArgumentConstraints = CR.getExprConstraintVars(CE);
+    CVarSet DestinationConstraints = CR.getExprConstraintVars(CE);
     InternalExternalPair<ConstraintVariable> Src = {FV->getInternalReturn(),
                                                     FV->getExternalReturn()};
-    for (auto *ArgC : ArgumentConstraints) {
+    for (auto *DstC : DestinationConstraints) {
       // Order of ParameterC and ArgumentC is reversed from when inserting
       // parameter casts because assignment now goes from returned to its
       // local use.
-      InternalExternalPair<ConstraintVariable> Dst = {ArgC, ArgC};
+      InternalExternalPair<ConstraintVariable> Dst = {DstC, DstC};
       if (ExprsWithCast.find(CE) == ExprsWithCast.end() &&
           needCasting(Src, Dst) != NO_CAST) {
         surroundByCast(Src, Dst, CE);
@@ -168,8 +168,8 @@ CastPlacementVisitor::needCasting(InternalExternalPair<ConstraintVariable> Src,
   return CastNeeded::NO_CAST;
 }
 
-// Get the string representation of the cast required  at all call. The return
-// is a pair of strings: a prefix and suffix string that for the complete cast
+// Get the string representation of the cast required for the call. The return
+// is a pair of strings: a prefix and suffix string that form the complete cast
 // when placed around the expression being cast.
 std::pair<std::string, std::string> CastPlacementVisitor::getCastString(
   InternalExternalPair<ConstraintVariable> Src,

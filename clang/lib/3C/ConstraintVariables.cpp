@@ -1402,8 +1402,9 @@ bool FunctionVariableConstraint::solutionEqualTo(
 
 std::string FunctionVariableConstraint::mkString(const EnvironmentMap &E,
                                                  bool EmitName, bool ForItype,
-                                                 bool EmitPointee, bool UnmaskTypedef) const {
-PVConstraint *RetArgsCV = ReturnVar.ExternalConstraint;
+                                                 bool EmitPointee,
+                                                 bool UnmaskTypedef) const {
+  PVConstraint *RetArgsCV = ReturnVar.ExternalConstraint;
   PVConstraint *RetParamCV = ReturnVar.InternalConstraint;
   std::string Ret = RetArgsCV->getRewritableOriginalTy();
   std::string Itype = "";
@@ -1824,8 +1825,6 @@ bool PointerVariableConstraint::isFullyChecked(const EnvironmentMap &E) const {
     if (isa<WildAtom>(CA))
       return false;
   }
-  //if (FV)
-  //  return FV->isFullyChecked(E);
   return true;
 }
 

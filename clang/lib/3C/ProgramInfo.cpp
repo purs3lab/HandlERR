@@ -806,8 +806,8 @@ CVarOption ProgramInfo::getVariable(clang::Decl *D, clang::ASTContext *C) {
     FVConstraint *FunFVar = getFuncFVConstraint(FD, C);
     assert(FunFVar != nullptr && "Unable to find function constraints.");
     return CVarOption(*FunFVar->getInternalParam(PIdx));
-
-  } else if (FunctionDecl *FD = dyn_cast<FunctionDecl>(D)) {
+  }
+  if (FunctionDecl *FD = dyn_cast<FunctionDecl>(D)) {
     FVConstraint *FunFVar = getFuncFVConstraint(FD, C);
     if (FunFVar == nullptr) {
       llvm::errs() << "No fun constraints for " << FD->getName() << "?!\n";
