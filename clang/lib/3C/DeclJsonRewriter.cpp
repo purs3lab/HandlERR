@@ -28,6 +28,10 @@ public:
       bool IsStatic = D->isStatic();
       auto PSL = PersistentSourceLoc::mkPSL(D, *Context);
       auto FuncK = std::make_tuple(FuncName, IsStatic, PSL.getFileName());
+      // Ignore if in system header
+      if (DeclJsonVisitor::isInSystemHeader(PSL.getFileName())) {
+        return true;
+      }
       // Did we already process this function?
       if (Info.FnArrPtrs.find(FuncK) == Info.FnArrPtrs.end() &&
         Info.FnNtArrPtrs.find(FuncK) == Info.FnNtArrPtrs.end()) {
@@ -256,6 +260,10 @@ public:
 private:
   ASTContext *Context;
   ProgramInfo &Info;
+
+  static bool isInSystemHeader(const std::string &FilePath) {
+    return FilePath.rfind("/usr/", 0) == 0;
+  }
 };
 
 void DeclToJsonConsumer::HandleTranslationUnit(ASTContext &C) {
@@ -365,7 +373,7 @@ void DumpAnalysisResultsToJson(ProgramInfo &I, llvm::raw_ostream &O) {
       if (addC1) {
         O << "\n,";
       }
-      O << "{\"ParamNum\":" << std::get<0>(AI)  << ", \"OrigType\":\"" <<
+      O << "{\"FieldIdx\":" << std::get<0>(AI)  << ", \"OrigType\":\"" <<
         std::get<1>(AI) << "\", \"ArrPtrsIdx\":";
       DumpIndxes(O, std::get<2>(AI));
       O << ", \"BoundsInfo\":";
@@ -394,7 +402,7 @@ void DumpAnalysisResultsToJson(ProgramInfo &I, llvm::raw_ostream &O) {
       if (addC1) {
         O << "\n,";
       }
-      O << "{\"ParamNum\":" << std::get<0>(AI)  << ", \"OrigType\":\"" <<
+      O << "{\"FieldIdx\":" << std::get<0>(AI)  << ", \"OrigType\":\"" <<
         std::get<1>(AI) << "\", \"ArrPtrsIdx\":";
       DumpIndxes(O, std::get<2>(AI));
       O << ", \"BoundsInfo\":";
