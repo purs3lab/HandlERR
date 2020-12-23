@@ -156,7 +156,6 @@ private:
 
   // Maps for global/static functions, global variables
   ExternalFunctionMapType ExternalFunctionFVCons;
-  std::set<std::string> DefinedExternalFunction;
   StaticFunctionMapType StaticFunctionFVCons;
   std::map<std::string, std::set<PVConstraint *>> GlobalVariableSymbols;
 

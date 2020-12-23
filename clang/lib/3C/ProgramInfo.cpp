@@ -332,8 +332,7 @@ bool ProgramInfo::link() {
     // everything about it.
     // Some global symbols we don't need to constrain to wild, like
     // malloc and free. Check those here and skip if we find them.
-    if (!llvm::is_contained(DefinedExternalFunction, FuncName) &&
-        !isExternOkay(FuncName)) {
+    if (!G->hasBody() && !isExternOkay(FuncName)) {
 
       // If there was a checked type on a variable in the input program, it
       // should stay that way. Otherwise, we shouldn't be adding a checked type
@@ -488,16 +487,6 @@ bool ProgramInfo::insertNewFVConstraint(FunctionDecl *FD, FVConstraint *FVCon,
     // external method.
     Ret = insertIntoExternalFunctionMap(ExternalFunctionFVCons, FuncName, FVCon,
                                         FD, C);
-    bool IsDef = FVCon->hasBody();
-    if (IsDef) {
-      // Some function (e.g, atoi) are given definitions inside the system
-      // headers. Here we ensure that such functions are treated the same as
-      // function without definitions.
-      SourceLocation DefnLoc = FD->getDefinition()->getLocation();
-      bool DefinedInSysHeader = C->getSourceManager().isInSystemHeader(DefnLoc);
-      if (!DefinedInSysHeader)
-        DefinedExternalFunction.insert(FuncName);
-    }
   } else {
     // static method
     auto Psl = PersistentSourceLoc::mkPSL(FD, *C);
