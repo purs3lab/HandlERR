@@ -313,7 +313,7 @@ bool _3CInterface::SolveConstraints(bool ComputeInterimState) {
 
     // Propagate initial data-flow information for Array pointers from
     // bounds declarations.
-    GlobalProgramInfo.getABoundsInfo().performFlowAnalysis(&GlobalProgramInfo);
+    GlobalProgramInfo.getABoundsInfo().runBoundsInference(&GlobalProgramInfo);
 
     // 3. Infer the bounds based on calls to malloc and calloc
     std::unique_ptr<ToolAction> ABInfTool =
@@ -326,7 +326,7 @@ bool _3CInterface::SolveConstraints(bool ComputeInterimState) {
       llvm_unreachable("No Action");
 
     // Propagate the information from allocator bounds.
-    GlobalProgramInfo.getABoundsInfo().performFlowAnalysis(&GlobalProgramInfo);
+    GlobalProgramInfo.getABoundsInfo().runBoundsInference(&GlobalProgramInfo);
 
   }
 
@@ -343,7 +343,7 @@ bool _3CInterface::SolveConstraints(bool ComputeInterimState) {
 
   if (AllTypes) {
     // Propagate data-flow information for Array pointers.
-    GlobalProgramInfo.getABoundsInfo().performFlowAnalysis(&GlobalProgramInfo);
+    GlobalProgramInfo.getABoundsInfo().runBoundsInference(&GlobalProgramInfo);
 
     if (DebugArrSolver)
       GlobalProgramInfo.getABoundsInfo().dumpAVarGraph("arr_bounds_final.dot");

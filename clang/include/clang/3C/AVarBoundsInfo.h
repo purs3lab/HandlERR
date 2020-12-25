@@ -227,8 +227,8 @@ public:
   // with existing bounds key (OldBK).
   void brainTransplant(BoundsKey NewBK, BoundsKey OldBK);
 
-  // Propagate the array bounds information for all array ptrs.
-  bool performFlowAnalysis(ProgramInfo *PI);
+  // Run complete bounds inference algorithm.
+  bool runBoundsInference(ProgramInfo *PI);
 
   // Get the context sensitive BoundsKey for the given key at CallSite
   // located at PSL.
@@ -349,7 +349,14 @@ private:
   // the provided graph and potential length variables.
   bool performWorkListInference(const std::set<BoundsKey> &ArrNeededBounds,
                                 AVarGraph &BKGraph,
-                                AvarBoundsInference &BI);
+                                AvarBoundsInference &BI,
+                                bool UsePotBnds);
+
+  // Propagate the array bounds information for all array ptrs.
+  bool performFlowAnalysis(ProgramInfo *PI,
+                           std::set<BoundsKey> &ArrNeededBounds,
+                           AvarBoundsInference &ABI,
+                           bool UsePotBnds = false);
 
   void insertParamKey(ParamDeclType ParamDecl, BoundsKey NK);
 };
