@@ -49,12 +49,12 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
   // Cast on arguments
   unsigned PIdx = 0;
   for (const auto &A : CE->arguments()) {
-    if (PIdx < FV->numParams() && (!FD || PIdx < FD->getNumParams())) {
+    if (PIdx < FV->numParams()) {
       // Avoid adding incorrect casts to generic function arguments by
       // removing implicit casts when on arguments with a consistently
       // used generic type.
       Expr *ArgExpr = A;
-      if (FD) {
+      if (FD && PIdx < FD->getNumParams()) {
         const TypeVariableType *TyVar =
           getTypeVariableType(FD->getParamDecl(PIdx));
         if (TyVar && TypeVars.find(TyVar->GetIndex()) != TypeVars.end() &&
@@ -152,6 +152,13 @@ CastPlacementVisitor::needCasting(InternalExternalPair<ConstraintVariable> Src,
         return CAST_TO_CHECKED;
     }
   }
+
+  // Destination has an itype, but the source is doesn't have a fully checked
+  // type. The type must match exactly, otherwise we cast to wild.
+  if (!DIChecked && DEChecked && !SEChecked)
+    if (SrcExt->isChecked(Info.getConstraints().getVariables()) &&
+        !DstExt->solutionEqualTo(Info.getConstraints(), SrcExt))
+      return CAST_TO_WILD;
 
   // Casting requirements are stricter when the parameter is a function pointer
   // or an itype.
