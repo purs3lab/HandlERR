@@ -64,6 +64,7 @@ private:
 
   template <typename DRType>
   void rewriteFieldOrVarDecl(DRType *N, RSet &ToRewrite);
+  void rewriteNamedInlineStruct(DeclReplacement *N, RSet &ToRewrite, std::vector<Decl *> SameLineDecls);
   void rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite);
   void rewriteSingleDecl(DeclReplacement *N, RSet &ToRewrite);
   void doDeclRewrite(SourceRange &SR, DeclReplacement *N);
