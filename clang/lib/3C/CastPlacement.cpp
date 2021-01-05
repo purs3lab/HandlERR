@@ -80,7 +80,7 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
   // Cast on return. Be sure not to place casts when the result is not used,
   // otherwise an externaly unsafe function whose result is not used would end
   // up with a bounds cast around it.
-  if (isResultUsed(CE)) {
+  if (Info.hasPersistentConstraints(CE, Context)) {
     CVarSet DestinationConstraints = CR.getExprConstraintVars(CE);
     InternalExternalPair<ConstraintVariable> Src = {FV->getInternalReturn(),
                                                     FV->getExternalReturn()};
@@ -98,13 +98,6 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
     }
   }
   return true;
-}
-
-bool CastPlacementVisitor::isResultUsed(Expr *E) {
-  for (auto P : Context->getParents(*E))
-    if (!P.get<CompoundStmt>())
-      return true;
-  return false;
 }
 
 // Check whether an explicit casting is needed when the pointer represented

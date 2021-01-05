@@ -64,7 +64,5 @@ private:
 
   void surroundByCast(InternalExternalPair<ConstraintVariable> Src,
                       InternalExternalPair<ConstraintVariable> Dst, Expr *);
-
-  bool isResultUsed(Expr *E);
 };
 #endif // LLVM_CLANG_3C_CASTPLACEMENT_H
