@@ -120,7 +120,7 @@ CastPlacementVisitor::needCasting(InternalExternalPair<ConstraintVariable> Src,
     return CastNeeded::NO_CAST;
 
   if (isa<FVConstraint>(SrcExt) &&
-      SrcExt->solutionEqualTo(Info.getConstraints(), DstExt))
+      SrcExt->solutionEqualTo(Info.getConstraints(), DstExt, true))
     return CastNeeded::NO_CAST;
 
   const auto &E = Info.getConstraints().getVariables();
@@ -153,12 +153,15 @@ CastPlacementVisitor::needCasting(InternalExternalPair<ConstraintVariable> Src,
     }
   }
 
-  // Destination has an itype, but the source is doesn't have a fully checked
-  // type. The type must match exactly, otherwise we cast to wild.
-  if (!DIChecked && DEChecked && !SEChecked)
-    if (SrcExt->isChecked(Info.getConstraints().getVariables()) &&
-        !DstExt->solutionEqualTo(Info.getConstraints(), SrcExt))
+  if (!SEChecked && SrcExt->isChecked(Info.getConstraints().getVariables()))
+    if (!DstExt->solutionEqualTo(Info.getConstraints(), SrcExt, true) &&
+        !DstExt->solutionEqualTo(Info.getConstraints(), SrcInt, true))
       return CAST_TO_WILD;
+
+  if (!DEChecked && DstExt->isChecked((Info.getConstraints().getVariables())))
+    if (!SrcExt->solutionEqualTo(Info.getConstraints(), DstExt, true) &&
+        !SrcExt->solutionEqualTo(Info.getConstraints(), DstInt, true))
+      return CAST_TO_CHECKED;
 
   // Casting requirements are stricter when the parameter is a function pointer
   // or an itype.

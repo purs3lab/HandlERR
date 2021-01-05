@@ -1286,7 +1286,7 @@ bool PointerVariableConstraint::hasSomeSizedArr() const {
 }
 
 bool PointerVariableConstraint::solutionEqualTo(
-    Constraints &CS, const ConstraintVariable *CV) const {
+    Constraints &CS, const ConstraintVariable *CV, bool ComparePtyp) const {
   bool Ret = false;
   if (CV != nullptr) {
     if (const auto *PV = dyn_cast<PVConstraint>(CV)) {
@@ -1298,7 +1298,7 @@ bool PointerVariableConstraint::solutionEqualTo(
         auto J = OthCVars.begin();
         // Special handling for zero width arrays so they can compare equal to
         // ARR or PTR.
-        if (IsZeroWidthArray) {
+        if (ComparePtyp && IsZeroWidthArray) {
           assert(I != Vars.end() && "Zero width array cannot be base type.");
           assert("Zero width arrays should be encoded as PTR." &&
                  CS.getAssignment(*I) == CS.getPtr());
@@ -1311,7 +1311,16 @@ bool PointerVariableConstraint::solutionEqualTo(
         }
         // Compare Vars to see if they are same.
         while (Ret && I != Vars.end() && J != OthCVars.end()) {
-          if (CS.getAssignment(*I) != CS.getAssignment(*J)) {
+          ConstAtom *IAssign = CS.getAssignment(*I);
+          ConstAtom *JAssign = CS.getAssignment(*J);
+          if (ComparePtyp) {
+            bool IIsWild = isa<WildAtom>(CS.getAssignment(*I));
+            bool JIsWild = isa<WildAtom>(CS.getAssignment(*J));
+            if (IIsWild != JIsWild) {
+              Ret = false;
+              break;
+            }
+          } else if (CS.getAssignment(*I) != CS.getAssignment(*J)) {
             Ret = false;
             break;
           }
@@ -1332,7 +1341,7 @@ bool PointerVariableConstraint::solutionEqualTo(
     } else if (FV && Vars.size() == 1) {
       // If this a function pointer and we're comparing it to a FVConstraint,
       // then solutions can still be equal.
-      Ret = FV->solutionEqualTo(CS, CV);
+      Ret = FV->solutionEqualTo(CS, CV, ComparePtyp);
     }
   }
   return Ret;
@@ -1387,23 +1396,23 @@ bool FunctionVariableConstraint::srcHasBounds() const {
 }
 
 bool FunctionVariableConstraint::solutionEqualTo(
-    Constraints &CS, const ConstraintVariable *CV) const {
+    Constraints &CS, const ConstraintVariable *CV, bool ComparePtyp) const {
   bool Ret = false;
   if (CV != nullptr) {
     if (const auto *OtherFV = dyn_cast<FVConstraint>(CV)) {
       PVConstraint *ThisRet = ReturnVar.ExternalConstraint;
       PVConstraint *OtherRet = OtherFV->ReturnVar.ExternalConstraint;
       Ret = (numParams() == OtherFV->numParams()) &&
-            ThisRet->solutionEqualTo(CS, OtherRet);
+            ThisRet->solutionEqualTo(CS, OtherRet, ComparePtyp);
       for (unsigned I = 0; I < numParams(); I++) {
         PVConstraint *ThisParam = getExternalParam(I);
         PVConstraint *OtherParam = OtherFV->getExternalParam(I);
-        Ret &= ThisParam->solutionEqualTo(CS,OtherParam);
+        Ret &= ThisParam->solutionEqualTo(CS, OtherParam, ComparePtyp);
       }
     } else if (const auto *OtherPV = dyn_cast<PVConstraint>(CV)) {
       // When comparing to a pointer variable, it might be that the pointer is a
       // function pointer. This is handled by PVConstraint::solutionEqualTo.
-      return OtherPV->solutionEqualTo(CS, this);
+      return OtherPV->solutionEqualTo(CS, this, ComparePtyp);
     }
   }
   return Ret;
