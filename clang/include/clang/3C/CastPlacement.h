@@ -24,7 +24,7 @@ public:
 
   bool VisitCastExpr(CastExpr *C);
 
-  const std::set<Expr *> &getExprsWithCast() const { return ExprsWithCast; }
+  std::set<Expr *> &getExprsWithCast() { return ExprsWithCast; }
 
 private:
   ASTContext *Context;
@@ -34,7 +34,7 @@ private:
 class CastPlacementVisitor : public RecursiveASTVisitor<CastPlacementVisitor> {
 public:
   explicit CastPlacementVisitor
-    (ASTContext *C, ProgramInfo &I, Rewriter &R, const std::set<Expr *> &EWC)
+    (ASTContext *C, ProgramInfo &I, Rewriter &R, std::set<Expr *> &EWC)
     : Context(C), Info(I), Writer(R), CR(Info, Context), ABRewriter(I),
       ExprsWithCast(EWC) {}
 
@@ -46,7 +46,7 @@ private:
   Rewriter &Writer;
   ConstraintResolver CR;
   ArrayBoundsRewriter ABRewriter;
-  const std::set<Expr *> &ExprsWithCast;
+  std::set<Expr *> &ExprsWithCast;
 
   // Enumeration indicating what type of cast is required at a call site
   enum CastNeeded {

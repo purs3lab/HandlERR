@@ -68,6 +68,7 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
       for (auto *DstC : DestinationConstraints) {
         InternalExternalPair<ConstraintVariable> Src = {DstC, DstC};
         if (needCasting(Src, Dst) != NO_CAST) {
+          ExprsWithCast.insert(ignoreCheckedCImplicit(A));
           surroundByCast(Src, Dst, A);
           break;
         }
@@ -91,6 +92,7 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
       if (ExprsWithCast.find(CE) == ExprsWithCast.end() &&
           needCasting(Src, Dst) != NO_CAST) {
         surroundByCast(Src, Dst, CE);
+        ExprsWithCast.insert(ignoreCheckedCImplicit(CE));
         break;
       }
     }
