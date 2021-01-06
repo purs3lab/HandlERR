@@ -1313,15 +1313,17 @@ bool PointerVariableConstraint::solutionEqualTo(
           ConstAtom *IAssign = CS.getAssignment(*I);
           ConstAtom *JAssign = CS.getAssignment(*J);
           if (ComparePtyp) {
-            bool IIsWild = isa<WildAtom>(CS.getAssignment(*I));
-            bool JIsWild = isa<WildAtom>(CS.getAssignment(*J));
+            if (IAssign != JAssign) {
+              Ret = false;
+              break;
+            }
+          } else {
+            bool IIsWild = isa<WildAtom>(IAssign);
+            bool JIsWild = isa<WildAtom>(JAssign);
             if (IIsWild != JIsWild) {
               Ret = false;
               break;
             }
-          } else if (CS.getAssignment(*I) != CS.getAssignment(*J)) {
-            Ret = false;
-            break;
           }
           ++I;
           ++J;
@@ -1330,7 +1332,7 @@ bool PointerVariableConstraint::solutionEqualTo(
         if (Ret) {
           FVConstraint *OtherFV = PV->getFV();
           if (FV != nullptr && OtherFV != nullptr) {
-            Ret = FV->solutionEqualTo(CS, OtherFV);
+            Ret = FV->solutionEqualTo(CS, OtherFV, ComparePtyp);
           } else if (FV != nullptr || OtherFV != nullptr) {
             // One of them has FV null.
             Ret = false;

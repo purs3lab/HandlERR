@@ -115,7 +115,7 @@ CastPlacementVisitor::needCasting(InternalExternalPair<ConstraintVariable> Src,
     return CastNeeded::NO_CAST;
 
   if (isa<FVConstraint>(SrcExt) &&
-      SrcExt->solutionEqualTo(Info.getConstraints(), DstExt, true))
+      SrcExt->solutionEqualTo(Info.getConstraints(), DstExt, false))
     return CastNeeded::NO_CAST;
 
   const auto &E = Info.getConstraints().getVariables();
@@ -149,13 +149,13 @@ CastPlacementVisitor::needCasting(InternalExternalPair<ConstraintVariable> Src,
   }
 
   if (!SEChecked && SrcExt->isChecked(Info.getConstraints().getVariables()))
-    if (!DstExt->solutionEqualTo(Info.getConstraints(), SrcExt, true) &&
-        !DstExt->solutionEqualTo(Info.getConstraints(), SrcInt, true))
+    if (!DstExt->solutionEqualTo(Info.getConstraints(), SrcExt, false) &&
+        !DstExt->solutionEqualTo(Info.getConstraints(), SrcInt, false))
       return CAST_TO_WILD;
 
   if (!DEChecked && DstExt->isChecked((Info.getConstraints().getVariables())))
-    if (!SrcExt->solutionEqualTo(Info.getConstraints(), DstExt, true) &&
-        !SrcExt->solutionEqualTo(Info.getConstraints(), DstInt, true))
+    if (!SrcExt->solutionEqualTo(Info.getConstraints(), DstExt, false) &&
+        !SrcExt->solutionEqualTo(Info.getConstraints(), DstInt, false))
       return CAST_TO_CHECKED;
 
   // Casting requirements are stricter when the parameter is a function pointer
@@ -166,7 +166,7 @@ CastPlacementVisitor::needCasting(InternalExternalPair<ConstraintVariable> Src,
   // This is also conditioned on if the src is checked to avoid adding casts to
   // WILD on top of a wild expression.
   if (SrcInt->isChecked(E) && (UncheckedItypeCall || FptrCall) &&
-      !DstExt->solutionEqualTo(Info.getConstraints(), SrcInt))
+      !DstExt->solutionEqualTo(Info.getConstraints(), SrcInt, false))
     return CastNeeded::CAST_TO_WILD;
 
   // If nothing above returned, then no casting is required.
