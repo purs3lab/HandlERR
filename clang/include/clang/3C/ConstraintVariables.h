@@ -470,8 +470,9 @@ private:
 
   void equateFVConstraintVars(ConstraintVariable *CV, ProgramInfo &Info) const;
 
-  void linkInternalExternalPair(Constraints &CS, QualType QT, bool IsReturn,
-                                InternalExternalPair<PVConstraint> Pair);
+  void linkInternalExternalPair(ProgramInfo &Info,
+                                InternalExternalPair<PVConstraint> Pair,
+                                bool IsReturn);
 
   InternalExternalPair<PVConstraint>
   allocateParamPair(const clang::QualType &QT, clang::DeclaratorDecl *D,

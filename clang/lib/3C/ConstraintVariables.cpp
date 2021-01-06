@@ -992,16 +992,15 @@ FunctionVariableConstraint::allocateParamPair(const clang::QualType &QT,
   PVConstraint *PVInt = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric,
                                          VarAtomForChecked);
   InternalExternalPair<PVConstraint> Pair = {PVInt, PVExt};
-  linkInternalExternalPair(I.getConstraints(), QT, N == RETVAR, Pair);
+  linkInternalExternalPair(I, Pair, N == RETVAR);
   return Pair;
 }
 
 void FunctionVariableConstraint::linkInternalExternalPair
-  (Constraints &CS, QualType QT, bool IsReturn,
-   InternalExternalPair<PVConstraint> Pair) {
+  (ProgramInfo &Info, InternalExternalPair<PVConstraint> Pair, bool IsReturn) {
+  Constraints &CS = Info.getConstraints();
   assert(Pair.InternalConstraint->getCvars().size() ==
          Pair.ExternalConstraint->getCvars().size());
-  assert(!(QT->isVoidPointerType() || QT->isFunctionPointerType()));
   for (unsigned J = 0; J < Pair.InternalConstraint->getCvars().size(); J++) {
     Atom *InternalA = Pair.InternalConstraint->getCvars()[J];
     Atom *ExternalA = Pair.ExternalConstraint->getCvars()[J];
