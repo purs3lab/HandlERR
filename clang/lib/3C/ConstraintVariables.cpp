@@ -852,14 +852,10 @@ FunctionVariableConstraint::FunctionVariableConstraint(
   this->HasEqArgumentConstraints = Ot->HasEqArgumentConstraints;
   this->IsFunctionPtr = Ot->IsFunctionPtr;
   this->HasEqArgumentConstraints = Ot->HasEqArgumentConstraints;
-  this->ReturnVar = Ot->ReturnVar;
+  this->ReturnVar = FVComponentVariable(&Ot->ReturnVar, CS);
   // Make copy of ParameterCVs too.
-  for (auto &ParmPv : Ot->ParamVars) {
-    InternalExternalPair<PVConstraint> Copy = {
-      ParmPv.InternalConstraint->getCopy(CS),
-      ParmPv.ExternalConstraint->getCopy(CS)};
-    this->ParamVars.push_back(Copy);
-  }
+  for (auto &ParmPv : Ot->ParamVars)
+    this->ParamVars.push_back(FVComponentVariable(&ParmPv, CS));
   this->Parent = Ot;
 }
 
@@ -958,9 +954,8 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
           PName = PVD->getName();
         }
       }
-      auto Pair = allocateParamPair(QT, ParmVD, PName, I, Ctx, &N,
-                                    ParamHasItype);
-      ParamVars.push_back(Pair);
+      ParamVars.push_back(
+        FVComponentVariable(QT, ParmVD, PName, I, Ctx, &N, ParamHasItype));
     }
 
     Hasproto = true;
@@ -973,54 +968,10 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
   }
 
   // ConstraintVariable for the return
-  ReturnVar = allocateParamPair(RT, D, RETVAR, I, Ctx, &N, ReturnHasItype);
+  ReturnVar = FVComponentVariable(RT, D, RETVAR, I, Ctx, &N, ReturnHasItype);
 }
 
-InternalExternalPair<PVConstraint>
-FunctionVariableConstraint::allocateParamPair(const clang::QualType &QT,
-                                              clang::DeclaratorDecl *D,
-                                              std::string N, ProgramInfo &I,
-                                              const clang::ASTContext &C,
-                                              std::string *InFunc,
-                                              bool HasItype) {
-  bool IsGeneric = D && getTypeVariableType(D);
-  PVConstraint *PVExt = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric);
-  // For void pointers and function pointers, internal and external would need
-  // to be equated, so can we avoid allocating extra constraints.
-  if ((QT->isVoidPointerType() || QT->isFunctionPointerType()) && !HasItype)
-    return {PVExt, PVExt};
-  PVConstraint *PVInt = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric,
-                                         HasItype);
-  InternalExternalPair<PVConstraint> Pair = {PVInt, PVExt};
-  linkInternalExternalPair(I, Pair, N == RETVAR);
-  return Pair;
-}
 
-void FunctionVariableConstraint::linkInternalExternalPair
-  (ProgramInfo &Info, InternalExternalPair<PVConstraint> Pair, bool IsReturn) {
-  Constraints &CS = Info.getConstraints();
-  assert(Pair.InternalConstraint->getCvars().size() ==
-         Pair.ExternalConstraint->getCvars().size());
-  for (unsigned J = 0; J < Pair.InternalConstraint->getCvars().size(); J++) {
-    Atom *InternalA = Pair.InternalConstraint->getCvars()[J];
-    Atom *ExternalA = Pair.ExternalConstraint->getCvars()[J];
-    if (isa<VarAtom>(InternalA) || isa<VarAtom>(ExternalA)) {
-      // Equate pointer types for internal and external parameter constraint
-      // variables.
-      CS.addConstraint(CS.createGeq(InternalA, ExternalA, false));
-      CS.addConstraint(CS.createGeq(ExternalA, InternalA, false));
-      // Constrain Internal >= External. If external solves to wild, then so
-      // does the internal. Not that this doesn't mean any unsafe external
-      // use causes the internal variable to be wild because the external
-      // variable solves to WILD only when there is an unsafe use that
-      // cannot be resolved by inserting casts.
-      CS.addConstraint(CS.createGeq(InternalA, ExternalA, true));
-
-      if (!isa<ConstAtom>(ExternalA) && IsReturn && J > 0)
-        CS.addConstraint(CS.createGeq(ExternalA, InternalA, true));
-    }
-  }
-}
 
 void FunctionVariableConstraint::constrainToWild(Constraints &CS,
                                                  const std::string &Rsn) const {
@@ -1036,7 +987,7 @@ void FunctionVariableConstraint::constrainToWild(
 }
 bool FunctionVariableConstraint::anyChanges(const EnvironmentMap &E) const {
   return ReturnVar.ExternalConstraint->anyChanges(E) ||
-         llvm::any_of(ParamVars, [&E](InternalExternalPair<PVConstraint> CV) {
+         llvm::any_of(ParamVars, [&E](FVComponentVariable CV) {
            return CV.ExternalConstraint->anyChanges(E);
          });
 }
@@ -1423,26 +1374,12 @@ std::string FunctionVariableConstraint::mkString(const EnvironmentMap &E,
                                                  bool EmitName, bool ForItype,
                                                  bool EmitPointee,
                                                  bool UnmaskTypedef) const {
-  PVConstraint *RetArgsCV = ReturnVar.ExternalConstraint;
-  PVConstraint *RetParamCV = ReturnVar.InternalConstraint;
-  std::string Ret = RetArgsCV->getRewritableOriginalTy();
-  std::string Itype = "";
-  if (RetArgsCV->anyChanges(E) && RetParamCV->anyChanges(E))
-    Ret = RetArgsCV->mkString(E);
-  else if (RetArgsCV->anyChanges(E))
-    Itype = " : itype(" + RetArgsCV->mkString(E, false, true) + ")";
+  std::string Ret = ReturnVar.mkTypeStr(E);
+  std::string Itype = ReturnVar.mkItypeStr(E);
   Ret = Ret + "(";
   std::vector<std::string> ParmStrs;
-  for (const auto &I : this->ParamVars) {
-    PVConstraint *ArgsCV = I.ExternalConstraint;
-    PVConstraint *ParamCV = I.InternalConstraint;
-    std::string ParmStr = ArgsCV->getRewritableOriginalTy() + ArgsCV->getName();
-    if (ArgsCV->anyChanges(E) && ParamCV->anyChanges(E))
-      ParmStr = ArgsCV->mkString(E);
-    else if (ArgsCV->anyChanges(E))
-      ParmStr += " : itype(" + ArgsCV->mkString(E, false, true) + ")";
-    ParmStrs.push_back(ParmStr);
-  }
+  for (const auto &I : this->ParamVars)
+    ParmStrs.push_back(I.mkString(E));
 
   if (ParmStrs.size() > 0) {
     std::ostringstream Ss;
@@ -1846,16 +1783,11 @@ void FunctionVariableConstraint::brainTransplant(ConstraintVariable *FromCV,
   FVConstraint *From = dyn_cast<FVConstraint>(FromCV);
   assert(From != nullptr);
   // Transplant returns.
-  ReturnVar.ExternalConstraint->brainTransplant(
-    From->ReturnVar.ExternalConstraint, I);
-  ReturnVar.InternalConstraint->brainTransplant(
-    From->ReturnVar.InternalConstraint, I);
+  ReturnVar.brainTransplant(&From->ReturnVar, I);
   // Transplant params.
   if (numParams() == From->numParams()) {
-    for (unsigned J = 0; J < From->numParams(); J++) {
-      getExternalParam(J)->brainTransplant(From->getExternalParam(J), I);
-      getInternalParam(J)->brainTransplant(From->getInternalParam(J), I);
-    }
+    for (unsigned J = 0; J < From->numParams(); J++)
+      ParamVars[J].brainTransplant(&From->ParamVars[J], I);
   } else if (numParams() != 0 && From->numParams() == 0) {
     auto &CS = I.getConstraints();
     const std::vector<ParamDeferment> &Defers = From->getDeferredParams();
@@ -1884,16 +1816,7 @@ void FunctionVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
   assert(From != nullptr);
   assert(From->getDeferredParams().size() == 0);
   // Transplant returns.
-  if (ReturnVar.InternalConstraint == ReturnVar.ExternalConstraint) {
-    From->ReturnVar.InternalConstraint->mergeDeclaration(
-      ReturnVar.InternalConstraint, I, ReasonFailed);
-    ReturnVar.InternalConstraint = From->ReturnVar.InternalConstraint;
-  } else {
-    ReturnVar.InternalConstraint->mergeDeclaration(
-      From->ReturnVar.InternalConstraint, I, ReasonFailed);
-  }
-  ReturnVar.ExternalConstraint->mergeDeclaration(
-    From->ReturnVar.ExternalConstraint, I, ReasonFailed);
+  ReturnVar.mergeDeclaration(&From->ReturnVar, I, ReasonFailed);
   if (ReasonFailed != "") {
     ReasonFailed += "for return value";
     return;
@@ -1913,16 +1836,7 @@ void FunctionVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
       return;
     }
     for (unsigned J = 0; J < From->numParams(); J++) {
-      if (getInternalParam(J) == getExternalParam(J)) {
-        From->getInternalParam(J)->mergeDeclaration(getInternalParam(J), I,
-                                                    ReasonFailed);
-        ParamVars[J].InternalConstraint = From->getInternalParam(J);
-      } else {
-        getInternalParam(J)->mergeDeclaration(From->getInternalParam(J), I,
-                                              ReasonFailed);
-      }
-      getExternalParam(J)->mergeDeclaration(From->getExternalParam(J), I,
-                                            ReasonFailed);
+      ParamVars[J].mergeDeclaration(&From->ParamVars[J], I, ReasonFailed);
       if (ReasonFailed != "") {
         ReasonFailed += "for parameter " + std::to_string(J);
         return;
@@ -1939,4 +1853,97 @@ void FunctionVariableConstraint::addDeferredParams(PersistentSourceLoc PL,
 
 bool FunctionVariableConstraint::getIsOriginallyChecked() const {
   return ReturnVar.ExternalConstraint->getIsOriginallyChecked();
+}
+
+void FVComponentVariable::mergeDeclaration(FVComponentVariable *From,
+                                           ProgramInfo &I,
+                                           std::string &ReasonFailed) {
+  if (InternalConstraint == ExternalConstraint) {
+    From->InternalConstraint->mergeDeclaration(InternalConstraint, I,
+                                               ReasonFailed);
+    InternalConstraint = From->InternalConstraint;
+  } else {
+    InternalConstraint->mergeDeclaration(From->InternalConstraint, I,
+                                         ReasonFailed);
+  }
+  ExternalConstraint->mergeDeclaration(From->ExternalConstraint, I,
+                                       ReasonFailed);
+}
+
+void FVComponentVariable::brainTransplant(FVComponentVariable *From,
+                                          ProgramInfo &I) {
+  if (InternalConstraint == ExternalConstraint)
+    InternalConstraint = From->InternalConstraint;
+  else
+    InternalConstraint->brainTransplant(From->InternalConstraint, I);
+  ExternalConstraint->brainTransplant(From->ExternalConstraint, I);
+}
+
+std::string
+FVComponentVariable::mkString(const EnvironmentMap &E) const {
+  std::string Str;
+  if (ExternalConstraint->anyChanges(E) && InternalConstraint->anyChanges(E))
+    Str = ExternalConstraint->mkString(E);
+  else {
+    Str = ExternalConstraint->getRewritableOriginalTy() +
+          ExternalConstraint->getName();
+    if (ExternalConstraint->anyChanges(E))
+      Str += " : itype(" + ExternalConstraint->mkString(E, false, true) + ")";
+  }
+  return Str;
+}
+
+std::string FVComponentVariable::mkTypeStr(const EnvironmentMap &E) const {
+  if (ExternalConstraint->anyChanges(E) && InternalConstraint->anyChanges(E))
+    return ExternalConstraint->mkString(E, false);
+  return ExternalConstraint->getRewritableOriginalTy();
+}
+
+std::string FVComponentVariable::mkItypeStr(const EnvironmentMap &E) const {
+  if (ExternalConstraint->anyChanges(E) && !InternalConstraint->anyChanges(E))
+    return " : itype(" + ExternalConstraint->mkString(E, false, true) + ")";
+  return "";
+}
+
+FVComponentVariable::FVComponentVariable(const QualType &QT,
+                                         clang::DeclaratorDecl *D,
+                                         std::string N, ProgramInfo &I,
+                                         const ASTContext &C,
+                                         std::string *InFunc, bool HasItype) {
+  bool IsGeneric = D && getTypeVariableType(D);
+  ExternalConstraint = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric);
+  if ((QT->isVoidPointerType() || QT->isFunctionPointerType()) && !HasItype) {
+    InternalConstraint = ExternalConstraint;
+    // For void pointers and function pointers, internal and external would need
+    // to be equated, so can we avoid allocating extra constraints.
+  } else {
+    InternalConstraint = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric,
+                                          HasItype);
+    Constraints &CS = I.getConstraints();
+    for (unsigned J = 0; J < InternalConstraint->getCvars().size(); J++) {
+      Atom *InternalA = InternalConstraint->getCvars()[J];
+      Atom *ExternalA = ExternalConstraint->getCvars()[J];
+      if (isa<VarAtom>(InternalA) || isa<VarAtom>(ExternalA)) {
+        // Equate pointer types for internal and external parameter constraint
+        // variables.
+        CS.addConstraint(CS.createGeq(InternalA, ExternalA, false));
+        CS.addConstraint(CS.createGeq(ExternalA, InternalA, false));
+        // Constrain Internal >= External. If external solves to wild, then so
+        // does the internal. Not that this doesn't mean any unsafe external
+        // use causes the internal variable to be wild because the external
+        // variable solves to WILD only when there is an unsafe use that
+        // cannot be resolved by inserting casts.
+        CS.addConstraint(CS.createGeq(InternalA, ExternalA, true));
+
+        if (!isa<ConstAtom>(ExternalA) && N == RETVAR && J > 0)
+          CS.addConstraint(CS.createGeq(ExternalA, InternalA, true));
+      }
+    }
+  }
+}
+
+FVComponentVariable::FVComponentVariable(FVComponentVariable *Ot,
+                                         Constraints &CS) {
+  InternalConstraint = Ot->InternalConstraint->getCopy(CS);
+  ExternalConstraint = Ot->ExternalConstraint->getCopy(CS);
 }

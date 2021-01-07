@@ -55,14 +55,14 @@ private:
     CAST_TO_WILD     // A standard C explicit cast required (checked -> wild)
   };
 
-  CastNeeded needCasting(InternalExternalPair<ConstraintVariable> Src,
-                         InternalExternalPair<ConstraintVariable> Dst);
+  CastNeeded needCasting(ConstraintVariable *SrcInt,
+                         ConstraintVariable *SrcExt,
+                         ConstraintVariable *DstInt,
+                         ConstraintVariable *DstExt);
 
   std::pair<std::string, std::string>
-  getCastString(InternalExternalPair<ConstraintVariable> Src,
-                InternalExternalPair<ConstraintVariable> Dst);
+  getCastString(ConstraintVariable *Dst, CastNeeded CastKind);
 
-  void surroundByCast(InternalExternalPair<ConstraintVariable> Src,
-                      InternalExternalPair<ConstraintVariable> Dst, Expr *);
+  void surroundByCast(ConstraintVariable *Dst, CastNeeded CastKind, Expr *E);
 };
 #endif // LLVM_CLANG_3C_CASTPLACEMENT_H

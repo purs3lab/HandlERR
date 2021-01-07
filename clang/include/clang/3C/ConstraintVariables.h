@@ -432,10 +432,30 @@ typedef struct {
   std::vector<CVarSet> PS;
 } ParamDeferment;
 
-template<typename CV>
-struct InternalExternalPair {
-  CV *InternalConstraint;
-  CV *ExternalConstraint;
+class FVComponentVariable {
+private:
+  friend class FunctionVariableConstraint;
+  PVConstraint *InternalConstraint;
+  PVConstraint *ExternalConstraint;
+
+public:
+
+
+  FVComponentVariable() : InternalConstraint(nullptr),
+                          ExternalConstraint(nullptr) {}
+
+  FVComponentVariable(FVComponentVariable *Ot, Constraints &CS);
+  FVComponentVariable(const clang::QualType &QT, clang::DeclaratorDecl *D,
+                      std::string N, ProgramInfo &I, const clang::ASTContext &C,
+                      std::string *InFunc, bool HasItype);
+
+  void mergeDeclaration(FVComponentVariable *From, ProgramInfo &I,
+                        std::string &ReasonFailed);
+  void brainTransplant(FVComponentVariable *From, ProgramInfo &I);
+
+  std::string mkItypeStr(const EnvironmentMap &E) const;
+  std::string mkTypeStr(const EnvironmentMap &E) const;
+  std::string mkString(const EnvironmentMap &E) const;
 };
 
 // Constraints on a function type. Also contains a 'name' parameter for
@@ -445,10 +465,10 @@ private:
   FunctionVariableConstraint(FunctionVariableConstraint *Ot, Constraints &CS);
 
   // N constraints on the return value of the function.
-  InternalExternalPair<PVConstraint> ReturnVar;
+  FVComponentVariable ReturnVar;
   // A vector of K sets of N constraints on the parameter values, for
   // K parameters accepted by the function.
-  std::vector<InternalExternalPair<PVConstraint>> ParamVars;
+  std::vector<FVComponentVariable> ParamVars;
 
   // Storing of parameters in the case of untyped prototypes
   std::vector<ParamDeferment> DeferredParams;
@@ -462,16 +482,6 @@ private:
   bool IsFunctionPtr;
 
   void equateFVConstraintVars(ConstraintVariable *CV, ProgramInfo &Info) const;
-
-  void linkInternalExternalPair(ProgramInfo &Info,
-                                InternalExternalPair<PVConstraint> Pair,
-                                bool IsReturn);
-
-  InternalExternalPair<PVConstraint>
-  allocateParamPair(const clang::QualType &QT, clang::DeclaratorDecl *D,
-                    std::string N, ProgramInfo &I, const clang::ASTContext &C,
-                    std::string *InFunc, bool HasItype);
-
 public:
   FunctionVariableConstraint()
       : ConstraintVariable(FunctionVariable, "", ""), FileName(""),

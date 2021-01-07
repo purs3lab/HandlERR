@@ -62,14 +62,14 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
           ArgExpr = ArgExpr->IgnoreImpCasts();
       }
 
-      CVarSet DestinationConstraints = CR.getExprConstraintVars(ArgExpr);
-      InternalExternalPair<ConstraintVariable> Dst = {
-        FV->getInternalParam(PIdx), FV->getExternalParam(PIdx)};
-      for (auto *DstC : DestinationConstraints) {
-        InternalExternalPair<ConstraintVariable> Src = {DstC, DstC};
-        if (needCasting(Src, Dst) != NO_CAST) {
+      CVarSet ArgConstraints = CR.getExprConstraintVars(ArgExpr);
+      for (auto *ArgC : ArgConstraints) {
+        CastNeeded CastKind = needCasting(ArgC, ArgC,
+                                          FV->getInternalParam(PIdx),
+                                          FV->getExternalParam(PIdx));
+        if (CastKind != NO_CAST) {
+          surroundByCast(FV->getExternalParam(PIdx), CastKind, A);
           ExprsWithCast.insert(ignoreCheckedCImplicit(A));
-          surroundByCast(Src, Dst, A);
           break;
         }
       }
@@ -85,16 +85,15 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
   // be cached in the persistent constraint set.
   if (Info.hasPersistentConstraints(CE, Context)) {
     CVarSet DestinationConstraints = CR.getExprConstraintVars(CE);
-    InternalExternalPair<ConstraintVariable> Src = {FV->getInternalReturn(),
-                                                    FV->getExternalReturn()};
     for (auto *DstC : DestinationConstraints) {
       // Order of ParameterC and ArgumentC is reversed from when inserting
       // parameter casts because assignment now goes from returned to its
       // local use.
-      InternalExternalPair<ConstraintVariable> Dst = {DstC, DstC};
+      CastNeeded CastKind = needCasting(FV->getInternalReturn(),
+                                        FV->getExternalReturn(), DstC, DstC);
       if (ExprsWithCast.find(CE) == ExprsWithCast.end() &&
-          needCasting(Src, Dst) != NO_CAST) {
-        surroundByCast(Src, Dst, CE);
+          CastKind != NO_CAST) {
+        surroundByCast(DstC, CastKind, CE);
         ExprsWithCast.insert(ignoreCheckedCImplicit(CE));
         break;
       }
@@ -104,14 +103,11 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
 }
 
 CastPlacementVisitor::CastNeeded
-CastPlacementVisitor::needCasting(InternalExternalPair<ConstraintVariable> Src,
-                                  InternalExternalPair<ConstraintVariable> Dst) {
+CastPlacementVisitor::needCasting(ConstraintVariable *SrcInt,
+                                  ConstraintVariable *SrcExt,
+                                  ConstraintVariable *DstInt,
+                                  ConstraintVariable *DstExt) {
   Constraints &CS = Info.getConstraints();
-  ConstraintVariable *SrcInt = Src.InternalConstraint;
-  ConstraintVariable *SrcExt = Src.ExternalConstraint;
-  ConstraintVariable *DstInt = Dst.InternalConstraint;
-  ConstraintVariable *DstExt = Dst.ExternalConstraint;
-
   // No casting is required if the source exactly matches either the
   // destinations itype or the destinations regular type.
   if (SrcExt->solutionEqualTo(CS, DstExt, false) ||
@@ -138,19 +134,18 @@ CastPlacementVisitor::needCasting(InternalExternalPair<ConstraintVariable> Src,
 // Get the string representation of the cast required for the call. The return
 // is a pair of strings: a prefix and suffix string that form the complete cast
 // when placed around the expression being cast.
-std::pair<std::string, std::string> CastPlacementVisitor::getCastString(
-  InternalExternalPair<ConstraintVariable> Src,
-  InternalExternalPair<ConstraintVariable> Dst) {
-  CastNeeded CastType = needCasting(Src, Dst);
+std::pair<std::string, std::string>
+CastPlacementVisitor::getCastString(ConstraintVariable *Dst,
+                                    CastNeeded CastKind) {
   const auto &E = Info.getConstraints().getVariables();
-  switch (CastType) {
+  switch (CastKind) {
     case CAST_TO_WILD:
       return std::make_pair(
-        "((" + Dst.ExternalConstraint->getRewritableOriginalTy() + ")",
+        "((" + Dst->getRewritableOriginalTy() + ")",
         ")");
     case CAST_TO_CHECKED: {
       std::string Suffix = ")";
-      if (const auto *DstPVC = dyn_cast<PVConstraint>(Dst.ExternalConstraint)) {
+      if (const auto *DstPVC = dyn_cast<PVConstraint>(Dst)) {
         assert("Checked cast not to a pointer" && !DstPVC->getCvars().empty());
         ConstAtom *CA = Info.getConstraints().getAssignment(
           DstPVC->getCvars().at(0));
@@ -172,7 +167,7 @@ std::pair<std::string, std::string> CastPlacementVisitor::getCastString(
         }
       }
       return std::make_pair(
-        "_Assume_bounds_cast<" + Dst.ExternalConstraint->mkString(E, false) +
+        "_Assume_bounds_cast<" + Dst->mkString(E, false) +
         ">(", Suffix);
     }
     default:
@@ -181,10 +176,9 @@ std::pair<std::string, std::string> CastPlacementVisitor::getCastString(
 }
 
 
-void CastPlacementVisitor::surroundByCast(
-  InternalExternalPair<ConstraintVariable> Src,
-  InternalExternalPair<ConstraintVariable> Dst, Expr *E) {
-  auto CastStrs = getCastString(Src, Dst);
+void CastPlacementVisitor::surroundByCast(ConstraintVariable *Dst,
+                                          CastNeeded CastKind, Expr *E) {
+  auto CastStrs = getCastString(Dst, CastKind);
 
   // If E is already a cast expression, we will try to rewrite the cast instead
   // of adding a new expression.
