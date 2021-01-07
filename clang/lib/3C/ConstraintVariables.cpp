@@ -987,7 +987,7 @@ FunctionVariableConstraint::allocateParamPair(const clang::QualType &QT,
   PVConstraint *PVExt = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric);
   // For void pointers and function pointers, internal and external would need
   // to be equated, so can we avoid allocating extra constraints.
-  if (QT->isVoidPointerType() || QT->isFunctionPointerType())
+  if ((QT->isVoidPointerType() || QT->isFunctionPointerType()) && !HasItype)
     return {PVExt, PVExt};
   PVConstraint *PVInt = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric,
                                          HasItype);
