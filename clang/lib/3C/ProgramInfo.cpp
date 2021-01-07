@@ -278,12 +278,6 @@ void ProgramInfo::printStats(const std::set<std::string> &F, raw_ostream &O,
   }
 }
 
-bool ProgramInfo::isExternOkay(const std::string &Ext) {
-  return llvm::StringSwitch<bool>(Ext)
-      .Cases("malloc", "free", true)
-      .Default(false);
-}
-
 bool ProgramInfo::link() {
   // For every global symbol in all the global symbols that we have found
   // go through and apply rules for whether they are functions or variables.
@@ -332,7 +326,7 @@ bool ProgramInfo::link() {
     // everything about it.
     // Some global symbols we don't need to constrain to wild, like
     // malloc and free. Check those here and skip if we find them.
-    if (!G->hasBody() && !isExternOkay(FuncName)) {
+    if (!G->hasBody()) {
 
       // If there was a checked type on a variable in the input program, it
       // should stay that way. Otherwise, we shouldn't be adding a checked type
