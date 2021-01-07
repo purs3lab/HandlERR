@@ -1814,6 +1814,8 @@ void PointerVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
   SrcHasItype = SrcHasItype || From->SrcHasItype;
   if (!From->ItypeStr.empty())
     ItypeStr = From->ItypeStr;
+  if (From->IsGeneric)
+    IsGeneric = true;
   if (!From->BoundsAnnotationStr.empty())
     BoundsAnnotationStr = From->BoundsAnnotationStr;
   if (FV) {
@@ -1891,8 +1893,14 @@ void FunctionVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
   assert(From != nullptr);
   assert(From->getDeferredParams().size() == 0);
   // Transplant returns.
-  ReturnVar.InternalConstraint->mergeDeclaration(
-    From->ReturnVar.InternalConstraint, I, ReasonFailed);
+  if (ReturnVar.InternalConstraint == ReturnVar.ExternalConstraint) {
+    From->ReturnVar.InternalConstraint->mergeDeclaration(
+      ReturnVar.InternalConstraint, I, ReasonFailed);
+    ReturnVar.InternalConstraint = From->ReturnVar.InternalConstraint;
+  } else {
+    ReturnVar.InternalConstraint->mergeDeclaration(
+      From->ReturnVar.InternalConstraint, I, ReasonFailed);
+  }
   ReturnVar.ExternalConstraint->mergeDeclaration(
     From->ReturnVar.ExternalConstraint, I, ReasonFailed);
   if (ReasonFailed != "") {
@@ -1914,9 +1922,15 @@ void FunctionVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
       return;
     }
     for (unsigned J = 0; J < From->numParams(); J++) {
+      if (getInternalParam(J) == getExternalParam(J)) {
+        From->getInternalParam(J)->mergeDeclaration(getInternalParam(J), I,
+                                                    ReasonFailed);
+        ParamVars[J].InternalConstraint = From->getInternalParam(J);
+      } else {
+        getInternalParam(J)->mergeDeclaration(From->getInternalParam(J), I,
+                                              ReasonFailed);
+      }
       getExternalParam(J)->mergeDeclaration(From->getExternalParam(J), I,
-                                            ReasonFailed);
-      getInternalParam(J)->mergeDeclaration(From->getInternalParam(J), I,
                                             ReasonFailed);
       if (ReasonFailed != "") {
         ReasonFailed += "for parameter " + std::to_string(J);
