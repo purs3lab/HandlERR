@@ -1840,15 +1840,6 @@ Atom *PointerVariableConstraint::getAtom(unsigned AtomIdx, Constraints &CS) {
   return nullptr;
 }
 
-bool PointerVariableConstraint::isFullyChecked(const EnvironmentMap &E) const {
-  for (const Atom *VA : Vars) {
-    const Atom *CA = getSolution(VA, E);
-    if (isa<WildAtom>(CA))
-      return false;
-  }
-  return true;
-}
-
 // Brain Transplant params and returns in [FromCV], recursively.
 void FunctionVariableConstraint::brainTransplant(ConstraintVariable *FromCV,
                                                  ProgramInfo &I) {
@@ -1948,11 +1939,4 @@ void FunctionVariableConstraint::addDeferredParams(PersistentSourceLoc PL,
 
 bool FunctionVariableConstraint::getIsOriginallyChecked() const {
   return ReturnVar.ExternalConstraint->getIsOriginallyChecked();
-}
-
-bool FunctionVariableConstraint::isFullyChecked(const EnvironmentMap &E) const {
-  return ReturnVar.ExternalConstraint->isFullyChecked(E) &&
-         llvm::all_of(ParamVars, [&E](InternalExternalPair<PVConstraint> P) {
-           return P.ExternalConstraint->isFullyChecked(E);
-         });
 }
