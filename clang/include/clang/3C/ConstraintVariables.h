@@ -477,7 +477,7 @@ private:
   InternalExternalPair<PVConstraint>
   allocateParamPair(const clang::QualType &QT, clang::DeclaratorDecl *D,
                     std::string N, ProgramInfo &I, const clang::ASTContext &C,
-                    std::string *InFunc, bool VarAtomForChecked);
+                    std::string *InFunc, bool HasItype);
 
 public:
   FunctionVariableConstraint()

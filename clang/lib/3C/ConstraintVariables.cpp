@@ -982,7 +982,7 @@ FunctionVariableConstraint::allocateParamPair(const clang::QualType &QT,
                                               std::string N, ProgramInfo &I,
                                               const clang::ASTContext &C,
                                               std::string *InFunc,
-                                              bool VarAtomForChecked) {
+                                              bool HasItype) {
   bool IsGeneric = D && getTypeVariableType(D);
   PVConstraint *PVExt = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric);
   // For void pointers and function pointers, internal and external would need
@@ -990,7 +990,7 @@ FunctionVariableConstraint::allocateParamPair(const clang::QualType &QT,
   if (QT->isVoidPointerType() || QT->isFunctionPointerType())
     return {PVExt, PVExt};
   PVConstraint *PVInt = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric,
-                                         VarAtomForChecked);
+                                         HasItype);
   InternalExternalPair<PVConstraint> Pair = {PVInt, PVExt};
   linkInternalExternalPair(I, Pair, N == RETVAR);
   return Pair;
