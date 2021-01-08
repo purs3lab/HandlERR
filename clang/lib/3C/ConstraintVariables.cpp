@@ -1859,6 +1859,11 @@ void FVComponentVariable::mergeDeclaration(FVComponentVariable *From,
                                            ProgramInfo &I,
                                            std::string &ReasonFailed) {
   if (InternalConstraint == ExternalConstraint) {
+    // Special handling for merging declarations where the original declaration
+    // was allocated using the same constraint variable for internal and
+    // external constraints but a subsequent declaration allocated separate
+    // variables. This can happen if the second declaration declares an itype
+    // but the original declaration does not.
     From->InternalConstraint->mergeDeclaration(InternalConstraint, I,
                                                ReasonFailed);
     InternalConstraint = From->InternalConstraint;
@@ -1872,6 +1877,8 @@ void FVComponentVariable::mergeDeclaration(FVComponentVariable *From,
 
 void FVComponentVariable::brainTransplant(FVComponentVariable *From,
                                           ProgramInfo &I) {
+  // As in mergeDeclaration, special handling is required if the original
+  // declaration did not allocate split constraint variables.
   if (InternalConstraint == ExternalConstraint)
     InternalConstraint = From->InternalConstraint;
   else
@@ -1913,9 +1920,9 @@ FVComponentVariable::FVComponentVariable(const QualType &QT,
   bool IsGeneric = D && getTypeVariableType(D);
   ExternalConstraint = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric);
   if ((QT->isVoidPointerType() || QT->isFunctionPointerType()) && !HasItype) {
-    InternalConstraint = ExternalConstraint;
     // For void pointers and function pointers, internal and external would need
     // to be equated, so can we avoid allocating extra constraints.
+    InternalConstraint = ExternalConstraint;
   } else {
     InternalConstraint = new PVConstraint(QT, D, N, I, C, InFunc, IsGeneric,
                                           HasItype);
@@ -1935,6 +1942,10 @@ FVComponentVariable::FVComponentVariable(const QualType &QT,
         // cannot be resolved by inserting casts.
         CS.addConstraint(CS.createGeq(InternalA, ExternalA, true));
 
+        // Atoms of return constraint variables are unified after the first
+        // level. This is because CheckedC does not allow assignment from e.g.
+        // a function return of type `int ** : itype(_Ptr<_Ptr<int>>)` to a
+        // variable with type `int **`.
         if (!isa<ConstAtom>(ExternalA) && N == RETVAR && J > 0)
           CS.addConstraint(CS.createGeq(ExternalA, InternalA, true));
       }

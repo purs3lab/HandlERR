@@ -432,6 +432,15 @@ typedef struct {
   std::vector<CVarSet> PS;
 } ParamDeferment;
 
+// This class contains a pair of PVConstraints that represent an internal and
+// external view of a variable for use as the parameter and return constraints
+// of FunctionVariableConstraints. The internal constraint represents how the
+// variable is used inside the function. The external constraint represents
+// how it can be used by callers to the function. For example, when a variable
+// is used unsafely inside the function, the internal constraint variable will
+// solve to an unchecked type, but the external constraint variable will still
+// be checked. The rewriting of the function then gives it an itype, allowing
+// callers to use the external checked type.
 class FVComponentVariable {
 private:
   friend class FunctionVariableConstraint;
@@ -439,8 +448,6 @@ private:
   PVConstraint *ExternalConstraint;
 
 public:
-
-
   FVComponentVariable() : InternalConstraint(nullptr),
                           ExternalConstraint(nullptr) {}
 
