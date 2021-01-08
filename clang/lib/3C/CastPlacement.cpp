@@ -78,8 +78,11 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
   }
 
   // Cast on return. Be sure not to place casts when the result is not used,
-  // otherwise an externaly unsafe function whose result is not used would end
-  // up with a bounds cast around it.
+  // otherwise an externally unsafe function whose result is not used would end
+  // up with a bounds cast around it. hasPersistentConstraints is used to
+  // determine if an expression is used because any expression that is
+  // eventually assigned to a variable or passed as a function argument will
+  // be cached in the persistent constraint set.
   if (Info.hasPersistentConstraints(CE, Context)) {
     CVarSet DestinationConstraints = CR.getExprConstraintVars(CE);
     InternalExternalPair<ConstraintVariable> Src = {FV->getInternalReturn(),
