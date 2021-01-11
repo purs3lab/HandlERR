@@ -35,7 +35,7 @@ void structs() {
 
   int d;
   int *faz = (int*)0;
-	//CHECK: _Ptr<int> faz = (_Ptr<int>)0;
+	//CHECK: _Ptr<int> faz =  (_Ptr<int>)0;
   faz = (&(struct b){&d, (int*) 1})->a;
 	//CHECK: faz = (&(struct b){&d, (int*) 1})->a;
   int *fuz = (int*)0;
@@ -44,7 +44,7 @@ void structs() {
 
   int *f = (int*) 0;
 	//CHECK_NOALL: int *f = (int*) 0;
-	//CHECK_ALL:   _Array_ptr<int> f = (_Array_ptr<int>) 0;
+	//CHECK_ALL:   _Array_ptr<int> f =  (_Array_ptr<int>) 0;
   ((&(struct c){f})->a)++;
 }
 
@@ -57,11 +57,11 @@ void lists() {
 
   int *b[1] = (int*[1]){&x};
 	//CHECK_NOALL: int *b[1] = (int*[1]){&x};
-	//CHECK_ALL:   _Ptr<int> b _Checked[1] = (_Ptr<int>){&x};
+	//CHECK_ALL:   _Ptr<int> b _Checked[1] = (_Ptr<int> _Checked[1]){&x};
 
   int *c[1] = (int*[1]){&x};
 	//CHECK_NOALL: int *c[1] = (int*[1]){&x};
-	//CHECK_ALL:   _Ptr<int> c _Checked[1] = (_Ptr<int>){&x};
+	//CHECK_ALL:   _Ptr<int> c _Checked[1] = (_Ptr<int> _Checked[1]){&x};
   int *c0 = c[0];
 	//CHECK_NOALL: int *c0 = c[0];
 	//CHECK_ALL:   _Ptr<int> c0 = c[0];
@@ -74,7 +74,7 @@ void lists() {
 
   int *e = (int*[1]){&x}[0];
 	//CHECK_NOALL: int *e = (int*[1]){&x}[0];
-	//CHECK_ALL:   _Ptr<int> e = (_Ptr<int>){&x}[0];
+	//CHECK_ALL:   _Ptr<int> e = (_Ptr<int> _Checked[1]){&x}[0];
 
   int *f = (int*[1]){(int*)1}[0];
 	//CHECK_NOALL: int *f = (int*[1]){(int*)1}[0];
@@ -106,7 +106,7 @@ void nested(int* x) {
 void silly(int *x) {
 	//CHECK: void silly(_Ptr<int> x) {
   int *a = (int*){x};
-	//CHECK: _Ptr<int> a = (_Ptr<int>){x};
+	//CHECK: _Ptr<int> a =  (_Ptr<int>){x};
 
   int *b = (int*){(int*) 1};
 	//CHECK: int *b = (int*){(int*) 1};
