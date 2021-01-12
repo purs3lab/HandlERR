@@ -627,9 +627,8 @@ void PointerVariableConstraint::setTypedef(TypedefNameDecl* T, std::string s) {
 std::string PointerVariableConstraint::mkString(const EnvironmentMap &E,
                                                 bool EmitName, bool ForItype,
                                                 bool EmitPointee, bool UnmaskTypedef) const {
-  if (IsTypedef && !UnmaskTypedef) {
+  if (IsTypedef && !UnmaskTypedef)
     return typedefString + (EmitName && getName() != RETVAR ? (" " + getName()) : " ");
-  }
 
   std::ostringstream Ss;
   // This deque will store all the type strings that need to pushed
@@ -780,15 +779,18 @@ std::string PointerVariableConstraint::mkString(const EnvironmentMap &E,
     EndStrs.push_front(" " + getName());
   }
 
-  if (EmittedBase == false) {
+  if (!EmittedBase) {
     // If we have a FV pointer, then our "base" type is a function pointer.
     // type.
     if (FV) {
       Ss << FV->mkString(E);
     } else if (typedeflevelinfo.hasTypedef) {
-      auto name = typedeflevelinfo.typedefName;
-      Ss << name;
+      auto Name = typedeflevelinfo.typedefName;
+      Ss << Name;
     } else {
+      std::ostringstream Stream;
+      auto Idx = typedeflevelinfo.typedefLevel;
+      getQualString(Idx, Stream);
       Ss << BaseType;
     }
   }
