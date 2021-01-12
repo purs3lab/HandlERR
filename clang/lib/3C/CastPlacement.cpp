@@ -55,10 +55,9 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
       // used generic type.
       Expr *ArgExpr = A;
       if (FD && PIdx < FD->getNumParams()) {
-        const TypeVariableType *TyVar =
-          getTypeVariableType(FD->getParamDecl(PIdx));
-        if (TyVar && TypeVars.find(TyVar->GetIndex()) != TypeVars.end() &&
-            TypeVars[TyVar->GetIndex()] != nullptr)
+        const int TyVarIdx = FV->getExternalParam(PIdx)->getGenericIndex();
+        if (TypeVars.find(TyVarIdx) != TypeVars.end() &&
+            TypeVars[TyVarIdx] != nullptr)
           ArgExpr = ArgExpr->IgnoreImpCasts();
       }
 

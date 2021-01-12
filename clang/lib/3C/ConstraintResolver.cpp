@@ -450,7 +450,7 @@ CVarSet ConstraintResolver::getExprConstraintVars(Expr *E) {
               N = "&" + N;
               ExprType = Context->getPointerType(ArgTy);
               PVConstraint *PVC = new PVConstraint(ExprType, nullptr, N, Info,
-                                                   *Context, nullptr, true);
+                                                   *Context, nullptr, 0);
               PVC->constrainOuterTo(CS, A, true);
               ReturnCVs.insert(PVC);
               DidInsert = true;
@@ -506,9 +506,10 @@ CVarSet ConstraintResolver::getExprConstraintVars(Expr *E) {
             // had a checked type in the input program because the constraint
             // variables contain constant atoms that are reused by the copy
             // constructor.
-            NewCV =
+            auto *NewPCV =
                 new PVConstraint(CE->getType(), nullptr, PCV->getName(), Info,
-                                 *Context, nullptr, PCV->getIsGeneric());
+                                 *Context, nullptr, PCV->getGenericIndex());
+            NewCV = NewPCV;
             if (PCV->hasBoundsKey())
               NewCV->setBoundsKey(PCV->getBoundsKey());
           } else {

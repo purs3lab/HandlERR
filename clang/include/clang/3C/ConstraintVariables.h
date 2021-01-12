@@ -276,11 +276,11 @@ private:
   // String representing declared bounds expression.
   std::string BoundsAnnotationStr;
 
-  // Does this variable represent a generic type?
+  // Does this variable represent a generic type? Which one (or -1 for none)?
   // Generic types can be used with fewer restrictions, so this field is used
-  // stop assignments wth generic variables from forcing constraint variables
+  // stop assignments with generic variables from forcing constraint variables
   // to be wild.
-  bool IsGeneric;
+  int GenericIndex;
 
   // Empty array pointers are represented the same as standard pointers. This
   // lets pointers be passed to functions expecting a zero width array. This
@@ -307,12 +307,11 @@ public:
   // Constructor for when we know a CVars and a type string.
   PointerVariableConstraint(CAtoms V, std::string T, std::string Name,
                             FunctionVariableConstraint *F, bool IsArr,
-                            std::string Is, bool Generic = false)
-      : ConstraintVariable(PointerVariable, "" /*not used*/, Name), BaseType(T),
-        Vars(V), FV(F), ArrPresent(IsArr), SrcHasItype(!Is.empty()),
-        ItypeStr(Is), PartOfFuncPrototype(false), Parent(nullptr),
-        BoundsAnnotationStr(""), IsGeneric(Generic), IsZeroWidthArray(false),
-        IsVoidPtr(false) {}
+                            std::string Is, int Generic = -1)
+    : ConstraintVariable(PointerVariable, "" /*not used*/, Name), BaseType(T),
+      Vars(V), FV(F), ArrPresent(IsArr), SrcHasItype(!Is.empty()), ItypeStr(Is),
+      PartOfFuncPrototype(false), Parent(nullptr), BoundsAnnotationStr(""),
+      GenericIndex(Generic), IsZeroWidthArray(false), IsVoidPtr(false) {}
 
   std::string getTy() const { return BaseType; }
   bool getArrPresent() const { return ArrPresent; }
@@ -341,7 +340,8 @@ public:
   // Get bounds annotation.
   std::string getBoundsStr() const { return BoundsAnnotationStr; }
 
-  bool getIsGeneric() const { return IsGeneric; }
+  bool getIsGeneric() const { return GenericIndex >= 0; }
+  int getGenericIndex() const { return GenericIndex; }
 
   bool getIsOriginallyChecked() const override {
     return llvm::any_of(Vars, [](Atom *A) { return isa<ConstAtom>(A); });
@@ -371,14 +371,14 @@ public:
   //          that all constructor calls will take the same global objects here.
   // inFunc: If this variable is part of a function prototype, this string is
   //         the name of the function. nullptr otherwise.
-  // IsGeneric: CheckedC supports generic types (_Itype_for_any) which need less
-  //            restrictive constraints. Set to true to indicate that this
-  //            variable is generic.
+  // ForceGenericIndex: CheckedC supports generic types (_Itype_for_any) which
+  //                    need less restrictive constraints. Set >= 0 to indicate
+  //                    that this variable should be considered generic.
   PointerVariableConstraint(const clang::QualType &QT, clang::DeclaratorDecl *D,
                             std::string N, ProgramInfo &I,
                             const clang::ASTContext &C,
                             std::string *InFunc = nullptr,
-                            bool IsGeneric = false,
+                            int ForceGenericIndex = -1,
                             bool VarAtomForChecked = false);
 
   const CAtoms &getCvars() const { return Vars; }
@@ -496,6 +496,9 @@ private:
   // Flag to indicate whether this is a function pointer or not.
   bool IsFunctionPtr;
 
+  // Count of type parameters from `_Itype_for_any(...)`
+  int TypeParams;
+
   void equateFVConstraintVars(ConstraintVariable *CV, ProgramInfo &Info) const;
 public:
   FunctionVariableConstraint()
@@ -549,6 +552,11 @@ public:
 
   bool srcHasItype() const override;
   bool srcHasBounds() const override;
+
+  int getGenericIndex() const {
+    return ReturnVar.ExternalConstraint->getGenericIndex();
+  }
+
   bool solutionEqualTo(Constraints &CS,
                        const ConstraintVariable *CV,
                        bool ComparePtyp = true) const override;
