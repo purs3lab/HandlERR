@@ -17,7 +17,6 @@ public:
 
   bool VisitVarDecl(VarDecl *VD) {
     if(P(VD)){
-      llvm::errs() << "Found vardecl\n";
       addNewVD(VD);
       return false;
     } else {
@@ -25,8 +24,7 @@ public:
     }
   }
 
-  //TODO properly gensym the name
-  //TODO ensure works for multi-decls
+  //TODO handle mixed type multi-decl
   std::string createDuplicateString(VarDecl *VD) {
     auto CV = Info.getVariable(VD, &Context);
     auto Type =
@@ -36,7 +34,8 @@ public:
                                     false)
                       : VD->getType().getAsString();
     auto TargetName = VD->getNameAsString();
-    return ";\n" + Type + " newvarname = " + TargetName + "";
+    auto NewName = "__" + TargetName + "_copy";
+    return ";\n" + Type + " " + NewName + "= " + TargetName + "";
   }
 
   void addNewVD(VarDecl *VD) {
@@ -56,7 +55,6 @@ private:
 void create_duplicate(ASTContext &Context, Rewriter &R,
                       ProgramInfo &Info,
                       Decl *FD, selector P) {
-  llvm::errs() << "Hit!\n";
   auto V = FindVarDecl(Context, R, Info, P);
   V.TraverseDecl(FD);
 }
