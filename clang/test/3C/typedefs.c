@@ -44,6 +44,10 @@ int foo(void) {
     bad b = (int*) 3;
     //CHECK: bad b = (int*) 3;
     badP b2 = (intptr*) 3;
+    typedef int nat;
+    const nat z = 3;
+    const nat* cnstp = &z;
+    //CHECK: _Ptr<const nat> cnstp = &z;
 
     return *p;
 }
