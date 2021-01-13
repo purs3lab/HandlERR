@@ -21,4 +21,4 @@ Option<std::string> createDuplicate(clang::ASTContext &Context,
 
 
 
-#endif //LLVM_DUPLCIATE_H
+#endif //LLVM_DUPLICATE_H
