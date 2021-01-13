@@ -1,5 +1,5 @@
-#ifndef LLVM_DUPLCIATE_H
-#define LLVM_DUPLCIATE_H
+#ifndef LLVM_DUPLICATE_H
+#define LLVM_DUPLICATE_H
 
 #include "ProgramInfo.h"
 #include "clang/AST/ASTContext.h"
