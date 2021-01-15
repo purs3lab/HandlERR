@@ -212,7 +212,8 @@ CSetBkeyPair
     E = E->IgnoreParens();
 
     // Non-pointer (int, char, etc.) types have a special base PVConstraint
-    if (TypE->isRecordType() || TypE->isArithmeticType()) {
+    if (TypE->isRecordType() || TypE->isArithmeticType() ||
+        TypE->isVectorType()) {
       if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
         // If we have a DeclRef, the PVC can get a meaningful name
         return convertToCSetBKeyPair(getBaseVarPVConstraint(DRE));
@@ -707,7 +708,7 @@ CVarSet ConstraintResolver::PVConstraintFromType(QualType TypE) {
   assert("Pointer type CVs should be obtained through getExprConstraintVars." &&
          !TypE->isPointerType());
   CVarSet Ret;
-  if (TypE->isRecordType() || TypE->isArithmeticType())
+  if (TypE->isRecordType() || TypE->isArithmeticType() || TypE->isVectorType())
     Ret.insert(PVConstraint::getNonPtrPVConstraint(Info.getConstraints()));
   else
     llvm::errs() << "Warning: Returning non-base, non-wild type";
@@ -718,7 +719,9 @@ CVarSet ConstraintResolver::getBaseVarPVConstraint(DeclRefExpr *Decl) {
   if (Info.hasPersistentConstraints(Decl, Context))
     return Info.getPersistentConstraintsSet(Decl, Context);
 
-  assert(Decl->getType()->isRecordType() || Decl->getType()->isArithmeticType());
+  assert(Decl->getType()->isRecordType() ||
+         Decl->getType()->isArithmeticType() ||
+         Decl->getType()->isVectorType());
 
   CVarSet Ret;
   auto DN = Decl->getDecl()->getName();
