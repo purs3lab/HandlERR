@@ -18,7 +18,7 @@ public:
 
 
   bool VisitVarDecl(VarDecl *VD) {
-    // If the selctor matches execute the duplicate function
+    // If the selector matches execute the duplicate function
     // and store the new name in the optional
     if(P(VD)){
       auto NewName = addDuplicate(VD);
