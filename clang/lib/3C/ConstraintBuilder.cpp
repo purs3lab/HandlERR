@@ -516,7 +516,8 @@ public:
       if (!Info.seenTypedef(PSL))
         // Add this typedef to the program info, if it contains a ptr to
         // an anonymous struct we mark as not being rewritable
-        Info.addTypedef(PSL, !PtrToStructDef::containsPtrToStructDef(TD));
+        Info.addTypedef(PSL, !PtrToStructDef::containsPtrToStructDef(TD),
+                        TD, *Context);
 
       return true;
   }

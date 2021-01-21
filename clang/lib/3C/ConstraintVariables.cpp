@@ -785,7 +785,6 @@ std::string PointerVariableConstraint::mkString(const EnvironmentMap &E,
     if (FV) {
       Ss << FV->mkString(E);
     } else if (typedeflevelinfo.hasTypedef) {
-      llvm::errs() << "Hit!\n";
       std::ostringstream Buf;
       getQualString(typedeflevelinfo.typedefLevel, Buf);
       auto Name = typedeflevelinfo.typedefName;

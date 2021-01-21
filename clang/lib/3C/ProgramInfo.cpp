@@ -634,15 +634,14 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
 }
 
 void ProgramInfo::unifyIfTypedef(const Type* Ty, ASTContext& Context, DeclaratorDecl* Decl, PVConstraint* P) {
-  if (const auto TDT = dyn_cast<TypedefType>(Ty)) {
-    auto Decl = TDT->getDecl();
+  if (const auto* TDT = dyn_cast<TypedefType>(Ty)) {
+    auto* TDecl = TDT->getDecl();
     auto PSL = PersistentSourceLoc::mkPSL(Decl, Context);
-    auto &pair = typedefVars[PSL];
-    CVarSet& bounds = pair.first;
-    if (pair.second) {
-      P->setTypedef(Decl, Decl->getNameAsString());
-      constrainConsVarGeq(P, bounds, CS, &PSL, Same_to_Same, true, this);
-      bounds.insert(P);
+    auto O = lookupTypedef(PSL);
+    if (O.hasValue()) {
+      ConstraintVariable& Bounds = O.getValue();
+      P->setTypedef(TDecl, TDecl->getNameAsString());
+      constrainConsVarGeq(P, &Bounds, CS, &PSL, Same_to_Same, true, this);
     }
   }
 }
@@ -1015,7 +1014,7 @@ ProgramInfo::getTypeParamBindings(CallExpr *CE, ASTContext *C) const {
   return TypeParamBindings.at(PSL);
 }
 
-std::pair<CVarSet, bool> ProgramInfo::lookupTypedef(PersistentSourceLoc PSL) {
+CVarOption ProgramInfo::lookupTypedef(PersistentSourceLoc PSL) {
   return typedefVars[PSL];
 }
 
@@ -1023,7 +1022,12 @@ bool ProgramInfo::seenTypedef(PersistentSourceLoc PSL) {
   return typedefVars.count(PSL) != 0;
 }
 
-void ProgramInfo::addTypedef(PersistentSourceLoc PSL, bool ShouldCheck) {
-  CVarSet empty;
-  typedefVars[PSL] = make_pair(empty, ShouldCheck);
+void ProgramInfo::addTypedef(PersistentSourceLoc PSL, bool ShouldCheck,
+                             TypedefDecl* TD, ASTContext &C) {
+  auto* PV = new PointerVariableConstraint(TD->getUnderlyingType(), nullptr,
+                                       TD->getNameAsString(), *this, C);
+  if (ShouldCheck)
+    this->typedefVars[PSL] = { *PV };
+  else
+    this->typedefVars[PSL] = {};
 }
