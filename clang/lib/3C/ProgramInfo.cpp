@@ -636,13 +636,14 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
 void ProgramInfo::unifyIfTypedef(const Type* Ty, ASTContext& Context, DeclaratorDecl* Decl, PVConstraint* P) {
   if (const auto* TDT = dyn_cast<TypedefType>(Ty)) {
     auto* TDecl = TDT->getDecl();
-    auto PSL = PersistentSourceLoc::mkPSL(Decl, Context);
+    auto PSL = PersistentSourceLoc::mkPSL(TDecl, Context);
     auto O = lookupTypedef(PSL);
     if (O.hasValue()) {
       ConstraintVariable& Bounds = O.getValue();
       P->setTypedef(TDecl, TDecl->getNameAsString());
       constrainConsVarGeq(P, &Bounds, CS, &PSL, Same_to_Same, true, this);
     }
+
   }
 }
 
@@ -1027,7 +1028,7 @@ void ProgramInfo::addTypedef(PersistentSourceLoc PSL, bool ShouldCheck,
   auto* PV = new PointerVariableConstraint(TD->getUnderlyingType(), nullptr,
                                        TD->getNameAsString(), *this, C);
   if (ShouldCheck)
-    this->typedefVars[PSL] = { *PV };
-  else
+    this->typedefVars[PSL] = {*PV};
+   else
     this->typedefVars[PSL] = {};
 }
