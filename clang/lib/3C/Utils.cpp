@@ -294,6 +294,20 @@ static bool castCheck(clang::QualType DstType, clang::QualType SrcType) {
   if (SrcPtrTypePtr || DstPtrTypePtr)
     return false;
 
+  // Check function cast by comparing parameter and return types individually
+  const auto *SrcFnType = dyn_cast<clang::FunctionProtoType>(SrcTypePtr);
+  const auto *DstFnType = dyn_cast<clang::FunctionProtoType>(DstTypePtr);
+  if (SrcFnType && DstFnType) {
+    if (SrcFnType->getNumParams() != DstFnType->getNumParams())
+      return false;
+
+    for (unsigned I = 0; I < SrcFnType->getNumParams(); I++)
+      if (!castCheck(SrcFnType->getParamType(I), DstFnType->getParamType(I)))
+        return false;
+
+    return castCheck(SrcFnType->getReturnType(), DstFnType->getReturnType());
+  }
+
   // If both are not scalar types? Then the types must be exactly same.
   if (!(SrcTypePtr->isScalarType() && DstTypePtr->isScalarType()))
     return SrcTypePtr == DstTypePtr;
@@ -359,21 +373,6 @@ unsigned longestCommonSubsequence(const char *Str1, const char *Str2,
                   longestCommonSubsequence(Str1, Str2, Str1Len - 1, Str2Len));
 }
 
-// Get the type variable used in a parameter declaration, or return null if no
-// type variable is used.
-const TypeVariableType *getTypeVariableType(DeclaratorDecl *Decl) {
-  // This makes a lot of assumptions about how the AST will look.
-  if (auto *ITy = Decl->getInteropTypeExpr()) {
-    const auto *Ty = ITy->getType().getTypePtr();
-    if (Ty && Ty->isPointerType()) {
-      auto *PtrTy = Ty->getPointeeType().getTypePtr();
-      if (auto *TypdefTy = dyn_cast_or_null<TypedefType>(PtrTy))
-        return dyn_cast<TypeVariableType>(TypdefTy->desugar());
-    }
-  }
-  return nullptr;
-}
-
 bool isTypeAnonymous(const clang::Type *T) {
   return T->isRecordType() &&
          !(T->getAsRecordDecl()->getIdentifier() ||
@@ -423,4 +422,14 @@ TypeLoc getBaseTypeLoc(TypeLoc T) {
           T.getTypePtr()->isPointerType() || T.getTypePtr()->isArrayType()))
     T = T.getNextTypeLoc();
   return T;
+}
+
+Expr *ignoreCheckedCImplicit(Expr *E) {
+  Expr *Old = nullptr;
+  Expr *New = E;
+  while (Old != New) {
+    Old = New;
+    New = Old->IgnoreExprTmp()->IgnoreImplicit();
+  }
+  return New;
 }
