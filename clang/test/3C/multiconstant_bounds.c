@@ -4,7 +4,7 @@
 // Issue: https://github.com/correctcomputation/checkedc-clang/issues/390
 //
 // RUN: 3c -alltypes %s | FileCheck -match-full-lines %s
-// RUN: 3c -alltypes %s | %clang -c -fcheckedc-extension -x c -o %t1.unused -
+// RUN: 3c -alltypes %s | %clang -c -fcheckedc-extension -Xclang -verify -x c -o %t1.unused -
 // expected-no-diagnostics
 //
 int a(char * : itype(_Nt_array_ptr<char>));
