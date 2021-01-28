@@ -391,6 +391,8 @@ public:
     return S->getKind() == PointerVariable;
   }
 
+  std::string gatherQualStrings(void) const;
+
   std::string mkString(const EnvironmentMap &E, bool EmitName = true,
                        bool ForItype = false,
                        bool EmitPointee = false,

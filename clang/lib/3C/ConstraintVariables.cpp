@@ -581,6 +581,7 @@ void PointerVariableConstraint::getQualString(uint32_t TypeIdx,
 void PointerVariableConstraint::insertQualType(uint32_t TypeIdx,
                                                QualType &QTy) {
   if (QTy.isConstQualified())
+  if (QTy.isConstQualified())
     QualMap[TypeIdx].insert(ConstQualification);
   if (QTy.isVolatileQualified())
     QualMap[TypeIdx].insert(VolatileQualification);
@@ -653,11 +654,24 @@ void PointerVariableConstraint::setTypedef(TypedefNameDecl* T, std::string s) {
 // variables and potentially nested function pointer declaration. Produces a
 // string that can be replaced in the source code.
 
+std::string PointerVariableConstraint::gatherQualStrings(void) const {
+  std::ostringstream S;
+  uint32_t Idx = 0;
+
+  for (auto It = Vars.begin(); It != Vars.end(); It++, Idx++) {
+    getQualString(Idx, S);
+  }
+
+  return S.str();
+}
+
 std::string PointerVariableConstraint::mkString(const EnvironmentMap &E,
                                                 bool EmitName, bool ForItype,
                                                 bool EmitPointee, bool UnmaskTypedef) const {
-  if (IsTypedef && !UnmaskTypedef)
-    return typedefString + (EmitName && getName() != RETVAR ? (" " + getName()) : " ");
+  if (IsTypedef && !UnmaskTypedef) {
+    return gatherQualStrings() + typedefString +
+           (EmitName && getName() != RETVAR ? (" " + getName()) : " ");
+  }
 
   std::ostringstream Ss;
   // This deque will store all the type strings that need to pushed

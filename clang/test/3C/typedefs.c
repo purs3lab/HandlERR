@@ -32,6 +32,8 @@ intptr bar(intptr x) {
 	return x;
 }
 
+typedef int* integer;
+//CHECK: typedef _Ptr<int> integer;
 int foo(void) { 
     //CHECK: int foo(void) {
     int x = 3;
@@ -48,6 +50,10 @@ int foo(void) {
     const nat z = 3;
     const nat* cnstp = &z;
     //CHECK: _Ptr<const nat> cnstp = &z;
+    int w = 34;
+    const integer c = &w;
+    //CHECK: const integer c = &w;
+
 
     return *p;
 }
