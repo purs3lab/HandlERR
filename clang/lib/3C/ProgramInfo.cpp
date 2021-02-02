@@ -1044,11 +1044,10 @@ bool ProgramInfo::seenTypedef(PersistentSourceLoc PSL) {
 
 void ProgramInfo::addTypedef(PersistentSourceLoc PSL, bool ShouldCheck,
                              TypedefDecl* TD, ASTContext &C) {
-  llvm::errs() << "Creating tyepdefvar for " << TD->getNameAsString() << "\n";
   auto Name = "typedef__" + TD->getNameAsString();
   auto* PV = new PointerVariableConstraint(TD->getUnderlyingType(), nullptr,
                                        Name, *this, C);
-  if (ShouldCheck)
+  if (ShouldCheck && canWrite(PSL.getFileName()))
     this->typedefVars[PSL] = {*PV};
    else
     this->typedefVars[PSL] = {};
