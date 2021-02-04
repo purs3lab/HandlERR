@@ -1035,11 +1035,11 @@ ProgramInfo::getTypeParamBindings(CallExpr *CE, ASTContext *C) const {
 }
 
 CVarOption ProgramInfo::lookupTypedef(PersistentSourceLoc PSL) {
-  return typedefVars[PSL];
+  return TypedefVars[PSL];
 }
 
 bool ProgramInfo::seenTypedef(PersistentSourceLoc PSL) {
-  return typedefVars.count(PSL) != 0;
+  return TypedefVars.count(PSL) != 0;
 }
 
 void ProgramInfo::addTypedef(PersistentSourceLoc PSL, bool ShouldCheck,
@@ -1053,5 +1053,5 @@ void ProgramInfo::addTypedef(PersistentSourceLoc PSL, bool ShouldCheck,
   if (!(ShouldCheck && canWrite(PSL.getFileName())))
     PV->constrainToWild(this->getConstraints(), Rsn, &PSL);
   constrainWildIfMacro(PV, TD->getLocation(), &PSL);
-  this->typedefVars[PSL] = {*PV};
+  this->TypedefVars[PSL] = {*PV};
 }
