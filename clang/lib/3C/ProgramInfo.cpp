@@ -1047,8 +1047,7 @@ void ProgramInfo::addTypedef(PersistentSourceLoc PSL, bool ShouldCheck,
   auto Name = "typedef__" + TD->getNameAsString();
   auto* PV = new PointerVariableConstraint(TD->getUnderlyingType(), nullptr,
                                        Name, *this, C);
-  if (ShouldCheck && canWrite(PSL.getFileName()))
-    this->typedefVars[PSL] = {*PV};
-   else
-    this->typedefVars[PSL] = {};
+  if (!(ShouldCheck && canWrite(PSL.getFileName())))
+    PV->constrainToWild(this->getConstraints(), "wild", &PSL);
+  this->typedefVars[PSL] = {*PV};
 }
