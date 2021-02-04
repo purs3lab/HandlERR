@@ -129,7 +129,6 @@ private:
 
   // Map storing constraint information for typedefed types
   // The set contains all the constraint variables that also use this tyepdef
-  // TODO this could be replaced w/ a signle CVar
   // The bool informs the rewriter whether or not this typedef should be
   // rewritten. It will be false for typedefs we don't support rewritting,
   // such as typedefs that are pointers to anonymous structs
