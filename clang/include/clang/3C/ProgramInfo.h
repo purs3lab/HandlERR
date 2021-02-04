@@ -129,10 +129,8 @@ private:
 
   // Map storing constraint information for typedefed types
   // The set contains all the constraint variables that also use this tyepdef
-  // The bool informs the rewriter whether or not this typedef should be
-  // rewritten. It will be false for typedefs we don't support rewritting,
-  // such as typedefs that are pointers to anonymous structs
-  std::map<PersistentSourceLoc, CVarOption> typedefVars;
+  // rewritten.
+  std::map<PersistentSourceLoc, CVarOption> TypedefVars;
 
   // Map with the same purpose as the Variables map, this stores constraint
   // variables for non-declaration expressions.
