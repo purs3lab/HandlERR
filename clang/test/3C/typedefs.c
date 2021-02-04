@@ -76,6 +76,12 @@ void barfoo(intptr x) {
 	  *x = 5;
 }
 
+#define MYDECL typedef int* ZZZ;
+MYDECL
+void zzz(void) {
+  int x = 3;
+  ZZZ z = &x;
+}
 
 
 

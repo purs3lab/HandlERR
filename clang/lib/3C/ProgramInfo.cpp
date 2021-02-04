@@ -1049,5 +1049,6 @@ void ProgramInfo::addTypedef(PersistentSourceLoc PSL, bool ShouldCheck,
                                        Name, *this, C);
   if (!(ShouldCheck && canWrite(PSL.getFileName())))
     PV->constrainToWild(this->getConstraints(), "wild", &PSL);
+  constrainWildIfMacro(PV, TD->getLocation(), &PSL);
   this->typedefVars[PSL] = {*PV};
 }
