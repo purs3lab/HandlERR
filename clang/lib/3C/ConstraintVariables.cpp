@@ -643,10 +643,10 @@ bool PointerVariableConstraint::isTypedef(void) {
   return IsTypedef;
 }
 
-void PointerVariableConstraint::setTypedef(TypedefNameDecl* T, std::string s) {
+void PointerVariableConstraint::setTypedef(TypedefNameDecl *T, std::string S) {
   IsTypedef = true;
   TDT = T;
-  typedefString = s;
+  typedefString = S;
 }
 
 
@@ -656,12 +656,7 @@ void PointerVariableConstraint::setTypedef(TypedefNameDecl* T, std::string s) {
 
 std::string PointerVariableConstraint::gatherQualStrings(void) const {
   std::ostringstream S;
-  uint32_t Idx = 0;
-
-  for (auto It = Vars.begin(); It != Vars.end(); It++, Idx++) {
-    getQualString(Idx, S);
-  }
-
+  getQualString(0, S);
   return S.str();
 }
 

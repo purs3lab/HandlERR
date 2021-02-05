@@ -83,6 +83,11 @@ void zzz(void) {
   ZZZ z = &x;
 }
 
+typedef int * * const a;
+//CHECK: typedef const _Ptr<_Ptr<int>> a;
+void xxx(void) {
+  a b;
+}
 
 
 

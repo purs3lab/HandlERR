@@ -647,11 +647,10 @@ void ProgramInfo::unifyIfTypedef(const Type* Ty, ASTContext& Context, Declarator
     auto PSL = PersistentSourceLoc::mkPSL(TDecl, Context);
     auto O = lookupTypedef(PSL);
     if (O.hasValue()) {
-      ConstraintVariable& Bounds = O.getValue();
+      auto *Bounds = &O.getValue();
       P->setTypedef(TDecl, TDecl->getNameAsString());
-      constrainConsVarGeq(P, &Bounds, CS, &PSL, Same_to_Same, true, this);
+      constrainConsVarGeq(P, Bounds, CS, &PSL, Same_to_Same, true, this);
     }
-
   }
 }
 

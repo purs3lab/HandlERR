@@ -321,7 +321,7 @@ public:
   bool hasSomeSizedArr() const;
 
   bool isTypedef(void);
-  void setTypedef(TypedefNameDecl *TypedefType, std::string);
+  void setTypedef(TypedefNameDecl *T, std::string S);
 
   // Return true if this constraint had an itype in the original source code.
   bool srcHasItype() const override {
