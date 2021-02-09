@@ -1,7 +1,6 @@
 // RUN: rm -rf %t*
-// RUN: 3c -base-dir=%S -output-dir=%t.checked %s %S/multidef_xfail1.c --
-
-// XFAIL: *
+// RUN: not 3c -base-dir=%S -output-dir=%t.checked %s %S/multidef_xfail1.c -- 2>%t.stderr
+// RUN: grep -q "duplicate definition for function foo" %t.stderr
 
 // The desired behavior in this case is to fail, so other checks are omitted
 
