@@ -97,6 +97,7 @@ manual_tests = ['3d-allocation.c',
  'calloc.c',
  'canonical_type_cast.c',
  'checkedregions.c',
+ 'compound_literal.c',
  'ex1.c',
  'extGVar.c',
  'extstructfields.c',
@@ -115,6 +116,8 @@ manual_tests = ['3d-allocation.c',
  'i3.c',
  'linkedlist.c',
  'malloc_array.c',
+ 'ptr_array.c',
+ 'ptrptr.c',
  'realloc.c',
  'realloc_complex.c',
  'refarrsubscript.c',
@@ -126,10 +129,8 @@ manual_tests = ['3d-allocation.c',
  'valist.c',
  'cast.c'] 
 
-need_diff = ['compound_literal.c', 
-'graphs.c',
-'ptr_array.c',
-'ptrptr.c'] 
+# No tests currently produce whitespace differences.
+need_diff = []
 
 b_tests = ['b10_allsafepointerstruct.c',
  'b11_calleestructnp.c',
