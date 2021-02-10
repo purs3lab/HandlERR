@@ -35,3 +35,18 @@ int *bar(int *q) {
   foo(q);
   return foo_var;
 }
+
+int baz(void) {
+  // CHECK_LOWER: int foo(void) {
+  // CHECK_HIGHER: int foo(void) _Checked {
+  int x = 3;
+  intptr p = &x;
+  // CHECK_LOWER: intptr p = &x;
+  // CHECK_HIGHER: intptr p = &x;
+  // In either case, the typedef should stay on the type
+  return *p;
+}
+
+
+
+

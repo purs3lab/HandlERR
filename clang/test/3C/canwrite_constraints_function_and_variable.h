@@ -19,3 +19,9 @@ int *foo_var = ((void *)0);
 // dedicated test for it.
 inline void no_op() {}
 // CHECK_HIGHER: inline void no_op() _Checked {}
+
+// In the lower case, this should stay wild
+// In the higher case, this should solve to checked
+typedef int* intptr;
+// CHECK_LOWER: typedef int* intptr;
+// CHECK_HIGHER: typedef _Ptr<int> intptr;

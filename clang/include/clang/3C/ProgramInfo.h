@@ -118,7 +118,7 @@ public:
 
   bool seenTypedef(PersistentSourceLoc PSL);
 
-  void addTypedef(PersistentSourceLoc PSL, bool ShouldCheck, TypedefDecl *TD,
+  void addTypedef(PersistentSourceLoc PSL, bool CanRewriteDef, TypedefDecl *TD,
                   ASTContext& C);
 
 private:
