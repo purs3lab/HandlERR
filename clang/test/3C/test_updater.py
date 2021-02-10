@@ -45,7 +45,7 @@ def process_file_smart(name, cnameNOALL, cnameALL, diff):
     file.close() 
     noallfile.close() 
     allfile.close() 
-    os.system("rm {} {}".format(cnameNOALL, cnameALL)) 
+    os.system("rm -r tmp.checkedALL tmp.checkedNOALL")
     
     # ensure all lines are the same length
     assert len(lines) == len(noall) == len(yeall), "fix file " + name
@@ -63,15 +63,13 @@ def process_file_smart(name, cnameNOALL, cnameALL, diff):
             else: 
                 lines[i] = line + "\n\t//CHECK_NOALL: " + noline.lstrip() + "\n\t//CHECK_ALL: " + yeline
     
-    run = "// RUN: 3c -alltypes -addcr %s -- | FileCheck -match-full-lines -check-prefixes=\"CHECK_ALL\",\"CHECK\" %s"
-    run += "\n// RUN: 3c -addcr %s -- | FileCheck -match-full-lines -check-prefixes=\"CHECK_NOALL\",\"CHECK\" %s"
-    run += "\n// RUN: 3c -addcr %s -- | %clang -c -fcheckedc-extension -x c -o /dev/null -" 
-    run += "\n// RUN: 3c -output-postfix=checked -alltypes %s"
-    if not diff: 
-        run += "\n// RUN: 3c -alltypes %S/{} -- | count 0".format(name + "hecked.c") 
-    else: 
-        run += "\n// RUN: 3c -alltypes %S/{} -- | diff -w %S/{} -".format(name + "hecked.c", name + "hecked.c") 
-    run += "\n// RUN: rm %S/{}\n".format(name + "hecked.c")
+    run = "// RUN: rm -rf %t*"
+    run += "\n// RUN: 3c -base-dir=%S -alltypes -addcr %s -- | FileCheck -match-full-lines -check-prefixes=\"CHECK_ALL\",\"CHECK\" %s"
+    run += "\n// RUN: 3c -base-dir=%S -addcr %s -- | FileCheck -match-full-lines -check-prefixes=\"CHECK_NOALL\",\"CHECK\" %s"
+    run += "\n// RUN: 3c -base-dir=%S -addcr %s -- | %clang -c -fcheckedc-extension -x c -o /dev/null -"
+    run += "\n// RUN: 3c -base-dir=%S -output-dir=%t.checked -alltypes %s --"
+    run += "\n// RUN: 3c -base-dir=%t.checked -alltypes %t.checked/{} -- | diff{} %t.checked/{} -\n".format(
+        name, " -w" if diff else "", name)
 
     file = open(name, "w+")
     file.write(run + "\n".join(lines)) 
@@ -81,11 +79,11 @@ def process_file_smart(name, cnameNOALL, cnameALL, diff):
 def process_smart(filename, diff): 
     strip_existing_annotations(filename) 
     
-    cnameNOALL = filename + "heckedNOALL.c" 
-    cnameALL = filename + "heckedALL.c"
+    cnameNOALL = "tmp.checkedNOALL/" + filename
+    cnameALL = "tmp.checkedALL/" + filename
 
-    os.system("{}3c -alltypes -addcr -output-postfix=checkedALL {}".format(bin_path, filename))
-    os.system("{}3c -addcr -output-postfix=checkedNOALL {}".format(bin_path, filename)) 
+    os.system("{}3c -alltypes -addcr -output-dir=tmp.checkedALL {} --".format(bin_path, filename))
+    os.system("{}3c -addcr -output-dir=tmp.checkedNOALL {} --".format(bin_path, filename))
 
     process_file_smart(filename, cnameNOALL, cnameALL, diff) 
     return
