@@ -1,3 +1,4 @@
+// RUN: rm -rf %t*
 // RUN: 3c -base-dir=%S -alltypes -addcr %s -- | FileCheck -match-full-lines %s
 // RUN: 3c -base-dir=%S -alltypes -addcr %s -- | %clang -c -f3c-tool -fcheckedc-extension -x c -o %t.unused -
 // RUN: 3c -base-dir=%S -addcr -alltypes -output-dir=%t.checked %s --

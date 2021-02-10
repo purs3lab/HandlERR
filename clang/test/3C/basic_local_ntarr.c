@@ -2,6 +2,7 @@
 //
 // Tests basic rewriting of Nt_array_ptrs
 
+// RUN: rm -rf %t*
 // RUN: 3c -base-dir=%S -alltypes %s -- | FileCheck -match-full-lines %s
 // RUN: 3c -base-dir=%S -alltypes %s -- | %clang -c -f3c-tool -fcheckedc-extension -x c -o %t1.unused -
 //

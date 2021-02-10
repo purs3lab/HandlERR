@@ -2,6 +2,7 @@
 //
 // Tests properties about constraint propagation between functions.
 //
+// RUN: rm -rf %t*
 // RUN: 3c -base-dir=%S %s -- | FileCheck -match-full-lines %s
 // RUN: 3c -base-dir=%S %s -- | %clang -c -fcheckedc-extension -x c -o %t1.unused -
 //

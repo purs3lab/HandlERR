@@ -1,3 +1,4 @@
+//RUN: rm -rf %t*
 //RUN: 3c -base-dir=%S -output-dir=%t.checked %s %S/extGVarbar2.c --
 //RUN: FileCheck -match-full-lines --input-file %t.checked/extGVarbar1.c %s
 //RUN: %clang -c %t.checked/extGVarbar1.c %t.checked/extGVarbar2.c

@@ -1,3 +1,4 @@
+// RUN: rm -rf %t*
 // RUN: 3c -base-dir=%S %s -- | diff %s -
 // RUN: 3c -base-dir=%S %s -- | %clang -c -fcheckedc-extension -x c -o %t.unused -
 

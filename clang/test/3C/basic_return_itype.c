@@ -2,6 +2,7 @@
 //
 // Tests properties about rewriter for return type when it is an itype
 //
+// RUN: rm -rf %t*
 // RUN: 3c -base-dir=%S -alltypes %s -- | FileCheck -match-full-lines %s
 // RUN: 3c -base-dir=%S -alltypes %s -- | %clang -c -fcheckedc-extension -x c -o %t1.unused -
 //

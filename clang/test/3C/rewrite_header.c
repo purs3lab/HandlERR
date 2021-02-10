@@ -1,3 +1,4 @@
+// RUN: rm -rf %t*
 // RUN: 3c -base-dir=%S -alltypes -addcr -output-dir=%t.checked %S/rewrite_header.c %S/rewrite_header.h --
 // RUN: FileCheck -match-full-lines -check-prefixes="CHECK" %t.checked/rewrite_header.c --input-file %t.checked/rewrite_header.c
 // RUN: FileCheck -match-full-lines -check-prefixes="CHECK" %t.checked/rewrite_header.h --input-file %t.checked/rewrite_header.h

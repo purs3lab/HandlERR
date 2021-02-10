@@ -1,3 +1,4 @@
+// RUN: rm -rf %t*
 // RUN: 3c -base-dir=%S -alltypes -addcr %s -- | FileCheck -match-full-lines -check-prefixes="CHECK_ALL","CHECK" %s
 // RUN: 3c -base-dir=%S --addcr --alltypes %s -- | %clang_cc1  -fcheckedc-extension -x c -
 // RUN: 3c -base-dir=%S -alltypes -output-dir=%t.checked %s

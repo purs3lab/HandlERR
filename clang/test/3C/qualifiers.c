@@ -1,3 +1,4 @@
+// RUN: rm -rf %t*
 // RUN: 3c -base-dir=%S -alltypes -output-dir=%t.checkedALL %s --
 // RUN: 3c -base-dir=%S -output-dir=%t.checkedNOALL %s --
 // RUN: %clang -c %t.checkedNOALL/qualifiers.c

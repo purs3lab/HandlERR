@@ -1,3 +1,4 @@
+//RUN: rm -rf %t*
 //RUN: 3c -base-dir=%S -output-dir=%t.checked %s %S/prototype_success2.c --
 //RUN: FileCheck -match-full-lines --input-file %t.checked/prototype_success1.c %s
 //RUN: %clang -c %t.checked/prototype_success1.c %t.checked/prototype_success2.c

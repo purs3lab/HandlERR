@@ -1,3 +1,4 @@
+// RUN: rm -rf %t*
 // RUN: 3c -base-dir=%S -alltypes %s -- | FileCheck -match-full-lines %s
 // RUN: 3c -base-dir=%S -alltypes %s -- | %clang -c -fcheckedc-extension -x c -o /dev/null -
 // RUN: 3c -base-dir=%S -alltypes %s -- | %clang_cc1  -fno-builtin -verify -fcheckedc-extension -x c -

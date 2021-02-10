@@ -2,6 +2,7 @@
 //
 // Tests for malloc and friends. 
 //
+// RUN: rm -rf %t*
 // RUN: 3c -base-dir=%S %s -- | FileCheck -match-full-lines %s
 // RUN: 3c -base-dir=%S %s -- | %clang_cc1  -fno-builtin -verify -fcheckedc-extension -x c -
 // RUN: 3c -base-dir=%S -output-dir=%t.checked %s --
