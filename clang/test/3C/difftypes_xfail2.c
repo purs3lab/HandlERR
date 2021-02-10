@@ -1,4 +1,4 @@
-//RUN: 3c -base-dir=%S -output-postfix=checked %s %S/difftypes_xfail1.c
+//RUN: 3c -base-dir=%S -output-dir=%t.checked %s %S/difftypes_xfail1.c --
 
 // XFAIL: *
 

@@ -1,5 +1,5 @@
-// RUN: 3c %s | FileCheck -match-full-lines %s
-// RUN: 3c %s | %clang -c -fcheckedc-extension -x c -o %t.unused -
+// RUN: 3c -base-dir=%S %s -- | FileCheck -match-full-lines %s
+// RUN: 3c -base-dir=%S %s -- | %clang -c -fcheckedc-extension -x c -o %t.unused -
 
 int foo1(int x, int *y);
 //CHECK: int foo1(int x, _Ptr<int> y);

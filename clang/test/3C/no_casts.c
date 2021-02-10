@@ -1,5 +1,5 @@
-// RUN: 3c %s | count 0
-// RUN: 3c %s | %clang -c -fcheckedc-extension -x c -o %t.unused -
+// RUN: 3c -base-dir=%S %s -- | diff %s -
+// RUN: 3c -base-dir=%S %s -- | %clang -c -fcheckedc-extension -x c -o %t.unused -
 
 void foo(char *a);
 void bar(int *a);
