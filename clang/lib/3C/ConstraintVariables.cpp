@@ -1730,7 +1730,7 @@ void PointerVariableConstraint::brainTransplant(ConstraintVariable *FromCV,
   assert(From != nullptr);
   CAtoms CFrom = From->getCvars();
   if(Vars.size() != CFrom.size()) {
-    ReasonFailed = "transplanting different pointer levels";
+    ReasonFailed = "transplanting between pointers with different depths";
     return;
   }
   if (From->hasBoundsKey()) {
@@ -1760,7 +1760,7 @@ void PointerVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
   CAtoms::iterator I = Vars.begin();
   CAtoms::iterator J = CFrom.begin();
   if (CFrom.size() != Vars.size()) {
-    ReasonFailed = "conflicting types ";
+    ReasonFailed = "transplanting between pointers with different depths";
     return;
   }
   while (I != Vars.end()) {
@@ -1828,7 +1828,7 @@ void FunctionVariableConstraint::brainTransplant(ConstraintVariable *FromCV,
   // Transplant returns.
   ReturnVar.brainTransplant(&From->ReturnVar, I, ReasonFailed);
   if (ReasonFailed != "") {
-    ReasonFailed += "for return value";
+    ReasonFailed += " for return value";
     return;
   }
 
@@ -1837,7 +1837,7 @@ void FunctionVariableConstraint::brainTransplant(ConstraintVariable *FromCV,
     for (unsigned J = 0; J < From->numParams(); J++) {
       ParamVars[J].brainTransplant(&From->ParamVars[J], I, ReasonFailed);
       if (ReasonFailed != "") {
-        ReasonFailed += "for parameter " + std::to_string(J);
+        ReasonFailed += " for parameter " + std::to_string(J);
         return;
       }
     }
@@ -1871,7 +1871,7 @@ void FunctionVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
   // Transplant returns.
   ReturnVar.mergeDeclaration(&From->ReturnVar, I, ReasonFailed);
   if (ReasonFailed != "") {
-    ReasonFailed += "for return value";
+    ReasonFailed += " for return value";
     return;
   }
 
@@ -1891,7 +1891,7 @@ void FunctionVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
     for (unsigned J = 0; J < From->numParams(); J++) {
       ParamVars[J].mergeDeclaration(&From->ParamVars[J], I, ReasonFailed);
       if (ReasonFailed != "") {
-        ReasonFailed += "for parameter " + std::to_string(J);
+        ReasonFailed += " for parameter " + std::to_string(J);
         return;
       }
     }
