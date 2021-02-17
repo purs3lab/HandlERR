@@ -574,8 +574,6 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
 
   // If this is an external function, there is no need to rewrite the
   // declaration. We cannot change the signature of external functions.
-  if (!Defnc->hasBody())
-    return true;
 
   // DidAnyParams tracks if we have made any changes to the parameters for this
   // declarations. If no changes are made, then there is no need to rewrite the
