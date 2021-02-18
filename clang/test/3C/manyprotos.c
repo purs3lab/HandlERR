@@ -1,12 +1,13 @@
-// RUN: 3c -alltypes %s | FileCheck -match-full-lines --check-prefixes="CHECK" %s
-// RUN: 3c -alltypes %s | %clang -c -fcheckedc-extension -x c -o %t1.unused -
+// RUN: rm -rf %t*
+// RUN: 3c -base-dir=%S -alltypes %s -- | FileCheck -match-full-lines --check-prefixes="CHECK" %s
+// RUN: 3c -base-dir=%S -alltypes %s -- | %clang -c -fcheckedc-extension -x c -o %t1.unused -
 
 int foo();
 //CHECK: int foo(_Array_ptr<int> x : count(y), int y);
 
 int bar(int *x, int c) { 
 //CHECK: int bar(_Array_ptr<int> x : count(c), int c) { 
-  return foo(x, 1) + 3;
+  return foo(x, c) + 3;
 }
 
 int foo(int *x, int y);

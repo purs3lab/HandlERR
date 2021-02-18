@@ -661,7 +661,7 @@ void ConstraintBuilderConsumer::HandleTranslationUnit(ASTContext &C) {
   TV.setProgramInfoTypeVars();
 
   if (Verbose)
-    outs() << "Done analyzing\n";
+    errs() << "Done analyzing\n";
 
   Info.exitCompilationUnit();
   return;
