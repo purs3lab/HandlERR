@@ -46,8 +46,3 @@ typedef struct {
   int x;
   float f;
 } A, *PA; // expected-warning {{Unable to rewrite a typedef with multiple names}}
-
-
-
-
-
