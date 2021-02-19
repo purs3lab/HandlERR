@@ -4,11 +4,8 @@
 
 // The desired behavior in this case is to fail, so other checks are omitted
 
-// Test body vs no body
+// 2 conflicting declarations in the same file.
 
-void foo(char **y) {
-  // this is the body
-}
+_Ptr<int> foo(int, char);
 
-void foo(char *x);
-
+int * foo(int, char *);

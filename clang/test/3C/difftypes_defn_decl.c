@@ -4,11 +4,11 @@
 
 // The desired behavior in this case is to fail, so other checks are omitted
 
-// Test no body vs body
-
-void foo(char *x);
+// Conflicting definition followed by declaration in the same file.
 
 void foo(char **y) {
   // this is the body
 }
+
+void foo(char *x);
 

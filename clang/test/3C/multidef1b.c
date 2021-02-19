@@ -4,8 +4,12 @@
 
 // The desired behavior in this case is to fail, so other checks are omitted
 
-int * foo(int x, _Ptr<char> y) { 
-    x = x + 4; 
+// Two different definitions of the same function signature, file 2 of 2. This
+// tests that 3C rejects duplicate definitions even if the signatures are the
+// same.
+
+_Ptr<int> foo(int x, _Ptr<char> y) { 
+    x = x + 5; 
     int *z = &x; 
     return z;
 }
