@@ -337,6 +337,18 @@ _3CInterface::_3CInterface(const struct _3COptions &CCopt,
   }
 
   CurrCompDB = CompDB;
+
+  GlobalProgramInfo.getPerfStats().startTotalTime();
+}
+
+_3CInterface::~_3CInterface() {
+  std::error_code Ec;
+  std::string AggregateStats = StatsOutputJson + ".aggregate.json";
+  llvm::raw_fd_ostream AggrJson(AggregateStats, Ec);
+  if (!AggrJson.has_error()) {
+    GlobalProgramInfo.print_aggregate_stats(FilePaths, AggrJson);
+    AggrJson.close();
+  }
 }
 
 bool _3CInterface::buildInitialConstraints() {
@@ -377,7 +389,11 @@ bool _3CInterface::solveConstraints() {
   if (DumpIntermediate)
     GlobalProgramInfo.dump();
 
+  auto &PStats = GlobalProgramInfo.getPerfStats();
+
+  PStats.startConstraintSolverTime();
   runSolver(GlobalProgramInfo, FilePaths);
+  PStats.endConstraintSolverTime();
 
   if (Verbose)
     errs() << "Constraints solved\n";
@@ -441,6 +457,12 @@ bool _3CInterface::solveConstraints() {
       GlobalProgramInfo.printStats(FilePaths, OutputJson, false, true);
       OutputJson.close();
     }
+    std::string AggregateStats = StatsOutputJson + ".aggregate.json";
+    llvm::raw_fd_ostream AggrJson(AggregateStats, Ec);
+    if (!AggrJson.has_error()) {
+      GlobalProgramInfo.print_aggregate_stats(FilePaths, AggrJson);
+      AggrJson.close();
+    }
 
     llvm::raw_fd_ostream WildPtrInfo(WildPtrInfoJson, Ec);
     if (!WildPtrInfo.has_error()) {
@@ -461,6 +483,7 @@ bool _3CInterface::solveConstraints() {
 
 bool _3CInterface::writeConvertedFileToDisk(const std::string &FilePath) {
   std::lock_guard<std::mutex> Lock(InterfaceMutex);
+  bool RetVal = false;
   if (std::find(SourceFiles.begin(), SourceFiles.end(), FilePath) !=
       SourceFiles.end()) {
     std::vector<std::string> SourceFiles;
@@ -473,14 +496,15 @@ bool _3CInterface::writeConvertedFileToDisk(const std::string &FilePath) {
         newFrontendActionFactoryA<RewriteAction<RewriteConsumer, ProgramInfo>>(
             GlobalProgramInfo, VerifyDiagnosticOutput);
 
-    if (RewriteTool) {
-      int ToolExitCode = Tool.run(RewriteTool.get());
-      if (ToolExitCode != 0)
-        return false;
-    }
-    return true;
+    GlobalProgramInfo.getPerfStats().endTotalTime();
+    GlobalProgramInfo.getPerfStats().startTotalTime();
+
+    if (RewriteTool)
+      RetVal = Tool.run(RewriteTool.get()) == 0;
   }
-  return false;
+  GlobalProgramInfo.getPerfStats().endTotalTime();
+  GlobalProgramInfo.getPerfStats().startTotalTime();
+  return RetVal;
 }
 
 bool _3CInterface::writeAllConvertedFilesToDisk() {
@@ -499,6 +523,8 @@ bool _3CInterface::writeAllConvertedFilesToDisk() {
   } else
     llvm_unreachable("No action");
 
+  GlobalProgramInfo.getPerfStats().endTotalTime();
+  GlobalProgramInfo.getPerfStats().startTotalTime();
   return true;
 }
 

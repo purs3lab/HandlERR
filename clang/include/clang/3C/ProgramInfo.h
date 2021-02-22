@@ -23,6 +23,55 @@
 #include "clang/Frontend/FrontendAction.h"
 #include "clang/Tooling/Tooling.h"
 
+class PerformanceStats {
+public:
+  double CompileTime;
+  double ConstraintBuilderTime;
+  double ConstraintSolverTime;
+  double ArrayBoundsInferenceTime;
+  double RewritingTime;
+  double TotalTime;
+
+  PerformanceStats() {
+    CompileTime = ConstraintBuilderTime = 0;
+    ConstraintSolverTime = ArrayBoundsInferenceTime = 0;
+    RewritingTime = TotalTime = 0;
+
+    CompileTimeSt = ConstraintBuilderTimeSt = 0;
+    ConstraintSolverTimeSt = ArrayBoundsInferenceTimeSt = 0;
+    RewritingTimeSt = TotalTimeSt = 0;
+  }
+
+  void startCompileTime();
+  void endCompileTime();
+
+  void startConstraintBuilderTime();
+  void endConstraintBuilderTime();
+
+  void startConstraintSolverTime();
+  void endConstraintSolverTime();
+
+  void startArrayBoundsInferenceTime();
+  void endArrayBoundsInferenceTime();
+
+  void startRewritingTime();
+  void endRewritingTime();
+
+  void startTotalTime();
+  void endTotalTime();
+
+  void printPerformanceStats(raw_ostream &O);
+
+private:
+  clock_t CompileTimeSt;
+  clock_t ConstraintBuilderTimeSt;
+  clock_t ConstraintSolverTimeSt;
+  clock_t ArrayBoundsInferenceTimeSt;
+  clock_t RewritingTimeSt;
+  clock_t TotalTimeSt;
+
+};
+
 class ProgramVariableAdder {
 public:
   virtual void addVariable(clang::DeclaratorDecl *D,
@@ -34,6 +83,8 @@ public:
 protected:
   virtual AVarBoundsInfo &getABoundsInfo() = 0;
 };
+
+typedef std::pair<CVarSet, BKeySet> CSetBkeyPair;
 
 class ProgramInfo : public ProgramVariableAdder {
 public:
@@ -57,6 +108,9 @@ public:
   void printStats(const std::set<std::string> &F, llvm::raw_ostream &O,
                   bool OnlySummary = false, bool JsonFormat = false);
 
+  void print_aggregate_stats(const std::set<std::string> &F,
+                             llvm::raw_ostream &O);
+
   // Populate Variables, VarDeclToStatement, RVariables, and DepthMap with
   // AST data structures that correspond do the data stored in PDMap and
   // ReversePDMap.
@@ -68,7 +122,13 @@ public:
   void exitCompilationUnit();
 
   bool hasPersistentConstraints(clang::Expr *E, ASTContext *C) const;
-  const CVarSet &getPersistentConstraints(clang::Expr *E, ASTContext *C) const;
+  const CSetBkeyPair &getPersistentConstraints(clang::Expr *E, ASTContext *C) const;
+  void storePersistentConstraints(clang::Expr *E, const CSetBkeyPair &Vars,
+                                  ASTContext *C);
+  // Get only constraint vars from the persistent contents of the
+  // expression E.
+  const CVarSet &getPersistentConstraintsSet(clang::Expr *E, ASTContext *C) const;
+  // Store CVarSet with an empty set of BoundsKey into persistent contents.
   void storePersistentConstraints(clang::Expr *E, const CVarSet &Vars,
                                   ASTContext *C);
 
@@ -90,7 +150,11 @@ public:
   Constraints &getConstraints() { return CS; }
   AVarBoundsInfo &getABoundsInfo() { return ArrBInfo; }
 
-  ConstraintsInfo &getInterimConstraintState() { return CState; }
+  PerformanceStats &getPerfStats() { return PerfS; }
+
+  ConstraintsInfo &getInterimConstraintState() {
+    return CState;
+  }
   bool computeInterimConstraintState(const std::set<std::string> &FilePaths);
 
   const ExternalFunctionMapType &getExternFuncDefFVMap() const {
@@ -136,13 +200,16 @@ private:
 
   // Map with the same purpose as the Variables map, this stores constraint
   // variables for non-declaration expressions.
-  std::map<PersistentSourceLoc, CVarSet> ExprConstraintVars;
+  std::map<PersistentSourceLoc, CSetBkeyPair> ExprConstraintVars;
+
+  //Performance stats
+  PerformanceStats PerfS;
 
   // Implicit casts do not physically exist in the source code, so their source
   // location can collide with the source location of another expression. Since
   // we need to look up constraint variables for implicit casts for the cast
   // placement, the variables are stored in this separate map.
-  std::map<PersistentSourceLoc, CVarSet> ImplicitCastConstraintVars;
+  std::map<PersistentSourceLoc, CSetBkeyPair> ImplicitCastConstraintVars;
 
   // Constraint system.
   Constraints CS;

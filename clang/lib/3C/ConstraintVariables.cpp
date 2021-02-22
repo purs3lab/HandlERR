@@ -1498,7 +1498,9 @@ static void createAtomGeq(Constraints &CS, Atom *L, Atom *R, std::string &Rsn,
         // Note: reversal.
         CS.addConstraint(CS.createGeq(R, L, Rsn, PSL, true));
       } else {
+        // Add edges both ways.
         CS.addConstraint(CS.createGeq(L, R, Rsn, PSL, true));
+        CS.addConstraint(CS.createGeq(R, L, Rsn, PSL, true));
       }
       CS.addConstraint(CS.createGeq(L, R, Rsn, PSL, false));
       if (DoEqType) {
@@ -1820,13 +1822,19 @@ void FunctionVariableConstraint::brainTransplant(ConstraintVariable *FromCV,
     auto &CS = I.getConstraints();
     const std::vector<ParamDeferment> &Defers = From->getDeferredParams();
     assert(getDeferredParams().size() == 0);
-    for (auto Deferred : Defers) {
+    for (auto Deferred : Defers ) {
       assert(numParams() == Deferred.PS.size());
-      for (unsigned J = 0; J < Deferred.PS.size(); J++) {
+      for(unsigned J = 0; J < Deferred.PS.size(); J++) {
         ConstraintVariable *ParamDC = getExternalParam(J);
-        CVarSet ArgDC = Deferred.PS[J];
+        CVarSet ArgDC = Deferred.PS[J].first;
         constrainConsVarGeq(ParamDC, ArgDC, CS, &(Deferred.PL), Wild_to_Safe,
-                            false, &I);
+                            false, &I, false);
+        auto &CSBI = I.getABoundsInfo().getCtxSensBoundsHandler();
+        CSBI.handleContextSensitiveAssignment(Deferred.PL, nullptr, ParamDC,
+                                              nullptr,
+                                              Deferred.PS[J].first,
+                                              Deferred.PS[J].second,
+                                              nullptr, nullptr);
       }
     }
   } else {
@@ -1873,8 +1881,9 @@ void FunctionVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
   }
 }
 
-void FunctionVariableConstraint::addDeferredParams(PersistentSourceLoc PL,
-                                                   std::vector<CVarSet> Ps) {
+void FunctionVariableConstraint::addDeferredParams(
+       PersistentSourceLoc PL,
+       std::vector<std::pair<CVarSet, BKeySet>> Ps) {
   ParamDeferment P = {PL, Ps};
   DeferredParams.push_back(P);
 }

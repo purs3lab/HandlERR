@@ -82,7 +82,7 @@ bool TypeVarVisitor::VisitCastExpr(CastExpr *CE) {
         if (TyIdx >= 0) {
           clang::QualType Ty = CE->getType();
           std::set<ConstraintVariable *> CVs =
-              CR.getExprConstraintVars(SubExpr);
+              CR.getExprConstraintVarsSet(SubExpr);
           insertBinding(Call, TyIdx, Ty, CVs);
         }
       }
@@ -106,7 +106,7 @@ bool TypeVarVisitor::VisitCallExpr(CallExpr *CE) {
         const int TyIdx = FVCon->getExternalParam(I)->getGenericIndex();
         if (TyIdx >= 0) {
           Expr *Uncast = A->IgnoreImpCasts();
-          std::set<ConstraintVariable *> CVs = CR.getExprConstraintVars(Uncast);
+          std::set<ConstraintVariable *> CVs = CR.getExprConstraintVarsSet(Uncast);
           insertBinding(CE, TyIdx, Uncast->getType(), CVs);
         }
         ++I;

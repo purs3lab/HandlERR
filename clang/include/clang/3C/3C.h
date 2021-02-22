@@ -102,6 +102,8 @@ public:
       const std::vector<std::string> &SourceFileList,
       clang::tooling::CompilationDatabase *CompDB);
 
+  virtual ~_3CInterface();
+
   // Constraint Building.
 
   // Build initial constraints.

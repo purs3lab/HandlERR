@@ -112,6 +112,7 @@ void ConstraintsInfo::printConstraintStats(llvm::raw_ostream &O,
   O << "\"Name\":\"" << CS.getVar(Cause)->getStr() << "\", ";
   WildPointerInferenceInfo PtrInfo = RootWildAtomsWithReason.at(Cause);
   O << "\"Reason\":\"" << PtrInfo.getWildPtrReason() << "\", ";
+  O << "\"InSrc\":" << (InSrcWildAtoms.find(Cause) != InSrcWildAtoms.end()) << ", ";
   O << "\"Location\":";
   const PersistentSourceLoc &PSL = PtrInfo.getLocation();
   if (PSL.valid()) {

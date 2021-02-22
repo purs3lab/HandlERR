@@ -294,7 +294,7 @@ private:
   void rewriteType(Expr *E, SourceRange &Range) {
     if (!Info.hasPersistentConstraints(E, Context))
       return;
-    const CVarSet &CVSingleton = Info.getPersistentConstraints(E, Context);
+    const CVarSet &CVSingleton = Info.getPersistentConstraintsSet(E, Context);
     if (CVSingleton.empty())
       return;
 
@@ -482,6 +482,8 @@ void RewriteConsumer::emitRootCauseDiagnostics(ASTContext &Context) {
 void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   Info.enterCompilationUnit(Context);
 
+  Info.getPerfStats().startRewritingTime();
+
   if (WarnRootCause)
     emitRootCauseDiagnostics(Context);
 
@@ -520,6 +522,8 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
 
   // Output files.
   emit(R, Context);
+
+  Info.getPerfStats().endRewritingTime();
 
   Info.exitCompilationUnit();
   return;
