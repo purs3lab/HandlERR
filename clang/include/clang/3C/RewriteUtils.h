@@ -96,20 +96,58 @@ public:
 
   SourceRange getSourceRange(SourceManager &SM) const override {
     TypeSourceInfo *TSInfo = Decl->getTypeSourceInfo();
-    FunctionTypeLoc TypeLoc;
+    FunctionTypeLoc FTypeLoc = FunctionTypeLoc();
+
+    SourceLocation AttrBeginLoc = SourceLocation();
+    SourceLocation AttrEndLoc = SourceLocation();
     if (TSInfo) {
       auto TSInfoLoc = TSInfo->getTypeLoc();
-      TypeLoc = getBaseTypeLoc(TSInfoLoc).getAs<clang::FunctionTypeLoc>();
+      TypeLoc TLoc = getBaseTypeLoc(TSInfoLoc);
+      AttributedTypeLoc ATypeLoc = TLoc.getAs<AttributedTypeLoc>();
+      if (!ATypeLoc.isNull()) {
+        TLoc = ATypeLoc.getNextTypeLoc();
+        AttrBeginLoc = ATypeLoc.getSourceRange().getBegin();;
+        AttrEndLoc = ATypeLoc.getSourceRange().getEnd();
+      }
+      if (Decl->hasAttrs()) {
+        for (auto *A : Decl->getAttrs())  {
+          SourceLocation NewAttrBegin = A->getRange().getBegin();
+          if (AttrBeginLoc.isInvalid() ||
+              SM.isBeforeInTranslationUnit(NewAttrBegin, AttrBeginLoc))
+            AttrBeginLoc = NewAttrBegin;
+
+          SourceLocation NewAttrEnd = A->getRange().getEnd();
+          if (AttrEndLoc.isInvalid() ||
+              SM.isBeforeInTranslationUnit(AttrEndLoc, NewAttrEnd))
+            AttrEndLoc = NewAttrEnd;
+        }
+      }
+      if (AttrEndLoc.isValid()) {
+        auto T = Lexer::findNextToken(AttrEndLoc, SM, Decl->getLangOpts());
+        AttrEndLoc = T->getEndLoc();
+      }
+      FTypeLoc = TLoc.getAs<clang::FunctionTypeLoc>();
     }
-    if (!TSInfo || TypeLoc.isNull())
-      return SourceRange(Decl->getBeginLoc(), getFunctionDeclRParen(Decl, SM));
+    if (FTypeLoc.isNull()) {
+      // When we can't get a FunctionTypeLoc, we have no way to rewrite in
+      // specifically parameter or return source ranges. We can still rewrite
+      // if we're replacing both the parameter and the return. For this we just
+      // need to get the source range for the entire function. If we are
+      // replacing only one of the parameter and return, then this case would
+      // rewriting like this would cause us to clobber the one we aren't
+      // rewriting.
+      assert("SourceRange will overwrite function return type or argument." &&
+             RewriteReturn && RewriteParams);
+      return SourceRange(Decl->getBeginLoc(),
+                         getFunctionDeclRParen(Decl, SM));
+    }
 
     // Function pointer are funky, and require special handling to rewrite the
     // return type.
     if (Decl->getReturnType()->isFunctionPointerType()) {
       if (RewriteParams && RewriteReturn) {
         auto T =
-            getBaseTypeLoc(TypeLoc.getReturnLoc()).getAs<FunctionTypeLoc>();
+            getBaseTypeLoc(FTypeLoc.getReturnLoc()).getAs<FunctionTypeLoc>();
         if (!T.isNull())
           return SourceRange(Decl->getBeginLoc(), T.getRParenLoc());
       }
@@ -119,7 +157,7 @@ public:
     // If rewriting the return, then the range starts at the begining of the
     // decl. Otherwise, skip to the left parenthesis of parameters.
     SourceLocation Begin =
-        RewriteReturn ? Decl->getBeginLoc() : TypeLoc.getLParenLoc();
+      RewriteReturn ? Decl->getBeginLoc() : FTypeLoc.getLParenLoc();
 
     // If rewriting Parameters, stop at the right parenthesis of the parameters.
     // Otherwise, stop after the return type.
@@ -127,7 +165,7 @@ public:
     if (RewriteParams) {
       // When there are no bounds or itypes on a function, the declaration ends
       // at the right paren of the declaration parameter list.
-      End = TypeLoc.getRParenLoc();
+      End = FTypeLoc.getRParenLoc();
 
       // If there's a bounds expression, this comes after the right paren of the
       // function declaration parameter list.
@@ -155,6 +193,14 @@ public:
     } else {
       End = Decl->getReturnTypeSourceRange().getEnd();
     }
+
+    if (RewriteParams && AttrEndLoc.isValid() &&
+        SM.isBeforeInTranslationUnit(End, AttrEndLoc))
+      End = AttrEndLoc;
+
+    if (RewriteReturn && AttrBeginLoc.isValid() &&
+        SM.isBeforeInTranslationUnit(AttrBeginLoc, Begin))
+      Begin = AttrBeginLoc;
 
     assert("Invalid FunctionDeclReplacement SourceRange!" && Begin.isValid() &&
            End.isValid());

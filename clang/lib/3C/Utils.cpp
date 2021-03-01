@@ -13,6 +13,7 @@
 #include "clang/3C/ConstraintVariables.h"
 #include "llvm/Support/Path.h"
 #include <errno.h>
+#include <sstream>
 
 using namespace llvm;
 using namespace clang;
@@ -143,6 +144,25 @@ std::string getStorageQualifierString(Decl *D) {
     return storageClassToString(VD->getStorageClass());
   }
   return "";
+}
+
+std::string attributeToString(const Attr *A, ASTContext &C) {
+  return "__attribute__((" + getSourceText(A->getRange(), C) + ")) ";
+}
+
+std::string getAttributeString(Decl *D) {
+  std::ostringstream AttrStr;
+  if (D->hasAttrs())
+    for (auto *A : D->getAttrs())
+      AttrStr << attributeToString(A, D->getASTContext());
+  if (auto *FD = dyn_cast<DeclaratorDecl>(D)) {
+    if (auto *TSInfo = FD->getTypeSourceInfo()) {
+      auto ATLoc = TSInfo->getTypeLoc().getAs<AttributedTypeLoc>();
+      if (!ATLoc.isNull())
+        AttrStr << attributeToString(ATLoc.getAttr(), D->getASTContext());
+    }
+  }
+  return AttrStr.str();
 }
 
 bool isNULLExpression(clang::Expr *E, ASTContext &C) {

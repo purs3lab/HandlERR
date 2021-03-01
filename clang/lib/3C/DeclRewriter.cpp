@@ -118,9 +118,10 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
         if (VDLToStmtMap.find(D) != VDLToStmtMap.end())
           DS = VDLToStmtMap[D];
 
-        std::string NewTy = getStorageQualifierString(D) +
-                            PV->mkString(Info.getConstraints().getVariables()) +
-                            ABRewriter.getBoundsString(PV, D);
+        std::string NewTy =
+          getAttributeString(D) + getStorageQualifierString(D) +
+          PV->mkString(Info.getConstraints().getVariables()) +
+          ABRewriter.getBoundsString(PV, D);
         if (auto *VD = dyn_cast<VarDecl>(D))
           RewriteThese.insert(new VarDeclReplacement(VD, DS, NewTy));
         else if (auto *FD = dyn_cast<FieldDecl>(D))
@@ -563,7 +564,8 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
     std::string Type, IType;
     this->buildDeclVar(IntCV, ExtCV, PVDecl, Type, IType, RewriteParams,
                        RewriteReturn);
-    ParmStrs.push_back(Type + IType);
+    std::string AttrStr = getAttributeString(PVDecl);
+    ParmStrs.push_back(AttrStr + Type + IType);
   }
 
   if (Defnc->numParams() == 0) {
@@ -597,6 +599,13 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   //        corresponding definition.
   //        https://github.com/correctcomputation/checkedc-clang/issues/437
   if ((RewriteReturn || RewriteParams) && hasDeclWithTypedef(FD)) {
+    RewriteParams = true;
+    RewriteReturn = true;
+  }
+
+  std::string AttrStr = getAttributeString(FD);
+  if ((RewriteReturn || RewriteParams) && !AttrStr.empty()) {
+    ReturnVar = AttrStr + ReturnVar;
     RewriteParams = true;
     RewriteReturn = true;
   }

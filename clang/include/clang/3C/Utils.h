@@ -104,6 +104,8 @@ bool hasFunctionBody(clang::Decl *D);
 
 std::string getStorageQualifierString(clang::Decl *D);
 
+std::string getAttributeString(clang::Decl *D);
+
 // Use this version for user input that has not yet been validated.
 std::error_code tryGetCanonicalFilePath(const std::string &FileName,
                                         std::string &AbsoluteFp);
