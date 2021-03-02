@@ -146,22 +146,29 @@ std::string getStorageQualifierString(Decl *D) {
   return "";
 }
 
+void forEachAttribute(Decl *D, llvm::function_ref<void(const Attr *A)> F) {
+  std::ostringstream AttrStr;
+  if (D->hasAttrs())
+    for (auto *A : D->getAttrs())
+      F(A);
+  if (auto *FD = dyn_cast<DeclaratorDecl>(D)) {
+    if (auto *TSInfo = FD->getTypeSourceInfo()) {
+      auto ATLoc = TSInfo->getTypeLoc().getAs<AttributedTypeLoc>();
+      if (!ATLoc.isNull())
+        F(ATLoc.getAttr());
+    }
+  }
+}
+
 std::string attributeToString(const Attr *A, ASTContext &C) {
   return "__attribute__((" + getSourceText(A->getRange(), C) + ")) ";
 }
 
 std::string getAttributeString(Decl *D) {
   std::ostringstream AttrStr;
-  if (D->hasAttrs())
-    for (auto *A : D->getAttrs())
-      AttrStr << attributeToString(A, D->getASTContext());
-  if (auto *FD = dyn_cast<DeclaratorDecl>(D)) {
-    if (auto *TSInfo = FD->getTypeSourceInfo()) {
-      auto ATLoc = TSInfo->getTypeLoc().getAs<AttributedTypeLoc>();
-      if (!ATLoc.isNull())
-        AttrStr << attributeToString(ATLoc.getAttr(), D->getASTContext());
-    }
-  }
+  forEachAttribute(D, [&AttrStr, D](const clang::Attr *A) {
+    AttrStr << attributeToString(A, D->getASTContext());
+  });
   return AttrStr.str();
 }
 
@@ -490,4 +497,18 @@ Expr *ignoreCheckedCImplicit(Expr *E) {
     New = Old->IgnoreExprTmp()->IgnoreImplicit();
   }
   return New;
+}
+
+FunctionTypeLoc getFunctionTypeLoc(TypeLoc TLoc) {
+  TLoc = getBaseTypeLoc(TLoc);
+  auto ATLoc = TLoc.getAs<AttributedTypeLoc>();
+  if (!ATLoc.isNull())
+    TLoc = ATLoc.getNextTypeLoc();
+  return TLoc.getAs<FunctionTypeLoc>();
+}
+
+FunctionTypeLoc getFunctionTypeLoc(DeclaratorDecl *Decl) {
+  if (auto *TSInfo = Decl->getTypeSourceInfo())
+    return getFunctionTypeLoc(TSInfo->getTypeLoc());
+  return FunctionTypeLoc();
 }

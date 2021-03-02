@@ -104,6 +104,9 @@ bool hasFunctionBody(clang::Decl *D);
 
 std::string getStorageQualifierString(clang::Decl *D);
 
+void forEachAttribute(clang::Decl *D,
+                      llvm::function_ref<void(const clang::Attr *A)> F);
+
 std::string getAttributeString(clang::Decl *D);
 
 // Use this version for user input that has not yet been validated.
@@ -207,4 +210,11 @@ clang::TypeLoc getBaseTypeLoc(clang::TypeLoc T);
 // Ignore all CheckedC temporary and clang implicit expression on E. This
 // combines the behavior of IgnoreExprTmp and IgnoreImplicit.
 clang::Expr *ignoreCheckedCImplicit(clang::Expr *E);
+
+// Get a FunctionTypeLoc object from the declaration/type location. This is a
+// little complicated due to various clang wrapper types that come from
+// parenthesised types and function attributes.
+clang::FunctionTypeLoc getFunctionTypeLoc(clang::TypeLoc TLoc);
+clang::FunctionTypeLoc getFunctionTypeLoc(clang::DeclaratorDecl *Decl);
+
 #endif
