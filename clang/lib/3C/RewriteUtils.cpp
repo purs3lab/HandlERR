@@ -468,7 +468,7 @@ SourceRange FunctionDeclReplacement::getSourceRange(SourceManager &SM) const {
   SourceLocation Begin = RewriteReturn ? getDeclBegin(SM) : getParamBegin(SM);
   SourceLocation End = RewriteParams ? getDeclEnd(SM) : getReturnEnd(SM);
   assert("Invalid FunctionDeclReplacement SourceRange!" && Begin.isValid() &&
-         End.isValid() && SM.isBeforeInTranslationUnit(Begin, End));
+         End.isValid());
   return SourceRange(Begin, End);
 }
 
