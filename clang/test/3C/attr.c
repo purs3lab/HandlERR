@@ -74,3 +74,14 @@ void j() {
 //CHECK: int g __attribute__((nodebug));
 //CHECK: __attribute__((nodebug)) _Ptr<int> h = ((void *)0);
 }
+
+#define FOO __attribute__((ms_abi))
+int *foo()  FOO ;
+int *foo() { return 0; }
+//CHECK: __attribute__((ms_abi)) _Ptr<int> foo(void) ;
+//CHECK: __attribute__((ms_abi)) _Ptr<int> foo(void) _Checked { return 0; }
+
+__attribute__((deprecated)) int *bar();
+int *bar() { return 0; }
+//CHECK: __attribute__((deprecated)) _Ptr<int> bar(void);
+//CHECK: __attribute__((deprecated)) _Ptr<int> bar(void) _Checked { return 0; }

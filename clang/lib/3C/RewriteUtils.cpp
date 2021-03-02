@@ -473,14 +473,7 @@ SourceRange FunctionDeclReplacement::getSourceRange(SourceManager &SM) const {
 }
 
 SourceLocation FunctionDeclReplacement::getDeclBegin(SourceManager &SM) const {
-  SourceLocation Begin = Decl->getBeginLoc();
-  forEachAttribute(Decl, [&Begin, &SM](const clang::Attr *A) {
-    SourceLocation NewAttrBegin = A->getRange().getBegin();
-    if (NewAttrBegin.isValid() &&
-        SM.isBeforeInTranslationUnit(NewAttrBegin, Begin))
-      Begin = NewAttrBegin;
-  });
-  return Begin;
+  return Decl->getBeginLoc();
 }
 
 SourceLocation FunctionDeclReplacement::getParamBegin(SourceManager &SM) const {
@@ -543,8 +536,15 @@ SourceLocation FunctionDeclReplacement::getDeclEnd(SourceManager &SM) const {
   // Functions attributes can appear after the the closing paren for the
   // parameter list.
   forEachAttribute(Decl, [&End, &SM, this](const clang::Attr *A) {
-    auto NewEnd = Lexer::findNextToken(A->getRange().getEnd(), SM,
-                                       Decl->getLangOpts())->getEndLoc();
+    SourceLocation AttrEnd = A->getRange().getEnd();
+
+    llvm::Optional<Token> NextTok = Lexer::findNextToken(AttrEnd, SM,
+                                                         Decl->getLangOpts());
+
+    SourceLocation NewEnd = NextTok.hasValue() ? NextTok->getEndLoc()
+                                               : A->getRange().getEnd();
+    NewEnd = SM.getExpansionLoc(NewEnd);
+
     if (!End.isValid() ||
         (NewEnd.isValid() && SM.isBeforeInTranslationUnit(End, NewEnd)))
       End = NewEnd;

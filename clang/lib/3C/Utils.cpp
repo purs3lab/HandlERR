@@ -146,14 +146,14 @@ std::string getStorageQualifierString(Decl *D) {
   return "";
 }
 
-void forEachAttribute(Decl *D, llvm::function_ref<void(const Attr *A)> F) {
+void forEachAttribute(Decl *D, llvm::function_ref<void(const Attr *)> F) {
   std::ostringstream AttrStr;
   if (D->hasAttrs())
     for (auto *A : D->getAttrs())
       F(A);
   if (auto *FD = dyn_cast<DeclaratorDecl>(D)) {
     if (auto *TSInfo = FD->getTypeSourceInfo()) {
-      auto ATLoc = TSInfo->getTypeLoc().getAs<AttributedTypeLoc>();
+      auto ATLoc = getBaseTypeLoc(TSInfo->getTypeLoc()).getAs<AttributedTypeLoc>();
       if (!ATLoc.isNull())
         F(ATLoc.getAttr());
     }
@@ -161,7 +161,7 @@ void forEachAttribute(Decl *D, llvm::function_ref<void(const Attr *A)> F) {
 }
 
 std::string attributeToString(const Attr *A, ASTContext &C) {
-  return "__attribute__((" + getSourceText(A->getRange(), C) + ")) ";
+  return "__attribute__((" + A->getAttrName()->getName().str() + ")) ";
 }
 
 std::string getAttributeString(Decl *D) {
@@ -484,6 +484,7 @@ TypeLoc getBaseTypeLoc(TypeLoc T) {
   assert(!T.isNull() && "Can't get base location from Null.");
   while (!T.getNextTypeLoc().isNull() &&
          (!T.getAs<ParenTypeLoc>().isNull() ||
+          !T.getAs<MacroQualifiedTypeLoc>().isNull() ||
           T.getTypePtr()->isPointerType() || T.getTypePtr()->isArrayType()))
     T = T.getNextTypeLoc();
   return T;
