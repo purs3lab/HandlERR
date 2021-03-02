@@ -171,6 +171,9 @@ endif()
 
 if(CLANGD_INCLUDE_VARIANT_clangd3c)
 add_clangDaemon_target(3cClangDaemon EXTRA_LIBS clang3C)
+# Propagate the FIVE_C flag if applicable: see the explanation at the bottom of
+# clang/lib/3C/CMakeLists.txt.
+target_link_libraries(obj.3cClangDaemon clang3C)
 target_compile_definitions(obj.3cClangDaemon PRIVATE INTERACTIVE3C=1)
 endif()
 
