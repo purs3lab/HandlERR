@@ -85,3 +85,10 @@ __attribute__((deprecated)) int *bar();
 int *bar() { return 0; }
 //CHECK: __attribute__((deprecated)) _Ptr<int> bar(void);
 //CHECK: __attribute__((deprecated)) _Ptr<int> bar(void) _Checked { return 0; }
+
+// Because toupper is a standard libary function, it has attributes in the AST
+// even though there are none in the source. This was causing issues when
+// trying to get the name of the attribute.
+
+int toupper(int c) { return 0; }
+//CHECK: int toupper(int c) _Checked { return 0; }
