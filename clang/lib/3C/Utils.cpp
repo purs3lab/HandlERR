@@ -153,25 +153,30 @@ void forEachAttribute(Decl *D, llvm::function_ref<void(const Attr *)> F) {
       F(A);
   if (auto *FD = dyn_cast<DeclaratorDecl>(D)) {
     if (auto *TSInfo = FD->getTypeSourceInfo()) {
-      auto ATLoc = getBaseTypeLoc(TSInfo->getTypeLoc()).getAs<AttributedTypeLoc>();
+      auto ATLoc = getBaseTypeLoc(
+        TSInfo->getTypeLoc()).getAs<AttributedTypeLoc>();
       if (!ATLoc.isNull())
         F(ATLoc.getAttr());
     }
   }
 }
 
-std::string attributeToString(const Attr *A, ASTContext &C) {
-  if (A->getAttrName() && !A->getAttrName()->getName().empty())
-    return "__attribute__((" + A->getAttrName()->getName().str() + ")) ";
-  return "";
-}
-
 std::string getAttributeString(Decl *D) {
-  std::ostringstream AttrStr;
-  forEachAttribute(D, [&AttrStr, D](const clang::Attr *A) {
-    AttrStr << attributeToString(A, D->getASTContext());
+  std::string AttrStr;
+  llvm::raw_string_ostream AttrStream(AttrStr);
+  forEachAttribute(D, [&AttrStream, D](const clang::Attr *A) {
+    A->printPretty(AttrStream, PrintingPolicy(D->getLangOpts()));
   });
-  return AttrStr.str();
+  AttrStream.flush();
+
+  // Attr::printPretty puts a space before each attribute resulting in a space
+  // appearing before any attributes, and no space following the attributes.
+  // I need this to be the other way around.
+  if (!AttrStr.empty()) {
+    assert(AttrStr[0] == ' ');
+    return AttrStr.substr(1) + ' ';
+  }
+  return AttrStr;
 }
 
 bool isNULLExpression(clang::Expr *E, ASTContext &C) {
