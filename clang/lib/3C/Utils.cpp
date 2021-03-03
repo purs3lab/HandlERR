@@ -161,7 +161,9 @@ void forEachAttribute(Decl *D, llvm::function_ref<void(const Attr *)> F) {
 }
 
 std::string attributeToString(const Attr *A, ASTContext &C) {
-  return "__attribute__((" + A->getAttrName()->getName().str() + ")) ";
+  if (A->getAttrName() && !A->getAttrName()->getName().empty())
+    return "__attribute__((" + A->getAttrName()->getName().str() + ")) ";
+  return "";
 }
 
 std::string getAttributeString(Decl *D) {
