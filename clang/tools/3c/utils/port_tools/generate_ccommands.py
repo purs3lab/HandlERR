@@ -1,4 +1,4 @@
-"""
+ """
 
 """
 import re
@@ -19,7 +19,7 @@ VSCODE_SETTINGS_JSON = os.path.realpath("settings.json")
 
 # to separate multiple commands in a line
 CMD_SEP = " &"
-DEFAULT_ARGS = ["-alltypes", "-dump-stats", "-output-postfix=checked", "-dump-intermediate"]
+DEFAULT_ARGS = ["-addcr", "-alltypes", "-output-postfix=checked"]
 if os.name == "nt":
     DEFAULT_ARGS.append("-extra-arg-before=--driver-mode=cl")
     CMD_SEP = " ;"
