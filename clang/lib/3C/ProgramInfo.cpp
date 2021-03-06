@@ -66,9 +66,12 @@ void PerformanceStats::endTotalTime() {
 }
 
 void PerformanceStats::printPerformanceStats(raw_ostream &O) {
-  O << TotalTime << "," << ConstraintBuilderTime << ",";
-  O << ConstraintSolverTime << "," << ArrayBoundsInferenceTime;
-  O << "," << RewritingTime << "\n";
+  O << "{\"TotalTime\":" << TotalTime;
+  O << ", \"ConstraintBuilderTime\":" << ConstraintBuilderTime;
+  O << ", \"ConstraintSolverTime\":" << ConstraintSolverTime;
+  O << ", \"ArrayBoundsInferenceTime\":" << ArrayBoundsInferenceTime;
+  O << ", \"RewritingTime\":" << RewritingTime;
+  O << "}";
 }
 
 ProgramInfo::ProgramInfo() : Persisted(true) {
@@ -328,6 +331,9 @@ void ProgramInfo::printStats(const std::set<std::string> &F, raw_ostream &O,
   }
 
   if (JsonFormat) {
+    O << ",";
+    O << "\"TimingStats\":";
+    PerfS.printPerformanceStats(O);
     O << "}}";
   }
 }

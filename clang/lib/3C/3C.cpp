@@ -343,6 +343,8 @@ _3CInterface::_3CInterface(const struct _3COptions &CCopt,
   }
 
   CurrCompDB = CompDB;
+  
+  GlobalProgramInfo.getPerfStats().startTotalTime();
 }
 
 bool _3CInterface::addVariables() {
