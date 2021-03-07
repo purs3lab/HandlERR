@@ -1505,7 +1505,9 @@ static void createAtomGeq(Constraints &CS, Atom *L, Atom *R, std::string &Rsn,
         // Note: reversal.
         CS.addConstraint(CS.createGeq(R, L, Rsn, PSL, true));
       } else {
+        // Add edges both ways.
         CS.addConstraint(CS.createGeq(L, R, Rsn, PSL, true));
+        CS.addConstraint(CS.createGeq(R, L, Rsn, PSL, true));
       }
       CS.addConstraint(CS.createGeq(L, R, Rsn, PSL, false));
       if (DoEqType) {
@@ -1833,8 +1835,10 @@ void FunctionVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
   }
 }
 
-void FunctionVariableConstraint::addDeferredParams(PersistentSourceLoc PL,
-                                                   std::vector<CVarSet> Ps) {
+void 
+FunctionVariableConstraint::
+addDeferredParams(PersistentSourceLoc PL,
+                  std::vector<std::pair<CVarSet, BKeySet>> Ps) {
   ParamDeferment P = {PL, Ps};
   DeferredParams.push_back(P);
 }
