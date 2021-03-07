@@ -186,7 +186,7 @@ CVarSet ConstraintResolver::getInvalidCastPVCons(CastExpr *E) {
   return {P};
 }
 
-inline CSetBkeyPair convertToCSetBKeyPair(const CVarSet &Vars) {
+inline CSetBkeyPair pairWithEmptyBkey(const CVarSet &Vars) {
   BKeySet EmptyBSet;
   EmptyBSet.clear();
   return std::make_pair(Vars, EmptyBSet);
@@ -209,7 +209,7 @@ CSetBkeyPair
     if (TypE->isRecordType() || TypE->isArithmeticType()) {
       if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
         // If we have a DeclRef, the PVC can get a meaningful name
-        return convertToCSetBKeyPair(getBaseVarPVConstraint(DRE));
+        return pairWithEmptyBkey(getBaseVarPVConstraint(DRE));
       }
       // Fetch the context sensitive bounds key.
       return std::make_pair(pvConstraintFromType(TypE),
@@ -227,7 +227,7 @@ CSetBkeyPair
     if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
       CVarOption CV = Info.getVariable(DRE->getDecl(), Context);
       assert("Declaration without constraint variable?" && CV.hasValue());
-      return convertToCSetBKeyPair({&CV.getValue()});
+      return pairWithEmptyBkey({&CV.getValue()});
       // x.f
     }
     if (MemberExpr *ME = dyn_cast<MemberExpr>(E)) {
@@ -281,7 +281,7 @@ CSetBkeyPair
       if (!isNULLExpression(ECE, *Context) && TypE->isPointerType() &&
           !isCastSafe(TypE, TmpE->getType())) {
         CVarSet Vars = getExprConstraintVarsSet(TmpE);
-        Ret = convertToCSetBKeyPair(getInvalidCastPVCons(ECE));
+        Ret = pairWithEmptyBkey(getInvalidCastPVCons(ECE));
         constrainConsVarGeq(Vars, Ret.first, CS, nullptr, Safe_to_Wild, false,
                             &Info);
         // NB: Expression ECE itself handled in
@@ -291,7 +291,7 @@ CSetBkeyPair
         // PVConstraint introduced for explicit cast so they can be rewritten.
         // Pretty much the same idea as CompoundLiteralExpr.
         PVConstraint *P = getRewritablePVConstraint(ECE);
-        Ret = convertToCSetBKeyPair({P});
+        Ret = pairWithEmptyBkey({P});
         // ConstraintVars for TmpE when ECE is NULL will be WILD, so
         // constraining GEQ these vars would be the cast always be WILD.
         if (!isNULLExpression(ECE, *Context)) {
@@ -321,7 +321,7 @@ CSetBkeyPair
         else if (BO->getRHS()->getType()->isPointerType())
           Ret = getExprConstraintVars(BO->getRHS());
         else
-          Ret = convertToCSetBKeyPair(pvConstraintFromType(TypE));
+          Ret = pairWithEmptyBkey(pvConstraintFromType(TypE));
         break;
         // Pointer-to-member ops unsupported.
       case BO_PtrMemD:
@@ -355,7 +355,7 @@ CSetBkeyPair
       case BO_LOr:
       case BO_Shl:
       case BO_Shr:
-        Ret = convertToCSetBKeyPair(pvConstraintFromType(TypE));
+        Ret = pairWithEmptyBkey(pvConstraintFromType(TypE));
         break;
       }
       // x[e]
@@ -428,7 +428,7 @@ CSetBkeyPair
       case UO_Minus:
       case UO_LNot:
       case UO_Not:
-        Ret = convertToCSetBKeyPair(pvConstraintFromType(TypE));
+        Ret = pairWithEmptyBkey(pvConstraintFromType(TypE));
         break;
       case UO_Coawait:
       case UO_Real:
@@ -629,7 +629,7 @@ CSetBkeyPair
 
       T = {P};
 
-      Ret = convertToCSetBKeyPair(T);
+      Ret = pairWithEmptyBkey(T);
     } else if (StmtExpr *SE = dyn_cast<StmtExpr>(E)) {
       CVarSet T;
       // Retrieve the last "thing" returned by the block.
