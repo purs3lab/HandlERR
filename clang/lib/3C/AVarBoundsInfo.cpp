@@ -110,18 +110,6 @@ public:
     }
   }
 
-  void filterOutBKeys(std::set<BoundsKey> &Src) {
-    for (auto BK : Src) {
-      // If the variable non-pointer?
-      if (PtrAtoms.find(BK) == PtrAtoms.end()) {
-        auto *S = VM[BK];
-        // If the variable is constant or in the same scope?
-        if (S->isNumConstant() || (*(TS) == *(S->getScope()))) {
-          Res.insert(BK);
-        }
-      }
-    }
-  }
   const ProgramVarScope *TS;
   std::set<BoundsKey> &Res;
   std::map<BoundsKey, ProgramVar *> &VM;
@@ -481,15 +469,14 @@ bool AvarBoundsInference::inferBounds(BoundsKey K, AVarGraph &BKGraph, bool From
 }
 
 bool AVarBoundsInfo::isValidBoundVariable(clang::Decl *D) {
-  if (isa<ParmVarDecl>(D) || isa<FunctionDecl>(D)) {
-    // All parameters and return values are valid bound variables.
+  // All parameters, return, and field values are valid bound variables.
+  if (isa<ParmVarDecl>(D) || isa<FunctionDecl>(D) || isa<FieldDecl>(D))
     return true;
-  } else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
+ 
+  // For VarDecls, check if these are are not dummy and have a name.
+  if (auto *VD = dyn_cast<VarDecl>(D))
     return !VD->getNameAsString().empty();
-  } else if (FieldDecl *FD = dyn_cast<FieldDecl>(D)) {
-    //return !FD->getNameAsString().empty();
-    return true;
-  }
+
   return false;
 }
 
@@ -916,19 +903,19 @@ BoundsKey AVarBoundsInfo::getVarKey(PersistentSourceLoc &PSL) {
   return DeclVarMap.left().at(PSL);
 }
 
-BoundsKey AVarBoundsInfo::getConstKey(uint64_t value) {
-  if (ConstVarKeys.find(value) == ConstVarKeys.end()) {
+BoundsKey AVarBoundsInfo::getConstKey(uint64_t Value) {
+  if (ConstVarKeys.find(Value) == ConstVarKeys.end()) {
     BoundsKey NK = ++BCount;
-    std::string ConsString = std::to_string(value);
+    std::string ConsString = std::to_string(Value);
     ProgramVar *NPV =
       ProgramVar::createNewProgramVar(NK,
                                       ConsString,
                                       GlobalScope::getGlobalScope(),
                                       true);
     insertProgramVar(NK, NPV);
-    ConstVarKeys[value] = NK;
+    ConstVarKeys[Value] = NK;
   }
-  return ConstVarKeys[value];
+  return ConstVarKeys[Value];
 }
 
 BoundsKey AVarBoundsInfo::getVarKey(llvm::APSInt &API) {

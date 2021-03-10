@@ -494,6 +494,7 @@ public:
 
   bool VisitInitListExpr(InitListExpr *E) {
     if (E->getType()->isStructureType()) {
+      E = E->getSemanticForm();
       const RecordDecl *Definition =
           E->getType()->getAsStructureType()->getDecl()->getDefinition();
 

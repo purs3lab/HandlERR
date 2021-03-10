@@ -195,8 +195,7 @@ inline CSetBkeyPair pairWithEmptyBkey(const CVarSet &Vars) {
 // Returns a pair of set of ConstraintVariables and set of BoundsKey
 // after evaluating the expression E. Will explore E recursively, but will
 // ignore parts of it that do not contribute to the final result.
-CSetBkeyPair
-    ConstraintResolver::getExprConstraintVars(Expr *E) {
+CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
   CSetBkeyPair EmptyCSBKeySet;
   BKeySet EmptyBSet;
   auto &ABI = Info.getABoundsInfo();
