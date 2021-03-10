@@ -316,7 +316,7 @@ public:
   bool hasSomeSizedArr() const;
 
   bool isTypedef(void);
-  void setTypedef(TypedefNameDecl *TypedefType, std::string);
+  void setTypedef(TypedefNameDecl *T, std::string S);
 
   // Return true if this constraint had an itype in the original source code.
   bool srcHasItype() const override {
@@ -387,6 +387,8 @@ public:
     return S->getKind() == PointerVariable;
   }
 
+  std::string gatherQualStrings(void) const;
+
   std::string mkString(const EnvironmentMap &E, bool EmitName = true,
                        bool ForItype = false, bool EmitPointee = false,
                        bool UnmaskTypedef = false) const override;
@@ -428,11 +430,6 @@ public:
 typedef PointerVariableConstraint PVConstraint;
 // Name for function return, for debugging
 #define RETVAR "$ret"
-
-typedef struct {
-  PersistentSourceLoc PL;
-  std::vector<std::pair<CVarSet, BKeySet>> PS;
-} ParamDeferment;
 
 // This class contains a pair of PVConstraints that represent an internal and
 // external view of a variable for use as the parameter and return constraints
@@ -477,8 +474,6 @@ private:
   // K parameters accepted by the function.
   std::vector<FVComponentVariable> ParamVars;
 
-  // Storing of parameters in the case of untyped prototypes
-  std::vector<ParamDeferment> DeferredParams;
   // File name in which this declaration is found.
   std::string FileName;
   bool Hasproto;
@@ -512,13 +507,6 @@ public:
   PVConstraint *getInternalReturn() const {
     return ReturnVar.InternalConstraint;
   }
-
-  const std::vector<ParamDeferment> &getDeferredParams() const {
-    return DeferredParams;
-  }
-
-  void addDeferredParams(PersistentSourceLoc PL,
-                         std::vector<std::pair<CVarSet, BKeySet>> Ps);
 
   size_t numParams() const { return ParamVars.size(); }
 
