@@ -9,11 +9,11 @@ typedef long size_t;
 extern _Itype_for_any(T) void *malloc(size_t size) : itype(_Array_ptr<T>) byte_count(size);
 struct foo {
     int *x;
-    unsigned x_len;
+    unsigned olol;
     int *y;
     unsigned fail_y_len;
 };
-//CHECK:    _Array_ptr<int> x : count(x_len);
+//CHECK:    _Array_ptr<int> x : count(olol);
 //CHECK:    _Array_ptr<int> y;
 
 void ctx_(struct foo *f, struct foo *f2) {
@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
     struct foo po, po2;
     po.x = malloc(n*sizeof(int));
     po.x[0] = 0;
-    po.x_len = n;
+    po.olol = n;
     po2.fail_y_len = n;
     ctx_(&po, &po2);
     return 0;
