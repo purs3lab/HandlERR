@@ -354,10 +354,13 @@ bool _3CInterface::addVariables() {
   // first step, so load the ASTs
   ClangTool &Tool = getGlobalClangTool();
   Tool.buildASTs(ASTs);
+  // Enable Diagnostics
+  for (auto &TU :ASTs) {
+    TU->enableSourceFileDiagnostics();
+  }
 
   VariableAdderConsumer VA = VariableAdderConsumer(GlobalProgramInfo, nullptr);
   for (auto &TU : ASTs) {
-    TU->enableSourceFileDiagnostics();
     VA.HandleTranslationUnit(TU->getASTContext());
   }
 
@@ -383,7 +386,6 @@ bool _3CInterface::buildInitialConstraints() {
 
   ConstraintBuilderConsumer CB = ConstraintBuilderConsumer(GlobalProgramInfo, nullptr);
   for (auto &TU : ASTs) {
-    TU->enableSourceFileDiagnostics();
     CB.HandleTranslationUnit(TU->getASTContext());
   }
 
@@ -447,7 +449,6 @@ bool _3CInterface::solveConstraints() {
 
     AllocBasedBoundsInference ABBI = AllocBasedBoundsInference(GlobalProgramInfo, nullptr);
     for (auto &TU : ASTs) {
-      TU->enableSourceFileDiagnostics();
       ABBI.HandleTranslationUnit(TU->getASTContext());
     }
 
@@ -469,7 +470,6 @@ bool _3CInterface::solveConstraints() {
 
   IntermediateToolHook ITH = IntermediateToolHook(GlobalProgramInfo, nullptr);
   for (auto &TU : ASTs) {
-    TU->enableSourceFileDiagnostics();
     ITH.HandleTranslationUnit(TU->getASTContext());
   }
 
@@ -567,7 +567,6 @@ bool _3CInterface::writeAllConvertedFilesToDisk() {
 
   RewriteConsumer RC = RewriteConsumer(GlobalProgramInfo);
   for (auto &TU : ASTs) {
-    TU->enableSourceFileDiagnostics();
     RC.HandleTranslationUnit(TU->getASTContext());
   }
 
