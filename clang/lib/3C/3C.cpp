@@ -353,7 +353,7 @@ bool _3CInterface::addVariables() {
 
   // first step, so load the ASTs
   ClangTool &Tool = getGlobalClangTool();
-  Tool.buildASTs(ASTs);
+  if (Tool.buildASTs(ASTs)) return false;
   // Enable Diagnostics
   for (auto &TU :ASTs) {
     TU->enableSourceFileDiagnostics();
