@@ -67,16 +67,10 @@ PersistentSourceLoc PersistentSourceLoc::mkPSL(clang::SourceRange SR,
   if (TFSL.isValid()) {
     const FileEntry *Fe = SM.getFileEntryForID(TFSL.getFileID());
     std::string ToConv = Fn;
-    StringRef DidConv = Fn;
     std::string FeAbsS = "";
-    if (Fe != nullptr) {
+    if (Fe != nullptr)
       ToConv = std::string(Fe->getName());
-      DidConv = Fe->tryGetRealPathName();
-    }
-    if (DidConv.empty())
-      getCanonicalFilePath(ToConv, FeAbsS);
-    else
-      FeAbsS = DidConv.str();
+    getCanonicalFilePath(ToConv, FeAbsS);
     Fn = std::string(sys::path::remove_leading_dotslash(FeAbsS));
   }
   PersistentSourceLoc PSL(Fn, FESL.getExpansionLineNumber(),

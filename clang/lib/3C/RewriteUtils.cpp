@@ -229,9 +229,8 @@ static void emit(Rewriter &R, ASTContext &C) {
       };
 
       // Check whether we are allowed to write this file.
-      std::string FeAbsS = FE->tryGetRealPathName().str();
-      if (FeAbsS == "")
-        getCanonicalFilePath(std::string(FE->getName()), FeAbsS);
+      std::string FeAbsS = "";
+      getCanonicalFilePath(std::string(FE->getName()), FeAbsS);
       if (!canWrite(FeAbsS)) {
         DiagnosticsEngine &DE = C.getDiagnostics();
         unsigned ID =

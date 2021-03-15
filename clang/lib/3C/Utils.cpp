@@ -173,7 +173,17 @@ std::error_code tryGetCanonicalFilePath(const std::string &FileName,
 void getCanonicalFilePath(const std::string &FileName,
                           std::string &AbsoluteFp) {
   std::error_code EC = tryGetCanonicalFilePath(FileName, AbsoluteFp);
-  assert(!EC && "tryGetCanonicalFilePath failed");
+  if (EC) {
+    llvm::errs() << "getCanonicalFilePath(\"" << FileName << "\") failed: " << EC.message() << "\n";
+    SmallString<256> CP;
+    std::error_code CPEC = sys::fs::current_path(CP);
+    if (CPEC) {
+      llvm::errs() << "Failed to get working directory: " << CPEC.message() << "\n";
+    } else {
+      llvm::errs() << "Working directory: \"" << CP << "\"\n";
+    }
+    llvm_unreachable("tryGetCanonicalFilePath failed");
+  }
 }
 
 bool filePathStartsWith(const std::string &Path, const std::string &Prefix) {
