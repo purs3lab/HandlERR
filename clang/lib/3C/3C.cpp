@@ -360,9 +360,12 @@ bool _3CInterface::addVariables() {
   }
 
   VariableAdderConsumer VA = VariableAdderConsumer(GlobalProgramInfo, nullptr);
+  unsigned int Errs = 0;
   for (auto &TU : ASTs) {
     VA.HandleTranslationUnit(TU->getASTContext());
+    Errs += TU->getDiagnostics().getClient()->getNumErrors();
   }
+  if (Errs > 0) return false;
 
 //  // 1a. Add Variables.
 //  std::unique_ptr<ToolAction> AdderTool = newFrontendActionFactoryA<
@@ -385,9 +388,12 @@ bool _3CInterface::buildInitialConstraints() {
 //  ClangTool &Tool = getGlobalClangTool();
 
   ConstraintBuilderConsumer CB = ConstraintBuilderConsumer(GlobalProgramInfo, nullptr);
+  unsigned int Errs = 0;
   for (auto &TU : ASTs) {
     CB.HandleTranslationUnit(TU->getASTContext());
+    Errs += TU->getDiagnostics().getClient()->getNumErrors();
   }
+  if (Errs > 0) return false;
 
 //  // 1b. Gather constraints.
 //  std::unique_ptr<ToolAction> ConstraintTool = newFrontendActionFactoryA<
@@ -448,9 +454,12 @@ bool _3CInterface::solveConstraints() {
     GlobalProgramInfo.getABoundsInfo().performFlowAnalysis(&GlobalProgramInfo);
 
     AllocBasedBoundsInference ABBI = AllocBasedBoundsInference(GlobalProgramInfo, nullptr);
+    unsigned int Errs = 0;
     for (auto &TU : ASTs) {
       ABBI.HandleTranslationUnit(TU->getASTContext());
+      Errs += TU->getDiagnostics().getClient()->getNumErrors();
     }
+    if (Errs > 0) return false;
 
 
 //    // 3. Infer the bounds based on calls to malloc and calloc
@@ -469,9 +478,12 @@ bool _3CInterface::solveConstraints() {
   }
 
   IntermediateToolHook ITH = IntermediateToolHook(GlobalProgramInfo, nullptr);
+  unsigned int Errs = 0;
   for (auto &TU : ASTs) {
     ITH.HandleTranslationUnit(TU->getASTContext());
+    Errs += TU->getDiagnostics().getClient()->getNumErrors();
   }
+  if (Errs > 0) return false;
 
 //  // 4. Run intermediate tool hook to run visitors that need to be executed
 //  // after constraint solving but before rewriting.
@@ -566,9 +578,12 @@ bool _3CInterface::writeAllConvertedFilesToDisk() {
 //  ClangTool &Tool = getGlobalClangTool();
 
   RewriteConsumer RC = RewriteConsumer(GlobalProgramInfo);
+  unsigned int Errs = 0;
   for (auto &TU : ASTs) {
     RC.HandleTranslationUnit(TU->getASTContext());
+    Errs += TU->getDiagnostics().getClient()->getNumErrors();
   }
+  if (Errs > 0) return false;
 
   //  // Rewrite the input files.
 //  std::unique_ptr<ToolAction> RewriteTool =
