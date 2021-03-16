@@ -216,6 +216,7 @@ _3CInterface::create(const struct _3COptions &CCopt,
 _3CInterface::_3CInterface(const struct _3COptions &CCopt,
                            const std::vector<std::string> &SourceFileList,
                            CompilationDatabase *CompDB, bool &Failed) {
+  llvm_unreachable("Test assertion");
 
   DumpIntermediate = CCopt.DumpIntermediate;
   Verbose = CCopt.Verbose;
