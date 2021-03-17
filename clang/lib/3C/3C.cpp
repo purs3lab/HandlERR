@@ -154,11 +154,24 @@ ArgumentsAdjuster getIgnoreCheckedPointerAdjuster() {
     return AdjustedArgs;
   };
 }
+ArgumentsAdjuster addVerifyAdjuster() {
+  return [](const CommandLineArguments &Args, StringRef /*unused*/) {
+    CommandLineArguments AdjustedArgs(Args);
+    if (std::find(AdjustedArgs.begin(),AdjustedArgs.end(),"-verify")
+        == AdjustedArgs.end()) {
+      AdjustedArgs.push_back("-Xclang");
+      AdjustedArgs.push_back("-verify");
+    }
+    return AdjustedArgs;
+  };
+}
 
 static ClangTool &getGlobalClangTool() {
   if (GlobalCTool == nullptr) {
     GlobalCTool = new ClangTool(*CurrCompDB, SourceFiles);
     GlobalCTool->appendArgumentsAdjuster(getIgnoreCheckedPointerAdjuster());
+    if (VerifyDiagnosticOutput)
+      GlobalCTool->appendArgumentsAdjuster(addVerifyAdjuster());
   }
   return *GlobalCTool;
 }
@@ -354,15 +367,14 @@ bool _3CInterface::addVariables() {
   // first step, so load the ASTs
   ClangTool &Tool = getGlobalClangTool();
   if (Tool.buildASTs(ASTs)) return false;
-  // Enable Diagnostics
-  for (auto &TU :ASTs) {
-    TU->enableSourceFileDiagnostics();
-  }
 
   VariableAdderConsumer VA = VariableAdderConsumer(GlobalProgramInfo, nullptr);
   unsigned int Errs = 0;
   for (auto &TU : ASTs) {
+    TU->getDiagnostics().getDiagnosticOptions().VerifyPrefixes = {"adder"};
+    TU->enableSourceFileDiagnostics();
     VA.HandleTranslationUnit(TU->getASTContext());
+    TU->getDiagnostics().getClient()->EndSourceFile();
     Errs += TU->getDiagnostics().getClient()->getNumErrors();
   }
   if (Errs > 0) return false;
@@ -390,7 +402,10 @@ bool _3CInterface::buildInitialConstraints() {
   ConstraintBuilderConsumer CB = ConstraintBuilderConsumer(GlobalProgramInfo, nullptr);
   unsigned int Errs = 0;
   for (auto &TU : ASTs) {
+    TU->getDiagnostics().getDiagnosticOptions().VerifyPrefixes = {"builder"};
+    TU->enableSourceFileDiagnostics();
     CB.HandleTranslationUnit(TU->getASTContext());
+    TU->getDiagnostics().getClient()->EndSourceFile();
     Errs += TU->getDiagnostics().getClient()->getNumErrors();
   }
   if (Errs > 0) return false;
@@ -456,7 +471,10 @@ bool _3CInterface::solveConstraints() {
     AllocBasedBoundsInference ABBI = AllocBasedBoundsInference(GlobalProgramInfo, nullptr);
     unsigned int Errs = 0;
     for (auto &TU : ASTs) {
+      TU->getDiagnostics().getDiagnosticOptions().VerifyPrefixes = {"bounds"};
+      TU->enableSourceFileDiagnostics();
       ABBI.HandleTranslationUnit(TU->getASTContext());
+      TU->getDiagnostics().getClient()->EndSourceFile();
       Errs += TU->getDiagnostics().getClient()->getNumErrors();
     }
     if (Errs > 0) return false;
@@ -480,7 +498,10 @@ bool _3CInterface::solveConstraints() {
   IntermediateToolHook ITH = IntermediateToolHook(GlobalProgramInfo, nullptr);
   unsigned int Errs = 0;
   for (auto &TU : ASTs) {
+    TU->getDiagnostics().getDiagnosticOptions().VerifyPrefixes = {"hook"};
+    TU->enableSourceFileDiagnostics();
     ITH.HandleTranslationUnit(TU->getASTContext());
+    TU->getDiagnostics().getClient()->EndSourceFile();
     Errs += TU->getDiagnostics().getClient()->getNumErrors();
   }
   if (Errs > 0) return false;
@@ -580,7 +601,10 @@ bool _3CInterface::writeAllConvertedFilesToDisk() {
   RewriteConsumer RC = RewriteConsumer(GlobalProgramInfo);
   unsigned int Errs = 0;
   for (auto &TU : ASTs) {
+    TU->getDiagnostics().getDiagnosticOptions().VerifyPrefixes = {"writer"};
+    TU->enableSourceFileDiagnostics();
     RC.HandleTranslationUnit(TU->getASTContext());
+    TU->getDiagnostics().getClient()->EndSourceFile();
     Errs += TU->getDiagnostics().getClient()->getNumErrors();
   }
   if (Errs > 0) return false;
