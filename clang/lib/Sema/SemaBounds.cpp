@@ -6615,6 +6615,7 @@ namespace {
     SmallVector<Expr *, 4> ModifyingExprs;
 
     void addError(Expr *E, ModifyingExprKind Kind) {
+      /*
       if (Message != Sema::NonModifyingMessage::NMM_None) {
         for (auto Iter = ModifyingExprs.begin(); Iter != ModifyingExprs.end(); Iter++) {
           if (*Iter == E)
@@ -6626,6 +6627,7 @@ namespace {
         S.Diag(E->getBeginLoc(), DiagId)
           << Kind << ReqFrom << E->getSourceRange();
       }
+      */
     }
   };
 }
