@@ -18,6 +18,7 @@
 #include "clang/Rewrite/Core/Rewriter.h"
 #include "llvm/Support/raw_ostream.h"
 #include <sstream>
+#include <algorithm>
 
 #ifdef FIVE_C
 #include "clang/3C/DeclRewriter_5C.h"
@@ -216,9 +217,10 @@ void DeclRewriter::rewriteTypedefDecl(TypedefDeclReplacement *TDR, RSet &ToRewri
 // SourceLocations will get be generated incorrectly if we rewrite it as a
 // normal multidecl.
 bool isInlineStruct(std::vector<Decl*> &InlineDecls) {
-  if (InlineDecls.size() == 2 && AllTypes)
+  if (InlineDecls.size() >= 2 && AllTypes)
     return isa<RecordDecl>(InlineDecls[0]) &&
-        isa<VarDecl>(InlineDecls[1]);
+        std::all_of(InlineDecls.begin() + 1, InlineDecls.end(),
+                       [](Decl* D) { return isa<VarDecl>(D); });
   else
     return false;
 }
@@ -243,7 +245,7 @@ void DeclRewriter::rewriteFieldOrVarDecl(DRType *N, RSet &ToRewrite) {
     std::vector<Decl *> SameLineDecls;
     getDeclsOnSameLine(N, SameLineDecls);
     if (isInlineStruct(SameLineDecls))
-      SameLineDecls.erase(SameLineDecls.begin() + 0);
+      SameLineDecls.erase(SameLineDecls.begin());
     rewriteMultiDecl(N, ToRewrite, SameLineDecls, false);
   } else {
     // Anything that reaches this case should be a multi-declaration that has

@@ -110,6 +110,7 @@ void foo2(int *x) {
   struct { int * c; } b = {};
 	//CHECK: struct { _Ptr<int> c; } b = {};
   struct {int *i;} *f;
+  struct {int *il} *g, *h, *i;
 } 
 
 
