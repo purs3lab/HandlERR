@@ -602,7 +602,7 @@ bool PointerVariableConstraint::emitArraySize(
     // Is the type only an array
     bool &AllArrays,
     // Are we processing an array
-    bool &ArrayRun, bool Nt) const {
+    bool &ArrayRun, bool Nt, bool Checked) const {
   bool Ret = false;
   if (ArrPresent) {
     auto I = ArrSizes.find(TypeIdx);
@@ -613,7 +613,8 @@ bool PointerVariableConstraint::emitArraySize(
     std::ostringstream SizeStr;
 
     if (Oat == O_SizedArray) {
-      SizeStr << (Nt ? " _Nt_checked" : " _Checked");
+      if (Checked)
+        SizeStr << (Nt ? " _Nt_checked" : " _Checked");
       SizeStr << "[" << Oas << "]";
       CheckedArrs.push(SizeStr.str());
       ArrayRun = true;
@@ -722,13 +723,12 @@ std::string PointerVariableConstraint::mkString(const EnvironmentMap &E,
     if (!ForItype && BaseType == "void")
       K = Atom::A_Wild;
 
-    if (PrevArr && ArrSizes.at(TypeIdx).first != O_SizedArray && !EmittedName) {
+    if (PrevArr && ArrSizes.at(TypeIdx).first == O_Pointer && !EmittedName) {
       EmittedName = true;
       addArrayAnnotations(CheckedArrs, EndStrs);
       EndStrs.push_front(" " + getName());
     }
-    PrevArr = ((K == Atom::A_Arr || K == Atom::A_NTArr) && ArrPresent &&
-               ArrSizes.at(TypeIdx).first == O_SizedArray);
+    PrevArr = (ArrPresent && ArrSizes.at(TypeIdx).first != O_Pointer);
 
     switch (K) {
     case Atom::A_Ptr:
@@ -750,7 +750,7 @@ std::string PointerVariableConstraint::mkString(const EnvironmentMap &E,
       // be [] instead of *, IF, the original type was an array.
       // And, if the original type was a sized array of size K.
       // we should substitute [K].
-      if (emitArraySize(CheckedArrs, TypeIdx, AllArrays, ArrayRun, false))
+      if (emitArraySize(CheckedArrs, TypeIdx, AllArrays, ArrayRun, false, true))
         break;
       // We need to check and see if this level of variable
       // is constrained by a bounds safe interface. If it is,
@@ -761,7 +761,7 @@ std::string PointerVariableConstraint::mkString(const EnvironmentMap &E,
       break;
     case Atom::A_NTArr:
 
-      if (emitArraySize(CheckedArrs, TypeIdx, AllArrays, ArrayRun, true))
+      if (emitArraySize(CheckedArrs, TypeIdx, AllArrays, ArrayRun, true, true))
         break;
       // This additional check is to prevent fall-through from the array.
       if (K == Atom::A_NTArr) {
@@ -780,6 +780,10 @@ std::string PointerVariableConstraint::mkString(const EnvironmentMap &E,
     // If there is no array in the original program, then we fall through to
     // the case where we write a pointer value.
     case Atom::A_Wild:
+      if (ArrSizes.at(TypeIdx).first != O_Pointer)
+        if (emitArraySize(CheckedArrs, TypeIdx, AllArrays, ArrayRun, false,
+                          false))
+          break;
       AllArrays = false;
       if (ArrayRun)
         addArrayAnnotations(CheckedArrs, EndStrs);
