@@ -371,7 +371,6 @@ bool _3CInterface::addVariables() {
   VariableAdderConsumer VA = VariableAdderConsumer(GlobalProgramInfo, nullptr);
   unsigned int Errs = 0;
   for (auto &TU : ASTs) {
-    TU->getDiagnostics().getDiagnosticOptions().VerifyPrefixes = {"adder"};
     TU->enableSourceFileDiagnostics();
     VA.HandleTranslationUnit(TU->getASTContext());
     TU->getDiagnostics().getClient()->EndSourceFile();
@@ -402,7 +401,6 @@ bool _3CInterface::buildInitialConstraints() {
   ConstraintBuilderConsumer CB = ConstraintBuilderConsumer(GlobalProgramInfo, nullptr);
   unsigned int Errs = 0;
   for (auto &TU : ASTs) {
-    TU->getDiagnostics().getDiagnosticOptions().VerifyPrefixes = {"builder"};
     TU->enableSourceFileDiagnostics();
     CB.HandleTranslationUnit(TU->getASTContext());
     TU->getDiagnostics().getClient()->EndSourceFile();
@@ -471,7 +469,6 @@ bool _3CInterface::solveConstraints() {
     AllocBasedBoundsInference ABBI = AllocBasedBoundsInference(GlobalProgramInfo, nullptr);
     unsigned int Errs = 0;
     for (auto &TU : ASTs) {
-      TU->getDiagnostics().getDiagnosticOptions().VerifyPrefixes = {"bounds"};
       TU->enableSourceFileDiagnostics();
       ABBI.HandleTranslationUnit(TU->getASTContext());
       TU->getDiagnostics().getClient()->EndSourceFile();
@@ -498,7 +495,6 @@ bool _3CInterface::solveConstraints() {
   IntermediateToolHook ITH = IntermediateToolHook(GlobalProgramInfo, nullptr);
   unsigned int Errs = 0;
   for (auto &TU : ASTs) {
-    TU->getDiagnostics().getDiagnosticOptions().VerifyPrefixes = {"hook"};
     TU->enableSourceFileDiagnostics();
     ITH.HandleTranslationUnit(TU->getASTContext());
     TU->getDiagnostics().getClient()->EndSourceFile();
@@ -601,7 +597,6 @@ bool _3CInterface::writeAllConvertedFilesToDisk() {
   RewriteConsumer RC = RewriteConsumer(GlobalProgramInfo);
   unsigned int Errs = 0;
   for (auto &TU : ASTs) {
-    TU->getDiagnostics().getDiagnosticOptions().VerifyPrefixes = {"writer"};
     TU->enableSourceFileDiagnostics();
     RC.HandleTranslationUnit(TU->getASTContext());
     TU->getDiagnostics().getClient()->EndSourceFile();
