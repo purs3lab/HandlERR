@@ -287,6 +287,9 @@ bool _3CInterface::parseASTs() {
 
   auto *Tool = new ClangTool(*CurrCompDB, SourceFiles);
   Tool->appendArgumentsAdjuster(getIgnoreCheckedPointerAdjuster());
+  // TODO: This currently only enables compiler diagnostic verification.
+  // see https://github.com/correctcomputation/checkedc-clang/issues/425
+  // for status.
   if (VerifyDiagnosticOutput)
     Tool->appendArgumentsAdjuster(addVerifyAdjuster());
 
