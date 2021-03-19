@@ -136,8 +136,9 @@ public:
   // Force use of equality constraints in function calls for this CV
   virtual void equateArgumentConstraints(ProgramInfo &I) = 0;
 
-  // Update this CV with information from duplicate declaration CVs
-  virtual void brainTransplant(ConstraintVariable *, ProgramInfo &) = 0;
+  // Internally combine the constraints and other data from the first parameter
+  // with this constraint variable. Used with redeclarations, especially of
+  // functions declared in multiple files.
   virtual void mergeDeclaration(ConstraintVariable *, ProgramInfo &,
                                 std::string &ReasonFailed) = 0;
 
@@ -315,7 +316,7 @@ public:
   bool hasSomeSizedArr() const;
 
   bool isTypedef(void);
-  void setTypedef(TypedefNameDecl *TypedefType, std::string);
+  void setTypedef(TypedefNameDecl *T, std::string S);
 
   // Return true if this constraint had an itype in the original source code.
   bool srcHasItype() const override {
@@ -378,13 +379,15 @@ public:
 
   const CAtoms &getCvars() const { return Vars; }
 
-  void brainTransplant(ConstraintVariable *From, ProgramInfo &I) override;
+  // Include new ConstAtoms, supplemental info, and merge function pointers
   void mergeDeclaration(ConstraintVariable *From, ProgramInfo &I,
                         std::string &ReasonFailed) override;
 
   static bool classof(const ConstraintVariable *S) {
     return S->getKind() == PointerVariable;
   }
+
+  std::string gatherQualStrings(void) const;
 
   std::string mkString(const EnvironmentMap &E, bool EmitName = true,
                        bool ForItype = false, bool EmitPointee = false,
@@ -428,11 +431,6 @@ typedef PointerVariableConstraint PVConstraint;
 // Name for function return, for debugging
 #define RETVAR "$ret"
 
-typedef struct {
-  PersistentSourceLoc PL;
-  std::vector<CVarSet> PS;
-} ParamDeferment;
-
 // This class contains a pair of PVConstraints that represent an internal and
 // external view of a variable for use as the parameter and return constraints
 // of FunctionVariableConstraints. The internal constraint represents how the
@@ -459,8 +457,6 @@ public:
 
   void mergeDeclaration(FVComponentVariable *From, ProgramInfo &I,
                         std::string &ReasonFailed);
-  void brainTransplant(FVComponentVariable *From, ProgramInfo &I);
-
   std::string mkItypeStr(const EnvironmentMap &E) const;
   std::string mkTypeStr(const EnvironmentMap &E) const;
   std::string mkString(const EnvironmentMap &E) const;
@@ -478,8 +474,6 @@ private:
   // K parameters accepted by the function.
   std::vector<FVComponentVariable> ParamVars;
 
-  // Storing of parameters in the case of untyped prototypes
-  std::vector<ParamDeferment> DeferredParams;
   // File name in which this declaration is found.
   std::string FileName;
   bool Hasproto;
@@ -514,12 +508,6 @@ public:
     return ReturnVar.InternalConstraint;
   }
 
-  const std::vector<ParamDeferment> &getDeferredParams() const {
-    return DeferredParams;
-  }
-
-  void addDeferredParams(PersistentSourceLoc PL, std::vector<CVarSet> Ps);
-
   size_t numParams() const { return ParamVars.size(); }
 
   bool hasProtoType() const { return Hasproto; }
@@ -530,7 +518,7 @@ public:
     return S->getKind() == FunctionVariable;
   }
 
-  void brainTransplant(ConstraintVariable *From, ProgramInfo &I) override;
+  // Merge return value and all params
   void mergeDeclaration(ConstraintVariable *FromCV, ProgramInfo &I,
                         std::string &ReasonFailed) override;
 

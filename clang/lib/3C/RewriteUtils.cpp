@@ -14,6 +14,7 @@
 #include "clang/3C/CastPlacement.h"
 #include "clang/3C/CheckedRegions.h"
 #include "clang/3C/DeclRewriter.h"
+#include "clang/3C/TypeVariableAnalysis.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Tooling/Transformer/SourceCode.h"
 
@@ -361,7 +362,7 @@ private:
   void rewriteType(Expr *E, SourceRange &Range) {
     if (!Info.hasPersistentConstraints(E, Context))
       return;
-    const CVarSet &CVSingleton = Info.getPersistentConstraints(E, Context);
+    const CVarSet &CVSingleton = Info.getPersistentConstraintsSet(E, Context);
     if (CVSingleton.empty())
       return;
 
@@ -400,8 +401,10 @@ public:
         // Construct a string containing concatenation of all type arguments for
         // the function call.
         std::string TypeParamString;
+        bool AllInconsistent = true;
         for (auto Entry : Info.getTypeParamBindings(CE, Context))
           if (Entry.second != nullptr) {
+            AllInconsistent = false;
             std::string TyStr = Entry.second->mkString(
                 Info.getConstraints().getVariables(), false, false, true);
             if (TyStr.back() == ' ')
@@ -414,8 +417,11 @@ public:
           }
         TypeParamString.pop_back();
 
-        SourceLocation TypeParamLoc = getTypeArgLocation(CE);
-        Writer.InsertTextAfter(TypeParamLoc, "<" + TypeParamString + ">");
+        // don't rewrite to malloc<void>(...), etc, just do malloc(...)
+        if (!AllInconsistent) {
+          SourceLocation TypeParamLoc = getTypeArgLocation(CE);
+          Writer.InsertTextAfter(TypeParamLoc, "<" + TypeParamString + ">");
+        }
       }
     }
     return true;
@@ -436,44 +442,20 @@ private:
     }
     llvm_unreachable("Could find SourceLocation for type arguments!");
   }
-
-  // Check if type arguments have already been provided for this function
-  // call so that we don't mess with anything already there.
-  bool typeArgsProvided(CallExpr *Call) {
-    Expr *Callee = Call->getCallee()->IgnoreImpCasts();
-    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(Callee)) {
-      // ArgInfo is null if there are no type arguments anywhere in the program
-      if (auto *ArgInfo = DRE->GetTypeArgumentInfo())
-        for (auto Arg : ArgInfo->typeArgumentss()) {
-          if (!Arg.typeName->isVoidType()) {
-            // Found a non-void type argument. No doubt type args are provided.
-            return true;
-          }
-          if (Arg.sourceInfo->getTypeLoc().getSourceRange().isValid()) {
-            // The type argument is void, but with a valid source range. This
-            // means an explict void type argument was provided.
-            return true;
-          }
-          // A void type argument without a source location. The type argument
-          // is implicit so, we're good to insert a new one.
-        }
-      return false;
-    }
-    // We only handle direct calls, so there must be a DeclRefExpr.
-    llvm_unreachable("Callee of function call is not DeclRefExpr.");
-  }
 };
 
 SourceRange FunctionDeclReplacement::getSourceRange(SourceManager &SM) const {
   SourceLocation Begin = RewriteReturn ? getDeclBegin(SM) : getParamBegin(SM);
   SourceLocation End = RewriteParams ? getDeclEnd(SM) : getReturnEnd(SM);
-  assert("Invalid FunctionDeclReplacement SourceRange!" && Begin.isValid() &&
-         End.isValid());
+  // Begin can be equal to End if the SourceRange only contains one token.
+  assert("Invalid FunctionDeclReplacement SourceRange!" &&
+         (Begin == End || SM.isBeforeInTranslationUnit(Begin, End)));
   return SourceRange(Begin, End);
 }
 
 SourceLocation FunctionDeclReplacement::getDeclBegin(SourceManager &SM) const {
-  return Decl->getBeginLoc();
+  SourceLocation Begin = Decl->getBeginLoc();
+  return Begin;
 }
 
 SourceLocation FunctionDeclReplacement::getParamBegin(SourceManager &SM) const {
@@ -492,34 +474,40 @@ SourceLocation FunctionDeclReplacement::getReturnEnd(SourceManager &SM) const {
 }
 
 SourceLocation FunctionDeclReplacement::getDeclEnd(SourceManager &SM) const {
-  FunctionTypeLoc FTypeLoc = getFunctionTypeLoc(Decl);
-
   SourceLocation End;
-  if (FTypeLoc.isNull()) {
-    // Without a FunctionTypeLocation, we have to approximate the end of the
-    // declaration as the location of the first r-paren before the start of the
-    // function body. This is messed up by comments and ifdef blocks containing
-    // r-paren, but works correctly most of the time.
-    End = getFunctionDeclRParen(Decl, SM);
-  } else if (Decl->getReturnType()->isFunctionPointerType()) {
-    // If a function returns a function pointer type, the paramter list for the
-    // returned function type comes after the top-level functions parameter
-    // list. Of course, this FunctionTypeLoc can also be null, so we have
-    // another fall back to the r-paren approximation.
-    FunctionTypeLoc T = getFunctionTypeLoc(FTypeLoc.getReturnLoc());
-    if (!T.isNull())
-      End = T.getRParenLoc();
-    else
-      End = getFunctionDeclRParen(Decl, SM);
-  } else {
-    End = FTypeLoc.getRParenLoc();
-  }
+   if (isKAndRFunctionDecl(Decl)) {
+     // For K&R style function declaration, use the beginning of the function
+     // body as the end of the declaration. K&R declarations must have a body.
+     End = locationPrecedingChar(Decl->getBody()->getBeginLoc(), SM, ';');
+   } else {
+     FunctionTypeLoc FTypeLoc = getFunctionTypeLoc(Decl);
+     if (FTypeLoc.isNull()) {
+       // Without a FunctionTypeLocation, we have to approximate the end of the
+       // declaration as the location of the first r-paren before the start of the
+       // function body. This is messed up by comments and ifdef blocks containing
+       // r-paren, but works correctly most of the time.
+       End = getFunctionDeclRParen(Decl, SM);
+     } else if (Decl->getReturnType()->isFunctionPointerType()) {
+       // If a function returns a function pointer type, the paramter list for the
+       // returned function type comes after the top-level functions parameter
+       // list. Of course, this FunctionTypeLoc can also be null, so we have
+       // another fall back to the r-paren approximation.
+       FunctionTypeLoc T = getFunctionTypeLoc(FTypeLoc.getReturnLoc());
+       if (!T.isNull())
+         End = T.getRParenLoc();
+       else
+         End = getFunctionDeclRParen(Decl, SM);
+     } else {
+       End = FTypeLoc.getRParenLoc();
+     }
+   }
 
   // If there's a bounds expression, this comes after the right paren of the
   // function declaration parameter list.
   if (auto *BoundsE = Decl->getBoundsExpr()) {
     SourceLocation BoundsEnd = BoundsE->getEndLoc();
-    if (BoundsEnd.isValid())
+    if (BoundsEnd.isValid() &&
+        (!End.isValid() || SM.isBeforeInTranslationUnit(End, BoundsEnd)))
       End = BoundsEnd;
   }
 
@@ -641,6 +629,8 @@ void RewriteConsumer::emitRootCauseDiagnostics(ASTContext &Context) {
 void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   Info.enterCompilationUnit(Context);
 
+  Info.getPerfStats().startRewritingTime();
+
   if (WarnRootCause)
     emitRootCauseDiagnostics(Context);
 
@@ -679,6 +669,8 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
 
   // Output files.
   emit(R, Context);
+
+  Info.getPerfStats().endRewritingTime();
 
   Info.exitCompilationUnit();
   return;

@@ -23,6 +23,54 @@
 #include "clang/Frontend/FrontendAction.h"
 #include "clang/Tooling/Tooling.h"
 
+class PerformanceStats {
+public:
+  double CompileTime;
+  double ConstraintBuilderTime;
+  double ConstraintSolverTime;
+  double ArrayBoundsInferenceTime;
+  double RewritingTime;
+  double TotalTime;
+
+  PerformanceStats() {
+    CompileTime = ConstraintBuilderTime = 0;
+    ConstraintSolverTime = ArrayBoundsInferenceTime = 0;
+    RewritingTime = TotalTime = 0;
+
+    CompileTimeSt = ConstraintBuilderTimeSt = 0;
+    ConstraintSolverTimeSt = ArrayBoundsInferenceTimeSt = 0;
+    RewritingTimeSt = TotalTimeSt = 0;
+  }
+
+  void startCompileTime();
+  void endCompileTime();
+
+  void startConstraintBuilderTime();
+  void endConstraintBuilderTime();
+
+  void startConstraintSolverTime();
+  void endConstraintSolverTime();
+
+  void startArrayBoundsInferenceTime();
+  void endArrayBoundsInferenceTime();
+
+  void startRewritingTime();
+  void endRewritingTime();
+
+  void startTotalTime();
+  void endTotalTime();
+
+  void printPerformanceStats(raw_ostream &O);
+
+private:
+  clock_t CompileTimeSt;
+  clock_t ConstraintBuilderTimeSt;
+  clock_t ConstraintSolverTimeSt;
+  clock_t ArrayBoundsInferenceTimeSt;
+  clock_t RewritingTimeSt;
+  clock_t TotalTimeSt;
+
+};
 class ProgramVariableAdder {
 public:
   virtual void addVariable(clang::DeclaratorDecl *D,
@@ -31,9 +79,16 @@ public:
     getABoundsInfo().insertVariable(D);
   }
 
+  virtual bool seenTypedef(PersistentSourceLoc PSL) = 0;
+
+  virtual void addTypedef(PersistentSourceLoc PSL, bool CanRewriteDef,
+                          TypedefDecl *TD, ASTContext &C) = 0;
+
 protected:
   virtual AVarBoundsInfo &getABoundsInfo() = 0;
 };
+
+typedef std::pair<CVarSet, BKeySet> CSetBkeyPair;
 
 class ProgramInfo : public ProgramVariableAdder {
 public:
@@ -57,6 +112,9 @@ public:
   void printStats(const std::set<std::string> &F, llvm::raw_ostream &O,
                   bool OnlySummary = false, bool JsonFormat = false);
 
+  void print_aggregate_stats(const std::set<std::string> &F,
+                             llvm::raw_ostream &O);
+
   // Populate Variables, VarDeclToStatement, RVariables, and DepthMap with
   // AST data structures that correspond do the data stored in PDMap and
   // ReversePDMap.
@@ -68,7 +126,13 @@ public:
   void exitCompilationUnit();
 
   bool hasPersistentConstraints(clang::Expr *E, ASTContext *C) const;
-  const CVarSet &getPersistentConstraints(clang::Expr *E, ASTContext *C) const;
+  const CSetBkeyPair &getPersistentConstraints(clang::Expr *E, ASTContext *C) const;
+  void storePersistentConstraints(clang::Expr *E, const CSetBkeyPair &Vars,
+                                  ASTContext *C);
+  // Get only constraint vars from the persistent contents of the
+  // expression E.
+  const CVarSet &getPersistentConstraintsSet(clang::Expr *E, ASTContext *C) const;
+  // Store CVarSet with an empty set of BoundsKey into persistent contents.
   void storePersistentConstraints(clang::Expr *E, const CVarSet &Vars,
                                   ASTContext *C);
 
@@ -90,7 +154,11 @@ public:
   Constraints &getConstraints() { return CS; }
   AVarBoundsInfo &getABoundsInfo() { return ArrBInfo; }
 
-  ConstraintsInfo &getInterimConstraintState() { return CState; }
+  PerformanceStats &getPerfStats() { return PerfS; }
+
+  ConstraintsInfo &getInterimConstraintState() {
+    return CState;
+  }
   bool computeInterimConstraintState(const std::set<std::string> &FilePaths);
 
   const ExternalFunctionMapType &getExternFuncDefFVMap() const {
@@ -113,11 +181,12 @@ public:
   void unifyIfTypedef(const clang::Type *, clang::ASTContext &,
                       clang::DeclaratorDecl *, PVConstraint *);
 
-  std::pair<CVarSet, bool> lookupTypedef(PersistentSourceLoc PSL);
+  CVarOption lookupTypedef(PersistentSourceLoc PSL);
 
   bool seenTypedef(PersistentSourceLoc PSL);
 
-  void addTypedef(PersistentSourceLoc PSL, bool ShouldCheck);
+  void addTypedef(PersistentSourceLoc PSL, bool CanRewriteDef, TypedefDecl *TD,
+                  ASTContext& C);
 
 private:
   // List of constraint variables for declarations, indexed by their location in
@@ -125,23 +194,27 @@ private:
   // analysis from compilation unit to compilation unit.
   VariableMap Variables;
 
-  // Map storing constraint information for typedefed types,
-  // The set contains all the constraint variables that also use this typedef.
-  // TODO this could be replaced w/ a single CVar.
-  // The bool informs the rewriter whether or not this typedef should be
-  // rewritten. It will be false for typedefs we don't support rewritting,
-  // such as typedefs that are pointers to anonymous structs.
-  std::map<PersistentSourceLoc, std::pair<CVarSet, bool>> TypedefVars;
+  // Map storing constraint information for typedefed types
+  // The set contains all the constraint variables that also use this tyepdef
+  // rewritten.
+  std::map<PersistentSourceLoc, CVarOption> TypedefVars;
 
-  // Map with the same purpose as the Variables map, this stores constraint
-  // variables for non-declaration expressions.
-  std::map<PersistentSourceLoc, CVarSet> ExprConstraintVars;
+  // A pair containing an AST node ID and the name of the main file in the
+  // translation unit. Used as a key to index expression in the following maps.
+  typedef std::pair<int64_t, std::string> IDAndTranslationUnit;
+  IDAndTranslationUnit getExprKey(clang::Expr *E, clang::ASTContext *C) const;
 
-  // Implicit casts do not physically exist in the source code, so their source
-  // location can collide with the source location of another expression. Since
-  // we need to look up constraint variables for implicit casts for the cast
-  // placement, the variables are stored in this separate map.
-  std::map<PersistentSourceLoc, CVarSet> ImplicitCastConstraintVars;
+  // Map with the similar purpose as the Variables map. This stores a set of
+  // constraint variables and bounds key for non-declaration expressions.
+  std::map<IDAndTranslationUnit, CSetBkeyPair> ExprConstraintVars;
+
+  // For each expr stored in the ExprConstraintVars, also store the source
+  // location for the expression. This is used to emit diagnostics. It is
+  // expected that multiple entries will map to the same source location.
+  std::map<IDAndTranslationUnit, PersistentSourceLoc> ExprLocations;
+
+  //Performance stats
+  PerformanceStats PerfS;
 
   // Constraint system.
   Constraints CS;
@@ -166,41 +239,20 @@ private:
   // For each call to a generic function, remember how the type parameters were
   // instantiated so they can be inserted during rewriting.
   TypeParamBindingsT TypeParamBindings;
-
-  // Insert the given FVConstraint* set into the provided Map.
-  void insertIntoExternalFunctionMap(ExternalFunctionMapType &Map,
-                                     const std::string &FuncName,
-                                     FVConstraint *NewC, FunctionDecl *FD,
-                                     ASTContext *C);
-
-  // Inserts the given FVConstraint* set into the provided static map.
-  void insertIntoStaticFunctionMap(StaticFunctionMapType &Map,
-                                   const std::string &FuncName,
-                                   const std::string &FileName,
-                                   FVConstraint *ToIns, FunctionDecl *FD,
-                                   ASTContext *C);
-
+  
   // Special-case handling for decl introductions. For the moment this covers:
   //  * void-typed variables
   //  * va_list-typed variables
   void specialCaseVarIntros(ValueDecl *D, ASTContext *Context);
 
   // Inserts the given FVConstraint set into the extern or static function map.
-  // Note: This can trigger a brainTransplant from an existing FVConstraint into
-  // the argument FVConstraint. The brainTransplant copies the atoms of the
-  // existing FVConstraint into the argument. This effectively throws out any
-  // constraints that may been applied to the argument FVConstraint, so do not
-  // call this function any time other than immediately after constructing an
-  // FVConstraint.
-  void insertNewFVConstraint(FunctionDecl *FD, FVConstraint *FVCon,
-                             ASTContext *C);
+  // Returns the merged version if it was a redeclaration, or the constraint
+  // parameter if it was new.
+  FunctionVariableConstraint *
+  insertNewFVConstraint(FunctionDecl *FD, FVConstraint *FVCon, ASTContext *C);
 
   // Retrieves a FVConstraint* from a Decl (which could be static, or global)
   FVConstraint *getFuncFVConstraint(FunctionDecl *FD, ASTContext *C);
-
-  // For each pointer type in the declaration of D, add a variable to the
-  // constraint system for that pointer type.
-  void addVariable(clang::DeclaratorDecl *D, clang::ASTContext *AstContext);
 
   void insertIntoPtrSourceMap(const PersistentSourceLoc *PSL,
                               ConstraintVariable *CV);
@@ -209,6 +261,11 @@ private:
 
   void insertCVAtoms(ConstraintVariable *CV,
                      std::map<ConstraintKey, ConstraintVariable *> &AtomMap);
+
+  // For each pointer type in the declaration of D, add a variable to the
+  // constraint system for that pointer type.
+  void addVariable(clang::DeclaratorDecl *D, clang::ASTContext *AstContext);
+
 };
 
 #endif

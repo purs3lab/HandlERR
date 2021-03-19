@@ -158,7 +158,7 @@ public:
     for (const auto &D : S->decls()) {
       if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
         Expr *InitE = VD->getInit();
-        CB.constrainLocalAssign(S, VD, InitE);
+        CB.constrainLocalAssign(S, VD, InitE, Same_to_Same);
       }
     }
 
@@ -171,9 +171,9 @@ public:
     QualType SrcT = C->getSubExpr()->getType();
     QualType DstT = C->getType();
     if (!isCastSafe(DstT, SrcT) && !Info.hasPersistentConstraints(C, Context)) {
-      auto CVs = CB.getExprConstraintVars(C->getSubExpr());
-      std::string Rsn =
-          "Cast from " + SrcT.getAsString() + " to " + DstT.getAsString();
+      auto CVs = CB.getExprConstraintVarsSet(C->getSubExpr());
+      std::string Rsn = "Cast from " + SrcT.getAsString() +  " to " +
+                        DstT.getAsString();
       CB.constraintAllCVarsToWild(CVs, Rsn, C);
     }
     return true;
@@ -236,14 +236,8 @@ public:
         // and for each arg to the function ...
         if (FVConstraint *TargetFV = dyn_cast<FVConstraint>(TmpC)) {
           unsigned I = 0;
-          bool CallUntyped = TFD ? TFD->getType()->isFunctionNoProtoType() &&
-                                       E->getNumArgs() != 0 &&
-                                       TargetFV->numParams() == 0
-                                 : false;
-
-          std::vector<CVarSet> Deferred;
           for (const auto &A : E->arguments()) {
-            CVarSet ArgumentConstraints;
+            CSetBkeyPair ArgumentConstraints;
             if (I < TargetFV->numParams()) {
               // Remove casts to void* on polymorphic types that are used
               // consistently.
@@ -258,28 +252,35 @@ public:
             } else
               ArgumentConstraints = CB.getExprConstraintVars(A);
 
-            if (CallUntyped) {
-              Deferred.push_back(ArgumentConstraints);
-            } else if (I < TargetFV->numParams()) {
+            if (I < TargetFV->numParams()) {
               // Constrain the arg CV to the param CV.
               ConstraintVariable *ParameterDC = TargetFV->getExternalParam(I);
 
+              // We cannot insert a cast if the source location of a call
+              // expression is not writable. By using Same_to_Same for calls at
+              // unwritable source locations, we ensure that we will not need to
+              // insert a cast because this unifies the checked type for the
+              // parameter and the argument.
+              ConsAction CA = Rewriter::isRewritable(A->getExprLoc())
+                              ? Wild_to_Safe : Same_to_Same;
               // Do not handle bounds key here because we will be
               // doing context-sensitive assignment next.
-              constrainConsVarGeq(ParameterDC, ArgumentConstraints, CS, &PL,
-                                  Wild_to_Safe, false, &Info, false);
+              constrainConsVarGeq(ParameterDC, ArgumentConstraints.first, CS,
+                                  &PL, CA, false, &Info, false);
 
-              if (AllTypes && TFD != nullptr) {
+              if (AllTypes && TFD != nullptr && I < TFD->getNumParams()) {
                 auto *PVD = TFD->getParamDecl(I);
-                auto &ABI = Info.getABoundsInfo();
+                auto &CSBI = Info.getABoundsInfo().getCtxSensBoundsHandler();
                 // Here, we need to handle context-sensitive assignment.
-                ABI.handleContextSensitiveAssignment(
-                    E, PVD, ParameterDC, A, ArgumentConstraints, Context, &CB);
+                CSBI.handleContextSensitiveAssignment(PL, PVD, ParameterDC, A,
+                                                      ArgumentConstraints.first,
+                                                      ArgumentConstraints.second,
+                                                      Context, &CB);
               }
             } else {
               // The argument passed to a function ith varargs; make it wild
               if (HandleVARARGS) {
-                CB.constraintAllCVarsToWild(ArgumentConstraints,
+                CB.constraintAllCVarsToWild(ArgumentConstraints.first,
                                             "Passing argument to a function "
                                             "accepting var args.",
                                             E);
@@ -293,8 +294,6 @@ public:
             }
             I++;
           }
-          if (CallUntyped)
-            TargetFV->addDeferredParams(PL, Deferred);
         }
       }
     }
@@ -318,7 +317,7 @@ public:
     // of the function.
     Expr *RetExpr = S->getRetValue();
 
-    CVarSet RconsVar = CB.getExprConstraintVars(RetExpr);
+    CVarSet RconsVar = CB.getExprConstraintVarsSet(RetExpr);
     // Constrain the return type of the function
     // to the type of the return expression.
     if (CVOpt.hasValue()) {
@@ -377,8 +376,8 @@ private:
   }
 
   // Constraint helpers.
-  void constraintInBodyVariable(Expr *E, ConstAtom *CAtom) {
-    CVarSet Var = CB.getExprConstraintVars(E);
+  void constraintInBodyVariable(Expr *e, ConstAtom *CAtom) {
+    CVarSet Var = CB.getExprConstraintVarsSet(e);
     constrainVarsTo(Var, CAtom);
   }
 
@@ -389,7 +388,7 @@ private:
     for (const auto &A : E->arguments()) {
       // Get constraint from within the function body
       // of the caller.
-      CVarSet ParameterEC = CB.getExprConstraintVars(A);
+      CVarSet ParameterEC = CB.getExprConstraintVarsSet(A);
 
       // Assign WILD to each of the constraint variables.
       FunctionDecl *FD = E->getDirectCallee();
@@ -412,7 +411,7 @@ private:
   // is WILD.
   void constraintPointerArithmetic(Expr *E, bool ModifyingExpr = true) {
     if (E->getType()->isFunctionPointerType()) {
-      CVarSet Var = CB.getExprConstraintVars(E);
+      CVarSet Var = CB.getExprConstraintVarsSet(E);
       std::string Rsn = "Pointer arithmetic performed on a function pointer.";
       CB.constraintAllCVarsToWild(Var, Rsn, E);
     } else {
@@ -479,25 +478,11 @@ public:
                                 TypeVarInfo &TVI)
       : Context(Context), Info(I), CB(Info, Context), TVInfo(TVI), ISD() {}
 
-  bool VisitTypedefDecl(TypedefDecl *TD) {
-    CVarSet Empty;
-    auto PSL = PersistentSourceLoc::mkPSL(TD, *Context);
-    // If we haven't seen this typedef before, initialize it's entry in the
-    // typedef map. If we have seen it before, and we need to preserve the
-    // constraints contained within it.
-    if (!Info.seenTypedef(PSL))
-      // Add this typedef to the program info, if it contains a ptr to
-      // an anonymous struct we mark as not being rewritable.
-      Info.addTypedef(PSL, !PtrToStructDef::containsPtrToStructDef(TD));
-
-    return true;
-  }
-
   bool VisitVarDecl(VarDecl *G) {
 
     if (G->hasGlobalStorage() && isPtrOrArrayType(G->getType())) {
       if (G->hasInit()) {
-        CB.constrainLocalAssign(nullptr, G, G->getInit());
+        CB.constrainLocalAssign(nullptr, G, G->getInit(), Same_to_Same);
       }
       ISD.processVarDecl(G, Info, Context, CB);
     }
@@ -506,6 +491,7 @@ public:
 
   bool VisitInitListExpr(InitListExpr *E) {
     if (E->getType()->isStructureType()) {
+      E = E->getSemanticForm();
       const RecordDecl *Definition =
           E->getType()->getAsStructureType()->getDecl()->getDefinition();
 
@@ -514,7 +500,7 @@ public:
       for (auto It = Fields.begin();
            InitIdx < E->getNumInits() && It != Fields.end(); InitIdx++, It++) {
         Expr *InitExpr = E->getInit(InitIdx);
-        CB.constrainLocalAssign(nullptr, *It, InitExpr);
+        CB.constrainLocalAssign(nullptr, *It, InitExpr, Same_to_Same, true);
       }
     }
     return true;
@@ -564,7 +550,22 @@ private:
 class VariableAdderVisitor : public RecursiveASTVisitor<VariableAdderVisitor> {
 public:
   explicit VariableAdderVisitor(ASTContext *Context, ProgramVariableAdder &VA)
-      : Context(Context), VarAdder(VA) {}
+    : Context(Context), VarAdder(VA) {}
+
+
+  bool VisitTypedefDecl(TypedefDecl* TD) {
+    CVarSet empty;
+    auto PSL = PersistentSourceLoc::mkPSL(TD, *Context);
+    // If we haven't seen this typedef before, initialize it's entry in the
+    // typedef map. If we have seen it before, and we need to preserve the
+    // constraints contained within it
+    if (!VarAdder.seenTypedef(PSL))
+      // Add this typedef to the program info, if it contains a ptr to
+      // an anonymous struct we mark as not being rewritable
+      VarAdder.addTypedef(PSL, !PtrToStructDef::containsPtrToStructDef(TD),
+                          TD, *Context);
+    return true;
+  }
 
   bool VisitVarDecl(VarDecl *D) {
     FullSourceLoc FL = Context->getFullLoc(D->getBeginLoc());
@@ -604,7 +605,7 @@ private:
   }
 };
 
-void ConstraintBuilderConsumer::HandleTranslationUnit(ASTContext &C) {
+void VariableAdderConsumer::HandleTranslationUnit(ASTContext &C) {
   Info.enterCompilationUnit(C);
   if (Verbose) {
     SourceManager &SM = C.getSourceManager();
@@ -617,19 +618,48 @@ void ConstraintBuilderConsumer::HandleTranslationUnit(ASTContext &C) {
   }
 
   VariableAdderVisitor VAV = VariableAdderVisitor(&C, Info);
+  TranslationUnitDecl *TUD = C.getTranslationUnitDecl();
+  // Collect Variables.
+  for (const auto &D : TUD->decls()) {
+    VAV.TraverseDecl(D);
+  }
+
+  if (Verbose)
+    errs() << "Done analyzing\n";
+
+  Info.exitCompilationUnit();
+  return;
+}
+
+void ConstraintBuilderConsumer::HandleTranslationUnit(ASTContext &C) {
+  Info.enterCompilationUnit(C);
+  if (Verbose) {
+    SourceManager &SM = C.getSourceManager();
+    FileID MainFileId = SM.getMainFileID();
+    const FileEntry *FE = SM.getFileEntryForID(MainFileId);
+    if (FE != nullptr)
+      errs() << "Analyzing file " << FE->getName() << "\n";
+    else
+      errs() << "Analyzing\n";
+  }
+
+  auto &PStats = Info.getPerfStats();
+
+  PStats.startConstraintBuilderTime();
+
   TypeVarVisitor TV = TypeVarVisitor(&C, Info);
   ConstraintResolver CSResolver(Info, &C);
   ContextSensitiveBoundsKeyVisitor CSBV =
-      ContextSensitiveBoundsKeyVisitor(&C, Info);
+      ContextSensitiveBoundsKeyVisitor(&C, Info, &CSResolver);
   ConstraintGenVisitor GV = ConstraintGenVisitor(&C, Info, TV);
   TranslationUnitDecl *TUD = C.getTranslationUnitDecl();
+
   // Generate constraints.
   for (const auto &D : TUD->decls()) {
-    // The order of these traversals CANNOT be changed because both the type
-    // variable and constraint gen visitor require that variables have been
-    // added to ProgramInfo, and the constraint gen visitor requires the type
-    // variable information gathered in the type variable traversal.
-    VAV.TraverseDecl(D);
+    // The order of these traversals CANNOT be changed because the constraint
+    // gen visitor requires the type variable information gathered in the type
+    // variable traversal.
+
     CSBV.TraverseDecl(D);
     TV.TraverseDecl(D);
     GV.TraverseDecl(D);
@@ -640,6 +670,10 @@ void ConstraintBuilderConsumer::HandleTranslationUnit(ASTContext &C) {
 
   if (Verbose)
     errs() << "Done analyzing\n";
+
+  PStats.endConstraintBuilderTime();
+
+  PStats.endConstraintBuilderTime();
 
   Info.exitCompilationUnit();
   return;

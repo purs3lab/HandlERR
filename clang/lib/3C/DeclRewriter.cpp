@@ -18,6 +18,7 @@
 #include "clang/Rewrite/Core/Rewriter.h"
 #include "llvm/Support/raw_ostream.h"
 #include <sstream>
+#include <algorithm>
 
 #ifdef FIVE_C
 #include "clang/3C/DeclRewriter_5C.h"
@@ -53,21 +54,19 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
     SVI.TraverseDecl(D);
     if (const auto &TD = dyn_cast<TypedefDecl>(D)) {
       auto PSL = PersistentSourceLoc::mkPSL(TD, Context);
-      // Don't rewrite base types like int.
-      if (!TD->getUnderlyingType()->isBuiltinType()) {
-        const auto Pair = Info.lookupTypedef(PSL);
-        const auto VSet = Pair.first;
-        if (!VSet.empty()) { // We ignore typedefs that are never used.
-          const auto Var = VSet.begin();
+      if (!TD->getUnderlyingType()->isBuiltinType()) { // Don't rewrite base types like int
+        const auto O = Info.lookupTypedef(PSL);
+        if (O.hasValue()) {
+          const auto &Var = O.getValue();
           const auto &Env = Info.getConstraints().getVariables();
-          if ((*Var)->anyChanges(Env)) {
-            std::string NewTy =
-                getStorageQualifierString(D) +
-                (*Var)->mkString(Info.getConstraints().getVariables(), false,
-                                 false, false, true) +
-                " " + TD->getNameAsString();
-            RewriteThese.insert(new TypedefDeclReplacement(TD, nullptr, NewTy));
-          }
+          if (Var.anyChanges(Env)) {
+            std::string newTy =
+                  getStorageQualifierString(D) +
+                  Var.mkString(Info.getConstraints().getVariables(), true,
+                                   false, false, true);
+              RewriteThese.insert(
+                  new TypedefDeclReplacement(TD, nullptr, newTy));
+            }
         }
       }
     }
@@ -209,9 +208,22 @@ void DeclRewriter::rewriteParmVarDecl(ParmVarDeclReplacement *N) {
     }
 }
 
-void DeclRewriter::rewriteTypedefDecl(TypedefDeclReplacement *TDR,
-                                      RSet &ToRewrite) {
+
+void DeclRewriter::rewriteTypedefDecl(TypedefDeclReplacement *TDR, RSet &ToRewrite) {
   rewriteSingleDecl(TDR, ToRewrite);
+}
+
+// In alltypes mode we need to handle inline structs inside functions specially
+// Because both the recorddecl and vardecl are inside one DeclStmt, the
+// SourceLocations will get be generated incorrectly if we rewrite it as a
+// normal multidecl.
+bool isInlineStruct(std::vector<Decl*> &InlineDecls) {
+  if (InlineDecls.size() >= 2 && AllTypes)
+    return isa<RecordDecl>(InlineDecls[0]) &&
+        std::all_of(InlineDecls.begin() + 1, InlineDecls.end(),
+                       [](Decl* D) { return isa<VarDecl>(D); });
+  else
+    return false;
 }
 
 template <typename DRType>
@@ -233,6 +245,8 @@ void DeclRewriter::rewriteFieldOrVarDecl(DRType *N, RSet &ToRewrite) {
   } else if (VisitedMultiDeclMembers.find(N) == VisitedMultiDeclMembers.end()) {
     std::vector<Decl *> SameLineDecls;
     getDeclsOnSameLine(N, SameLineDecls);
+    if (isInlineStruct(SameLineDecls))
+      SameLineDecls.erase(SameLineDecls.begin());
     rewriteMultiDecl(N, ToRewrite, SameLineDecls, false);
   } else {
     // Anything that reaches this case should be a multi-declaration that has
@@ -248,6 +262,8 @@ void DeclRewriter::rewriteSingleDecl(DeclReplacement *N, RSet &ToRewrite) {
       dyn_cast<TypedefDecl>(N->getDecl()) || isSingleDeclaration(N);
   assert("Declaration is not a single declaration." && IsSingleDecl);
   // This is the easy case, we can rewrite it locally, at the declaration.
+  // TODO why do we call getDecl() and getSourceRange() directly,
+  // TODO as opposed to getSourceRange()?
   SourceRange TR = N->getDecl()->getSourceRange();
   doDeclRewrite(TR, N);
 }
@@ -712,7 +728,7 @@ void FunctionDeclBuilder::buildDeclVar(PVConstraint *IntCV, PVConstraint *ExtCV,
   ParmVarDecl *PVD = dyn_cast<ParmVarDecl>(Decl);
   if (PVD) {
     SourceRange Range = PVD->getSourceRange();
-    if (Range.isValid()) {
+    if (Range.isValid() && !inParamMultiDecl(PVD) ) {
       Type = getSourceText(Range, *Context);
       if (!Type.empty()) {
         // Great, we got the original source including any itype and bounds.
@@ -770,6 +786,22 @@ bool FunctionDeclBuilder::hasDeclWithTypedef(const FunctionDecl *FD) {
         FDIter->dump();
       }
     }
+  }
+  return false;
+}
+
+// K&R style function declarations can declare multiple parameter variables in
+// a single declaration statement. The source ranges for these parameters
+// overlap, so we cannot copy the declaration from source code to output code
+bool FunctionDeclBuilder::inParamMultiDecl(const ParmVarDecl *PVD) {
+  const DeclContext *DCtx = PVD->getDeclContext();
+  if (DCtx) {
+    SourceRange SR = PVD->getSourceRange();
+    SourceManager &SM = Context->getSourceManager();
+    for (auto *D : DCtx->decls())
+      if (D != PVD && D->getBeginLoc().isValid() &&
+          SM.isPointWithin(D->getBeginLoc(), SR.getBegin(), SR.getEnd()))
+        return true;
   }
   return false;
 }
