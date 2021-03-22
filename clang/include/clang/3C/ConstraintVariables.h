@@ -57,7 +57,6 @@ private:
 protected:
   std::string OriginalType;
   // Underlying name of the C variable this ConstraintVariable represents.
-  std::string Name;
   // Set of constraint variables that have been constrained due to a
   // bounds-safe interface (itype). They are remembered as being constrained
   // so that later on we do not introduce a spurious constraint
@@ -79,6 +78,7 @@ protected:
         ValidBoundsKey(false), IsForDecl(false) {}
 
 public:
+  std::string Name;
   // Create a "for-rewriting" representation of this ConstraintVariable.
   // The 'emitName' parameter is true when the generated string should include
   // the name of the variable, false for just the type.

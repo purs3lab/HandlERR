@@ -671,6 +671,9 @@ std::string PointerVariableConstraint::mkString(const EnvironmentMap &E,
   }
 
   std::ostringstream Ss;
+  // Annotations that will need to be placed on the identifier of an unchecked
+  // function pointer.
+  std::ostringstream FptrInner;
   // This deque will store all the type strings that need to pushed
   // to the end of the type string. This is typically things like
   // closing delimiters.
@@ -790,14 +793,12 @@ std::string PointerVariableConstraint::mkString(const EnvironmentMap &E,
       ArrayRun = false;
       if (EmittedBase) {
         Ss << "*";
-      } else {
+      } else if (!FV) {
         assert(BaseType.size() > 0);
         EmittedBase = true;
-        if (FV) {
-          Ss << FV->mkString(E);
-        } else {
-          Ss << BaseType << " *";
-        }
+        Ss << BaseType << " *";
+      } else {
+        FptrInner << "*";
       }
 
       getQualString(TypeIdx, Ss);
@@ -825,10 +826,17 @@ std::string PointerVariableConstraint::mkString(const EnvironmentMap &E,
   }
 
   if (!EmittedBase) {
-    // If we have a FV pointer, then our "base" type is a function pointer.
-    // type.
+    // If we have a FV pointer, then our "base" type is a function pointer type.
     if (FV) {
-      Ss << FV->mkString(E);
+      if (Ss.str().empty()) {
+        for (std::string Str : EndStrs)
+          FptrInner << Str;
+        EndStrs.clear();
+      }
+      bool EmitFVName = !FptrInner.str().empty();
+      if (EmitFVName)
+        FV->Name = "(" + FptrInner.str() + ")";
+      Ss << FV->mkString(E, EmitFVName);
     } else if (TypedefLevelInfo.HasTypedef) {
       std::ostringstream Buf;
       getQualString(TypedefLevelInfo.TypedefLevel, Buf);
@@ -1420,7 +1428,7 @@ std::string FunctionVariableConstraint::mkString(const EnvironmentMap &E,
   std::string Ret = ReturnVar.mkTypeStr(E);
   std::string Itype = ReturnVar.mkItypeStr(E);
   // This is done to rewrite the typedef of a function proto
-  if (UnmaskTypedef && EmitName)
+  if (EmitName)
     Ret += Name;
   Ret = Ret + "(";
   std::vector<std::string> ParmStrs;
