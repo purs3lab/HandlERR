@@ -829,6 +829,10 @@ std::string PointerVariableConstraint::mkString(const EnvironmentMap &E,
     // If we have a FV pointer, then our "base" type is a function pointer type.
     if (FV) {
       if (Ss.str().empty()) {
+        if (!EmittedName) {
+          EndStrs.push_front(getName());
+          EmittedName = true;
+        }
         for (std::string Str : EndStrs)
           FptrInner << Str;
         EndStrs.clear();
