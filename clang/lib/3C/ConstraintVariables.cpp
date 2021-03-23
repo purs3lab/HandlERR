@@ -843,7 +843,7 @@ std::string PointerVariableConstraint::mkString(Constraints &CS,
     if (FV) {
       if (Ss.str().empty()) {
         if (!EmittedName) {
-          EndStrs.push_front(getName());
+          FptrInner << getName();
           EmittedName = true;
         }
         for (std::string Str : EndStrs)
