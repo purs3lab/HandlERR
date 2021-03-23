@@ -851,9 +851,13 @@ std::string PointerVariableConstraint::mkString(Constraints &CS,
         EndStrs.clear();
       }
       bool EmitFVName = !FptrInner.str().empty();
-      if (EmitFVName)
-        FV->Name = "(" + FptrInner.str() + ")";
-      Ss << FV->mkString(CS, EmitFVName);
+      if (EmitFVName) {
+        auto FVStrSplit = FV->mkStringSplit(CS);
+        Ss << FVStrSplit.first << "(" << FptrInner.str() << ")"
+           << FVStrSplit.second;
+      } else {
+        Ss << FV->mkString(CS);
+      }
     } else if (TypedefLevelInfo.HasTypedef) {
       std::ostringstream Buf;
       getQualString(TypedefLevelInfo.TypedefLevel, Buf);
@@ -1453,12 +1457,20 @@ std::string FunctionVariableConstraint::mkString(Constraints &CS,
                                                  bool EmitName, bool ForItype,
                                                  bool EmitPointee,
                                                  bool UnmaskTypedef) const {
+  std::string Front, Back;
+  std::tie(Front, Back) = mkStringSplit(CS);
+  // This is done to rewrite the typedef of a function proto
+  if (UnmaskTypedef && EmitName)
+    return Front + Name + Back;
+  return Front + Back;
+}
+
+std::pair<std::string, std::string>
+FunctionVariableConstraint::mkStringSplit(Constraints &CS) const {
   std::string Ret = ReturnVar.mkTypeStr(CS, false);
   std::string Itype = ReturnVar.mkItypeStr(CS);
-  // This is done to rewrite the typedef of a function proto
-  if (EmitName)
-    Ret += Name;
-  Ret = Ret + "(";
+
+  std::string Params = "(";
   std::vector<std::string> ParmStrs;
   for (const auto &I : this->ParamVars)
     ParmStrs.push_back(I.mkString(CS));
@@ -1470,10 +1482,10 @@ std::string FunctionVariableConstraint::mkString(Constraints &CS,
               std::ostream_iterator<std::string>(Ss, ", "));
     Ss << ParmStrs.back();
 
-    Ret = Ret + Ss.str() + ")";
+    Params = Params + Ss.str() + ")";
   } else
-    Ret = Ret + "void)";
-  return Ret + Itype;
+    Params = Params + "void)";
+  return std::make_pair(Ret, Params + Itype);
 }
 
 // Reverses the direction of CA for function subtyping.
