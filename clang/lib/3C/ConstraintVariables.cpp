@@ -802,17 +802,19 @@ std::string PointerVariableConstraint::mkString(const EnvironmentMap &E,
       if (ArrayRun)
         addArrayAnnotations(CheckedArrs, EndStrs);
       ArrayRun = false;
-      if (EmittedBase) {
-        Ss << "*";
-      } else if (!FV) {
-        assert(BaseType.size() > 0);
-        EmittedBase = true;
-        Ss << BaseType << " *";
-      } else {
+      if (FV != nullptr) {
         FptrInner << "*";
+        getQualString(TypeIdx, FptrInner);
+      } else {
+        if (!EmittedBase) {
+          assert(!BaseType.empty());
+          EmittedBase = true;
+          Ss << BaseType << " ";
+        }
+        Ss << "*";
+        getQualString(TypeIdx, Ss);
       }
 
-      getQualString(TypeIdx, Ss);
       break;
     case Atom::A_Const:
     case Atom::A_Var:

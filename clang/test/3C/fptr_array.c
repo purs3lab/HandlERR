@@ -49,6 +49,10 @@ int *(*k)(void);
 //CHECK_ALL: _Ptr<_Ptr<int> (void)> ks _Checked[2] _Checked[2] = {((void *)0)};
 //CHECK_ALL: _Ptr<_Ptr<int> (void)> k = ((void *)0);
 
+void (* const l)(int *);
+//CHECK_NOALL: void (*const l)(_Ptr<int> ) = ((void *)0);
+//CHECK_ALL: const _Ptr<void (_Ptr<int> )> l = ((void *)0);
+
 void test(void){
   fs[1] = f;
   gs[1] = g;
@@ -56,4 +60,7 @@ void test(void){
   is[1] = i;
   js[1] = j;
   ks[1][1] = k;
+  void (* const ls[1])(int *) = {l};
+  //CHECK_NOALL: void (*const ls[1])(_Ptr<int> ) = {l};
+  //CHECK_ALL: const _Ptr<void (_Ptr<int> )> ls _Checked[1] = {l};
 }
