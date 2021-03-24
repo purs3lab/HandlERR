@@ -97,14 +97,10 @@ PVConstraint *ConstraintResolver::addAtom(PVConstraint *PVC, ConstAtom *PtrTyp,
   Atom *NewA = CS.getFreshVar("&" + (PVC->getName()), VarAtom::V_Other);
   CAtoms CA = PVC->getCvars();
   if (!CA.empty()) {
-    Atom *A = *CA.begin();
-    // If PVC is already a pointer, add implication forcing outermost
-    //   one to be wild if this added one is
-    if (VarAtom *VA = dyn_cast<VarAtom>(A)) {
-      auto *Prem = CS.createGeq(NewA, CS.getWild());
-      auto *Conc = CS.createGeq(VA, CS.getWild());
-      CS.addConstraint(CS.createImplies(Prem, Conc));
-    }
+    // If PVC is already a pointer, add implication forcing outermost one to be
+    // wild if this added one is
+    if (auto *VA = dyn_cast<VarAtom>(*CA.begin()))
+      CS.addConstraint(new Geq(VA, NewA));
   }
 
   CA.insert(CA.begin(), NewA);
