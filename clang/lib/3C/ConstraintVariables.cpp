@@ -464,28 +464,13 @@ PointerVariableConstraint::PointerVariableConstraint(
   getQualString(TypeIdx, QualStr);
   BaseType = QualStr.str() + BaseType;
 
-  // Here lets add implication that if outer pointer is WILD
-  // then make the inner pointers WILD too.
+  // If an outer pointer is wild, then the inner pointer must also be wild.
   if (Vars.size() > 1) {
-    bool UsedPrGeq = false;
-    for (auto VI = Vars.begin(), VE = Vars.end(); VI != VE; VI++) {
-      if (VarAtom *VIVar = dyn_cast<VarAtom>(*VI)) {
-        // Premise.
-        Geq *PrGeq = new Geq(VIVar, CS.getWild());
-        UsedPrGeq = false;
-        for (auto VJ = (VI + 1); VJ != VE; VJ++) {
-          if (VarAtom *VJVar = dyn_cast<VarAtom>(*VJ)) {
-            // Conclusion.
-            Geq *CoGeq = new Geq(VJVar, CS.getWild());
-            CS.addConstraint(CS.createImplies(PrGeq, CoGeq));
-            UsedPrGeq = true;
-          }
-        }
-        // Delete unused constraint.
-        if (!UsedPrGeq) {
-          delete (PrGeq);
-        }
-      }
+    for (unsigned VarIdx = 0; VarIdx < Vars.size() - 1; VarIdx++) {
+      VarAtom *VI = dyn_cast<VarAtom>(Vars[VarIdx]);
+      VarAtom *VJ = dyn_cast<VarAtom>(Vars[VarIdx + 1]);
+      if (VI && VJ)
+        CS.addConstraint(new Geq(VJ, VI));
     }
   }
 }
