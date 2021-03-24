@@ -506,7 +506,6 @@ public:
                  bool IsCheckedConstraint = true);
   Geq *createGeq(Atom *Lhs, Atom *Rhs, const std::string &Rsn,
                  PersistentSourceLoc *PL, bool IsCheckedConstraint = true);
-  Implies *createImplies(Geq *Premise, Geq *Conclusion);
 
   VarAtom *createFreshGEQ(std::string Name, VarAtom::VarKind VK, ConstAtom *Con,
                           std::string Rsn = DEFAULT_REASON,

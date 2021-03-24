@@ -645,10 +645,6 @@ Geq *Constraints::createGeq(Atom *Lhs, Atom *Rhs, const std::string &Rsn,
   return new Geq(Lhs, Rhs, Rsn, PL, IsCheckedConstraint);
 }
 
-Implies *Constraints::createImplies(Geq *Premise, Geq *Conclusion) {
-  return new Implies(Premise, Conclusion);
-}
-
 void Constraints::resetEnvironment() {
   Environment.resetFullSolution(getDefaultSolution());
 }
