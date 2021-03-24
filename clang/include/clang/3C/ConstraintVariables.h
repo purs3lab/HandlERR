@@ -225,9 +225,6 @@ private:
   //  * A sized array, then U -> (a,b) , a = O_SizedArray, b is static size.
   //  * An unsized array, then U -(a,b) , a = O_UnSizedArray, b has no meaning.
   std::map<uint32_t, std::pair<OriginalArrType, uint64_t>> ArrSizes;
-  // If for all U in arrSizes, any U -> (a,b) where a = O_SizedArray or
-  // O_UnSizedArray, arrPresent is true.
-  bool ArrPresent;
 
   // True if this variable has an itype in the original source code.
   bool SrcHasItype;
@@ -242,9 +239,10 @@ private:
   void insertQualType(uint32_t TypeIdx, QualType &QTy);
   // This function tries to emit an array size for the variable.
   // and returns true if the variable is an array and a size is emitted.
-  bool emitArraySize(std::stack<std::string> &CheckedArrs, uint32_t TypeIdx,
-                     bool &AllArray, bool &ArrayRun, bool Nt) const;
-  void addArrayAnnotations(std::stack<std::string> &CheckedArrs,
+  bool emitArraySize(std::stack<std::string> &ConstSizeArrs, uint32_t TypeIdx,
+                     Atom::AtomKind Kind) const;
+
+  void addArrayAnnotations(std::stack<std::string> &ConstArrs,
                            std::deque<std::string> &EndStrs) const;
 
   // Utility used by the constructor to obtain a string representation of a
@@ -302,16 +300,16 @@ private:
 public:
   // Constructor for when we know a CVars and a type string.
   PointerVariableConstraint(CAtoms V, std::string T, std::string Name,
-                            FunctionVariableConstraint *F, bool IsArr,
+                            FunctionVariableConstraint *F,
                             std::string Is, int Generic = -1)
       : ConstraintVariable(PointerVariable, "" /*not used*/, Name), BaseType(T),
-        Vars(V), FV(F), ArrPresent(IsArr), SrcHasItype(!Is.empty()),
+        Vars(V), FV(F), SrcHasItype(!Is.empty()),
         ItypeStr(Is), PartOfFuncPrototype(false), Parent(nullptr),
         BoundsAnnotationStr(""), GenericIndex(Generic), IsZeroWidthArray(false),
         IsVoidPtr(false) {}
 
   std::string getTy() const { return BaseType; }
-  bool getArrPresent() const { return ArrPresent; }
+  bool getArrPresent() const;
   // Check if the outermost pointer is an unsized array.
   bool isTopCvarUnsizedArr() const;
   // Check if any of the pointers is either a sized or unsized arr.
@@ -576,6 +574,8 @@ public:
   std::string mkString(Constraints &CS, bool EmitName = true,
                        bool ForItype = false, bool EmitPointee = false,
                        bool UnmaskTypedef = false) const override;
+  std::pair<std::string, std::string> mkStringSplit(Constraints &CS) const;
+
   void print(llvm::raw_ostream &O) const override;
   void dump() const override { print(llvm::errs()); }
   void dumpJson(llvm::raw_ostream &O) const override;
