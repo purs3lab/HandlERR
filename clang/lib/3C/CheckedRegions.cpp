@@ -215,6 +215,10 @@ bool CheckedRegionFinder::VisitCStyleCastExpr(CStyleCastExpr *E) {
   return true;
 }
 
+
+
+
+
 bool CheckedRegionFinder::VisitCallExpr(CallExpr *C) {
   auto *FD = C->getDirectCallee();
   FoldingSetNodeID ID;
@@ -227,9 +231,10 @@ bool CheckedRegionFinder::VisitCallExpr(CallExpr *C) {
       if (Info.hasTypeParamBindings(C,Context))
         for (auto Entry : Info.getTypeParamBindings(C, Context))
           Wild |= (Entry.second == nullptr);
-      auto Type = FD->getReturnType();
+      const auto IT = FD->getInteropType();
+      const auto Type = FD->getReturnType();
       Wild |= (!(FD->hasPrototype() || FD->doesThisDeclarationHaveABody())) ||
-              containsUncheckedPtr(Type);
+              containsUncheckedPtr(IT.getTypePtrOrNull() ? IT : Type);
       auto *FV = Info.getFuncConstraint(FD, Context);
       for (unsigned I = 0; I < FV->numParams(); I++)
         Wild |= isWild(*FV->getExternalParam(I));
