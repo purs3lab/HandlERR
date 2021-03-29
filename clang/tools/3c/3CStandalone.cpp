@@ -250,6 +250,20 @@ static cl::opt<bool> OptForceItypes(
     cl::init(false), cl::cat(_3CCategory));
 #endif
 
+std::string getFinalStatsPath(const std::string &J) {
+  // Get final path for a stats file.
+  SmallString<255> AbsPath;
+  std::error_code EC = llvm::sys::fs::real_path(J, AbsPath);
+  // If the path is not absolute path, then append output directory.
+  if (!EC && J != AbsPath.str()) {
+    std::string FP = OptOutputDir.getValue();
+    FP += llvm::sys::path::get_separator();
+    FP += J;
+    return FP;
+  }
+  return J;
+}
+
 int main(int argc, const char **argv) {
   sys::PrintStackTraceOnErrorSignal(argv[0]);
 
@@ -272,10 +286,12 @@ int main(int argc, const char **argv) {
   CcOptions.OutputDir = OptOutputDir.getValue();
   CcOptions.Verbose = OptVerbose;
   CcOptions.DumpIntermediate = OptDumpIntermediate;
-  CcOptions.ConstraintOutputJson = OptConstraintOutputJson.getValue();
-  CcOptions.StatsOutputJson = OptStatsOutputJson.getValue();
-  CcOptions.WildPtrInfoJson = OptWildPtrInfoJson.getValue();
-  CcOptions.PerPtrInfoJson = OptPerPtrWILDInfoJson.getValue();
+  CcOptions.ConstraintOutputJson =
+      getFinalStatsPath(OptConstraintOutputJson.getValue());
+  CcOptions.StatsOutputJson = getFinalStatsPath(OptStatsOutputJson.getValue());
+  CcOptions.WildPtrInfoJson = getFinalStatsPath(OptWildPtrInfoJson.getValue());
+  CcOptions.PerPtrInfoJson =
+      getFinalStatsPath(OptPerPtrWILDInfoJson.getValue());
   CcOptions.AddCheckedRegions = OptAddCheckedRegions;
   CcOptions.EnableAllTypes = OptAllTypes;
   CcOptions.DisableCCTypeChecker = OptDiableCCTypeChecker;
