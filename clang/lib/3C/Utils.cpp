@@ -57,33 +57,36 @@ FunctionDecl *getDefinition(FunctionDecl *FD) {
   return nullptr;
 }
 
-// Get the source location for the right paren of a function declaration
-// using the source character data buffer. Because this uses the character
-// buffer directly, it sees character data prior to preprocessing. This
-// means characters that are in comments, macros or otherwise not part of the
-// final preprocessed source code are seen and can cause this function to give
-// an incorrect result. This should only be used as a fall back for when the
-// clang library function FunctionTypeLoc::getRParenLoc cannot be called due to
-// a null FunctionTypeLoc or for when the function returns an invalid source
-// location.
+
+//This should only be used as a fall back for when the clang library function
+// FunctionTypeLoc::getRParenLoc cannot be called due to a null FunctionTypeLoc
+// or for when the function returns an invalid source location.
 SourceLocation getFunctionDeclRParen(FunctionDecl *FD, SourceManager &S) {
   const FunctionDecl *OFd = nullptr;
-
   if (FD->hasBody(OFd) && OFd == FD) {
     // Replace everything up to the beginning of the body.
     const Stmt *Body = FD->getBody(OFd);
-
-    int Offset = 0;
-    const char *Buf = S.getCharacterData(Body->getSourceRange().getBegin());
-
-    while (*Buf != ')') {
-      Buf--;
-      Offset--;
-    }
-
-    return Body->getSourceRange().getBegin().getLocWithOffset(Offset);
+    return locationPrecedingChar(Body->getBeginLoc(), S, ')');
   }
   return FD->getSourceRange().getEnd();
+}
+
+// Find the source location of the first character C preceding the given source
+// location.  Because this uses the character buffer directly, it sees character
+// data prior to preprocessing. This means characters that are in comments,
+// macros or otherwise not part of the final preprocessed source code are seen
+// and can cause this function to give an incorrect result. This should only be
+// used as a fall back for when clang library function for obtaining source
+// locations are not available or return invalid results.
+SourceLocation
+locationPrecedingChar(SourceLocation SL, SourceManager &S, char C) {
+  int Offset = 0;
+  const char *Buf = S.getCharacterData(SL);
+  while (*Buf != C) {
+    Buf--;
+    Offset--;
+  }
+  return SL.getLocWithOffset(Offset);
 }
 
 clang::CheckedPointerKind getCheckedPointerKind(InteropTypeExpr *ItypeExpr) {
@@ -170,12 +173,6 @@ std::error_code tryGetCanonicalFilePath(const std::string &FileName,
   return EC;
 }
 
-void getCanonicalFilePath(const std::string &FileName,
-                          std::string &AbsoluteFp) {
-  std::error_code EC = tryGetCanonicalFilePath(FileName, AbsoluteFp);
-  assert(!EC && "tryGetCanonicalFilePath failed");
-}
-
 bool filePathStartsWith(const std::string &Path, const std::string &Prefix) {
   // If the path exactly equals the prefix, don't ruin it by appending a
   // separator to the prefix. (This may never happen in 3C, but let's get it
@@ -221,9 +218,9 @@ bool isPtrOrArrayType(const clang::QualType &QT) {
   return QT->isPointerType() || QT->isArrayType();
 }
 
-bool isStructOrUnionType(clang::VarDecl *VD) {
-  return VD->getType().getTypePtr()->isStructureType() ||
-         VD->getType().getTypePtr()->isUnionType();
+bool isStructOrUnionType(clang::DeclaratorDecl *DD) {
+  return DD->getType().getTypePtr()->isStructureType() ||
+         DD->getType().getTypePtr()->isUnionType();
 }
 
 std::string qtyToStr(clang::QualType QT, const std::string &Name) {
@@ -470,4 +467,22 @@ Expr *ignoreCheckedCImplicit(Expr *E) {
     New = Old->IgnoreExprTmp()->IgnoreImplicit();
   }
   return New;
+}
+
+FunctionTypeLoc getFunctionTypeLoc(TypeLoc TLoc) {
+  TLoc = getBaseTypeLoc(TLoc);
+  auto ATLoc = TLoc.getAs<AttributedTypeLoc>();
+  if (!ATLoc.isNull())
+    TLoc = ATLoc.getNextTypeLoc();
+  return TLoc.getAs<FunctionTypeLoc>();
+}
+
+FunctionTypeLoc getFunctionTypeLoc(DeclaratorDecl *Decl) {
+  if (auto *TSInfo = Decl->getTypeSourceInfo())
+    return getFunctionTypeLoc(TSInfo->getTypeLoc());
+  return FunctionTypeLoc();
+}
+
+bool isKAndRFunctionDecl(FunctionDecl *FD) {
+  return !FD->hasPrototype() && FD->getNumParams();
 }
