@@ -33,8 +33,7 @@ int *sus(int *x, int *y) {
 }
 
 int *foo() {
-  //CHECK_NOALL: _Ptr<int> foo(void) _Checked {
-  //CHECK_ALL: _Ptr<int> foo(void) {
+  //CHECK: _Ptr<int> foo(void) {
   int sx = 3, sy = 4;
   int *x = &sx;
   //CHECK_NOALL: _Ptr<int> x = &sx;
@@ -49,8 +48,7 @@ int *foo() {
 }
 
 int *bar() {
-  //CHECK_NOALL: _Ptr<int> bar(void) _Checked {
-  //CHECK_ALL: _Ptr<int> bar(void) {
+  //CHECK: _Ptr<int> bar(void) {
   int sx = 3, sy = 4;
   int *x = &sx;
   //CHECK_NOALL: _Ptr<int> x = &sx;

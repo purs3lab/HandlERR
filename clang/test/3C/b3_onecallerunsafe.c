@@ -33,8 +33,7 @@ int *sus(int *x, int *y) {
 }
 
 int *foo() {
-  //CHECK_NOALL: _Ptr<int> foo(void) _Checked {
-  //CHECK_ALL: _Ptr<int> foo(void) {
+  //CHECK: _Ptr<int> foo(void) {
   int sx = 3;
   int sy = 4;
   int *x = &sx;
