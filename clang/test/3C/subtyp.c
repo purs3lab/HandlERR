@@ -9,12 +9,13 @@ void take(int *p : itype(_Nt_array_ptr<int>));
 //CHECK: void take(int *p : itype(_Nt_array_ptr<int>));
 int *foo(int *x) {
   //CHECK_NOALL: int *foo(int *x : itype(_Ptr<int>)) : itype(_Ptr<int>) {
-  //CHECK_ALL: _Nt_array_ptr<int> foo(_Nt_array_ptr<int> x) _Checked {
+  //CHECK_ALL: _Nt_array_ptr<int> foo(_Nt_array_ptr<int> x) {
   take(x);
   return x;
 }
 void bar() {
-  //CHECK: void bar() _Checked {
+  //CHECK_NOALL: void bar() {
+  //CHECK_ALL: void bar() _Checked {
   int *x = 0;
   //CHECK_NOALL: _Ptr<int> x = 0;
   //CHECK_ALL: _Nt_array_ptr<int> x = 0;
