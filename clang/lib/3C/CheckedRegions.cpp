@@ -345,10 +345,11 @@ bool CheckedRegionFinder::isInStatementPosition(CallExpr *C) {
 }
 
 bool CheckedRegionFinder::isWild(CVarOption Cv) {
-  if (Cv.hasValue() &&
-      Cv.getValue().hasWild(Info.getConstraints().getVariables()))
-    return true;
-  return false;
+  const auto &E = Info.getConstraints().getVariables();
+  if (Cv.hasValue())
+    return Cv.getValue().hasWild(E) || Cv.getValue().hasParamWild(E);
+  else
+    return false;
 }
 
 bool CheckedRegionFinder::containsUncheckedPtr(QualType Qt) {

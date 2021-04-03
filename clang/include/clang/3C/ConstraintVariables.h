@@ -130,6 +130,7 @@ public:
   // Here, AIdx is the pointer level which needs to be checked.
   // By default, we check for all pointer levels (or VarAtoms)
   virtual bool hasWild(const EnvironmentMap &E, int AIdx = -1) const = 0;
+  virtual bool hasParamWild(const EnvironmentMap &E) const = 0;
   virtual bool hasArr(const EnvironmentMap &E, int AIdx = -1) const = 0;
   virtual bool hasNtArr(const EnvironmentMap &E, int AIdx = -1) const = 0;
 
@@ -416,6 +417,7 @@ public:
   bool anyChanges(const EnvironmentMap &E) const override;
   bool anyArgumentIsWild(const EnvironmentMap &E);
   bool hasWild(const EnvironmentMap &E, int AIdx = -1) const override;
+  bool hasParamWild(const EnvironmentMap &E) const override;
   bool hasArr(const EnvironmentMap &E, int AIdx = -1) const override;
   bool hasNtArr(const EnvironmentMap &E, int AIdx = -1) const override;
 
@@ -476,6 +478,7 @@ public:
 
   bool hasItypeSolution(Constraints &CS) const;
   bool hasCheckedSolution(Constraints &CS) const;
+  bool hasWild(const EnvironmentMap &E) const;
 
   PVConstraint *getInternal() const { return InternalConstraint; }
   PVConstraint *getExternal() const { return ExternalConstraint; }
@@ -585,6 +588,7 @@ public:
                        PersistentSourceLoc *PL) const override;
   bool anyChanges(const EnvironmentMap &E) const override;
   bool hasWild(const EnvironmentMap &E, int AIdx = -1) const override;
+  bool hasParamWild(const EnvironmentMap &E) const override;
   bool hasArr(const EnvironmentMap &E, int AIdx = -1) const override;
   bool hasNtArr(const EnvironmentMap &E, int AIdx = -1) const override;
 
