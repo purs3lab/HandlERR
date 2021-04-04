@@ -41,9 +41,9 @@ int *foo(int *y, int *w) {
 //CHECK-NEXT:   return x;
 //CHECK-NEXT: }
 
-//CHECK_ALL: _Array_ptr<int> foo(_Array_ptr<int> y, _Ptr<int> w) _Checked {
+//CHECK_ALL: _Array_ptr<int> foo(_Array_ptr<int> y, _Ptr<int> w) {
 //CHECK_ALL: _Array_ptr<int> z = 0;
-//CHECK_NOALL: _Ptr<int> foo(_Ptr<int> y, _Ptr<int> w) _Checked {
+//CHECK_NOALL: _Ptr<int> foo(_Ptr<int> y, _Ptr<int> w) {
 //CHECK_NOALL: _Ptr<int> z = 0;
 
 void baz(int *p) {

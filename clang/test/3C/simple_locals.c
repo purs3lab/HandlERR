@@ -122,7 +122,7 @@ int arrcheck(int *a, int b) { return a[b]; }
 
 int badcall(int *a, int b) { return arrcheck(a, b); }
 //CHECK_ALL: int badcall(_Array_ptr<int> a : count(b), int b) _Checked { return arrcheck(a, b); }
-//CHECK_NOALL: int badcall(_Ptr<int> a, int b) _Checked { return arrcheck(a, b); }
+//CHECK_NOALL: int badcall(_Ptr<int> a, int b) { return arrcheck(a, b); }
 
 void pullit(char *base, char *out, int *index) {
   char tmp = base[*index];
