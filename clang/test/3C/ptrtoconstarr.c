@@ -49,7 +49,7 @@ int foo(void) {
 }
 
 int baz(void) {
-  //CHECK_ALL: int baz(void) {
+  //CHECK_ALL: int baz(void) _Checked {
   //CHECK_NOALL: int baz(void) {
   char local[5] = "test";
   //CHECK_ALL: char local _Nt_checked[5] =  "test";

@@ -215,10 +215,6 @@ bool CheckedRegionFinder::VisitCStyleCastExpr(CStyleCastExpr *E) {
   return true;
 }
 
-
-
-
-
 bool CheckedRegionFinder::VisitCallExpr(CallExpr *C) {
   auto *FD = C->getDirectCallee();
   FoldingSetNodeID ID;
@@ -277,8 +273,7 @@ bool CheckedRegionFinder::VisitDeclRefExpr(DeclRefExpr *DR) {
   auto T = DR->getType();
   auto *D = DR->getDecl();
   CVarOption CV = Info.getVariable(D, Context);
-  bool IW = isWild(CV) || containsUncheckedPtr(T);
-
+  bool IW = false;
   if (auto *FD = dyn_cast<FunctionDecl>(D)) {
     auto *FV = Info.getFuncConstraint(FD, Context);
     IW |= FV->hasWild(Info.getConstraints().getVariables());
@@ -286,7 +281,8 @@ bool CheckedRegionFinder::VisitDeclRefExpr(DeclRefExpr *DR) {
       PVConstraint *ParamCV = FV->getExternalParam(I);
       IW |= isWild(*ParamCV);
     }
-  }
+  } else
+    IW = isWild(CV) || containsUncheckedPtr(T);
 
   Wild |= IW;
   return true;

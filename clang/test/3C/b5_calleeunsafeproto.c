@@ -25,7 +25,8 @@ int *sus(int *, int *);
 //CHECK_ALL: int *sus(_Array_ptr<int> x, _Ptr<int> y) : itype(_Ptr<int>);
 
 int *foo() {
-  //CHECK: _Ptr<int> foo(void) {
+  //CHECK_NOALL: _Ptr<int> foo(void) _Checked {
+  //CHECK_ALL: _Ptr<int> foo(void) {
   int sx = 3, sy = 4;
   int *x = &sx;
   //CHECK_NOALL: _Ptr<int> x = &sx;
@@ -40,7 +41,8 @@ int *foo() {
 }
 
 int *bar() {
-  //CHECK: _Ptr<int> bar(void) {
+  //CHECK_NOALL: _Ptr<int> bar(void) _Checked {
+  //CHECK_ALL: _Ptr<int> bar(void) {
   int sx = 3, sy = 4;
   int *x = &sx;
   //CHECK_NOALL: _Ptr<int> x = &sx;

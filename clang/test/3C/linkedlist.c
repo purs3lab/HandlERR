@@ -135,7 +135,6 @@ void delete (int data, List *list) {
     //CHECK: while (current != NULL) _Checked {
 
     if (current->data == data) {
-      //CHECK: if (current->data == data) _Unchecked {
 
       previous->next = current->next;
 
@@ -191,6 +190,7 @@ void destroy(List *list) {
   //CHECK: _Ptr<Node> next = current;
 
   while (current != NULL) {
+    //CHECK: while (current != NULL) _Checked {
     next = current->next;
     free(current);
     current = next;

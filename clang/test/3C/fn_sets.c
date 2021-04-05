@@ -22,7 +22,7 @@ int *g(int *y) {
 }
 
 void foo(int *z) {
-  //CHECK: void foo(_Ptr<int> z) {
+  //CHECK: void foo(_Ptr<int> z) _Checked {
   int *w = (0 ? f : g)(z);
   //CHECK: _Ptr<int> w = (0 ? f : g)(z);
 }
