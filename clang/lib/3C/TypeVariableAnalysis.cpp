@@ -97,7 +97,7 @@ bool TypeVarVisitor::VisitCallExpr(CallExpr *CE) {
       FDef = FD;
     if (auto *FVCon = Info.getFuncConstraint(FDef, Context)) {
       // if we need to rewrite it but can't (macro, etc), it isn't safe
-      bool ForcedInconsistent = !typeArgsProvided(CE)
+      bool ForcedInconsistent = !typeArgsProvided(CE, Context)
                                 && !Rewriter::isRewritable(CE->getExprLoc());
       // Visit each function argument, and if it use a type variable, insert it
       // into the type variable binding map.
@@ -108,7 +108,7 @@ bool TypeVarVisitor::VisitCallExpr(CallExpr *CE) {
           break;
         const int TyIdx = FVCon->getExternalParam(I)->getGenericIndex();
         if (TyIdx >= 0) {
-          Expr *Uncast = A->IgnoreImpCasts();
+          Expr *Uncast = A->IgnoreParenImpCasts();
           std::set<ConstraintVariable *> CVs = CR.getExprConstraintVarsSet(Uncast);
           insertBinding(CE, TyIdx, Uncast->getType(), CVs, ForcedInconsistent);
         }
@@ -193,8 +193,8 @@ void TypeVarVisitor::setProgramInfoTypeVars() {
 
 // Check if type arguments have already been provided for this function
 // call so that we don't mess with anything already there.
-bool typeArgsProvided(CallExpr *Call) {
-  Expr *Callee = Call->getCallee()->IgnoreImpCasts();
+bool typeArgsProvided(CallExpr *Call, ASTContext *Context) {
+  Expr *Callee = Call->getCallee()->IgnoreParenImpCasts();
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(Callee)) {
     // ArgInfo is null if there are no type arguments anywhere in the program
     if (auto *ArgInfo = DRE->GetTypeArgumentInfo())
@@ -213,6 +213,14 @@ bool typeArgsProvided(CallExpr *Call) {
       }
     return false;
   }
+  llvm::errs() << "typeArgsProvided failed:\n";
+  FullSourceLoc FullLoc = Context->getFullLoc(Call->getBeginLoc());
+  FullLoc.print(llvm::errs(), Context->getSourceManager());
+  llvm::errs() << "Call:\n";
+  Call->dump();
+  llvm::errs() << "Callee (after IgnoreImpCasts):\n";
+  Callee->dump();
+  llvm::errs() << "\n";
   // We only handle direct calls, so there must be a DeclRefExpr.
   llvm_unreachable("Callee of function call is not DeclRefExpr.");
 }

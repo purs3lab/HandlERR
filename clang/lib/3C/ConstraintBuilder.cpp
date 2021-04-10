@@ -246,7 +246,7 @@ public:
               if (ConsistentTypeParams.find(TyIdx) !=
                   ConsistentTypeParams.end())
                 ArgumentConstraints =
-                    CB.getExprConstraintVars(A->IgnoreImpCasts());
+                    CB.getExprConstraintVars(A->IgnoreParenImpCasts());
               else
                 ArgumentConstraints = CB.getExprConstraintVars(A);
             } else

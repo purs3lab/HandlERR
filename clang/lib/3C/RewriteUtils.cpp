@@ -437,7 +437,7 @@ public:
     if (isa_and_nonnull<FunctionDecl>(CE->getCalleeDecl())) {
       // If the function call already has type arguments, we'll trust that
       // they're correct and not add anything else.
-      if (typeArgsProvided(CE))
+      if (typeArgsProvided(CE, Context))
         return true;
 
       if (Info.hasTypeParamBindings(CE, Context)) {
@@ -478,7 +478,7 @@ private:
   // Attempt to find the right spot to insert the type arguments. This should be
   // directly after the name of the function being called.
   SourceLocation getTypeArgLocation(CallExpr *Call) {
-    Expr *Callee = Call->getCallee()->IgnoreImpCasts();
+    Expr *Callee = Call->getCallee()->IgnoreParenImpCasts();
     if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(Callee)) {
       size_t NameLength = DRE->getNameInfo().getAsString().length();
       return Call->getBeginLoc().getLocWithOffset(NameLength);

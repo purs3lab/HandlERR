@@ -58,7 +58,7 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
         const int TyVarIdx = FV->getExternalParam(PIdx)->getGenericIndex();
         if (TypeVars.find(TyVarIdx) != TypeVars.end() &&
             TypeVars[TyVarIdx] != nullptr)
-          ArgExpr = ArgExpr->IgnoreImpCasts();
+          ArgExpr = ArgExpr->IgnoreParenImpCasts();
       }
 
       CVarSet ArgConstraints = CR.getExprConstraintVarsSet(ArgExpr);

@@ -99,6 +99,6 @@ private:
                      CVarSet &CVs, bool ForceInconsistent = false);
 };
 
-bool typeArgsProvided(CallExpr *Call);
+bool typeArgsProvided(CallExpr *Call, ASTContext *Context);
 
 #endif
