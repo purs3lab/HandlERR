@@ -486,3 +486,10 @@ FunctionTypeLoc getFunctionTypeLoc(DeclaratorDecl *Decl) {
 bool isKAndRFunctionDecl(FunctionDecl *FD) {
   return !FD->hasPrototype() && FD->getNumParams();
 }
+
+int64_t getStmtIdWorkaround(const Stmt *St, const ASTContext &Context) {
+  // XXX If we wanted to produce IDs of smaller absolute value, we could
+  // probably fix the alignment of negative values returned by
+  // identifyKnownObject so we can successfully divide them by sizeof(St).
+  return Context.getAllocator().identifyKnownObject(St);
+}

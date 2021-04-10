@@ -212,4 +212,9 @@ clang::FunctionTypeLoc getFunctionTypeLoc(clang::DeclaratorDecl *Decl);
 
 bool isKAndRFunctionDecl(clang::FunctionDecl *FD);
 
+// Use instead of Stmt::getID to work around
+// https://github.com/correctcomputation/checkedc-clang/issues/544.
+int64_t getStmtIdWorkaround(const clang::Stmt *St,
+                            const clang::ASTContext &Context);
+
 #endif
