@@ -893,6 +893,7 @@ std::string PointerVariableConstraint::mkString(Constraints &CS,
       auto Name = TypedefLevelInfo.TypedefName;
       Ss << Buf.str() << Name;
     } else {
+      assert(!BaseType.empty());
       Ss << BaseType;
     }
   }
