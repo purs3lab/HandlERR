@@ -624,8 +624,9 @@ ConstraintsGraph &Constraints::getPtrTypCG() {
   return *PtrTypCG;
 }
 
-Geq *Constraints::createGeq(Atom *Lhs, Atom *Rhs, bool IsCheckedConstraint) {
-  return new Geq(Lhs, Rhs, IsCheckedConstraint);
+Geq *Constraints::createGeq(Atom *Lhs, Atom *Rhs, bool IsCheckedConstraint,
+                            bool Soft) {
+  return new Geq(Lhs, Rhs, IsCheckedConstraint, Soft);
 }
 
 Geq *Constraints::createGeq(Atom *Lhs, Atom *Rhs, const std::string &Rsn,
