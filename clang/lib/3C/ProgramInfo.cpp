@@ -704,6 +704,8 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       PVConstraint *PVExternal = F->getExternalParam(I);
       unifyIfTypedef(Ty, *AstContext, PVD, PVInternal);
       unifyIfTypedef(Ty, *AstContext, PVD, PVExternal);
+      ensureNtCorrect(PVD, *AstContext, PVInternal);
+      ensureNtCorrect(PVD, *AstContext, PVExternal);
       PVInternal->setValidDecl();
       PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(PVD, *AstContext);
       // Constraint variable is stored on the parent function, so we need to
@@ -730,6 +732,7 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       NewCV = P;
       std::string VarName(VD->getName());
       unifyIfTypedef(Ty, *AstContext, VD, P);
+      ensureNtCorrect(VD, *AstContext, P);
       if (VD->hasGlobalStorage()) {
         // If we see a definition for this global variable, indicate so in
         // ExternGVars.
@@ -764,6 +767,13 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
   }
   constrainWildIfMacro(NewCV, D->getLocation());
   Variables[PLoc] = NewCV;
+}
+
+void ProgramInfo::ensureNtCorrect(const VarDecl *VD, const ASTContext &C,
+                                  PointerVariableConstraint *PV) {
+  if (AllTypes && !canBeNtArray(VD->getType())) {
+    PV->constrainOuterTo(CS, CS.getArr(), true);
+  }
 }
 
 void ProgramInfo::unifyIfTypedef(const Type* Ty, ASTContext& Context, DeclaratorDecl* Decl, PVConstraint* P) {
