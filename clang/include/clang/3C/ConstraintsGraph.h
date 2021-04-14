@@ -155,7 +155,7 @@ public:
   }
 
   bool getNeighbors(Data D, std::set<Data> &DataSet, bool Succ,
-                    bool Append = false, bool IgnoreSoftEdges = false) {
+                    bool Append = false, bool IgnoreSoftEdges = true) {
     NodeType *N = this->findNode(D);
     if (N == nullptr)
       return false;
