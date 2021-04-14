@@ -292,17 +292,17 @@ class Geq : public Constraint {
 public:
   Geq(Atom *Lhs, Atom *Rhs, bool IsCC = true, bool Soft = false)
       : Constraint(C_Geq), Lhs(Lhs), Rhs(Rhs), IsCheckedConstraint(IsCC),
-        SoftConstraint(Soft) {}
+        IsSoftConstraint(Soft) {}
 
   Geq(Atom *Lhs, Atom *Rhs, const std::string &Rsn, bool IsCC = true,
       bool Soft = false)
       : Constraint(C_Geq, Rsn), Lhs(Lhs), Rhs(Rhs), IsCheckedConstraint(IsCC),
-        SoftConstraint(Soft) {}
+        IsSoftConstraint(Soft) {}
 
   Geq(Atom *Lhs, Atom *Rhs, const std::string &Rsn, PersistentSourceLoc *PL,
       bool IsCC = true, bool Soft = false)
       : Constraint(C_Geq, Rsn, PL), Lhs(Lhs), Rhs(Rhs),
-        IsCheckedConstraint(IsCC), SoftConstraint(Soft) {}
+        IsCheckedConstraint(IsCC), IsSoftConstraint(Soft) {}
 
   static bool classof(const Constraint *C) { return C->getKind() == C_Geq; }
 
@@ -374,14 +374,14 @@ public:
   }
 
   bool isSoftConstraint(void) {
-    return SoftConstraint;
+    return IsSoftConstraint;
   }
 
 private:
   Atom *Lhs;
   Atom *Rhs;
   bool IsCheckedConstraint;
-  bool SoftConstraint;
+  bool IsSoftConstraint;
 };
 
 // a ==> b
