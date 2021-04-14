@@ -32,7 +32,7 @@ void ConstraintsGraph::addConstraint(Geq *C, const Constraints &CS) {
   if (auto *VA2 = clang::dyn_cast<VarAtom>(A2))
     assert(CS.getVar(VA2->getLoc()) == VA2);
 
-  addEdge(A2, A1, C->isSoftConstraint());
+  addEdge(A2, A1, C->isSoft());
 }
 
 std::string llvm::DOTGraphTraits<GraphVizOutputGraph>::getNodeLabel(
@@ -115,7 +115,7 @@ void GraphVizOutputGraph::mergeConstraintGraph(const ConstraintsGraph &Graph,
 
       if (!EdgeExists) {
         // Otherwise, we actually need to create a new edge.
-        GraphVizEdge *GE = new GraphVizEdge(*D, EK, E->SoftEdge);
+        GraphVizEdge *GE = new GraphVizEdge(*D, EK, E->IsSoft);
         connect(*S, *D, *GE);
       }
     }

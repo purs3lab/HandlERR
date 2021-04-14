@@ -38,7 +38,7 @@ public:
 
   void connectTo(NodeType &Other, bool SoftEdge = false) {
     auto *BLR = new EdgeType(Other);
-    BLR->SoftEdge = SoftEdge;
+    BLR->IsSoft = SoftEdge;
     this->addEdge(*BLR);
     auto *BRL = new EdgeType(*this);
     Other.addPredecessor(*BRL);
@@ -95,7 +95,7 @@ struct DataEdge : public llvm::DGEdge<DataNode<DataType>, DataEdge<DataType>> {
   typedef llvm::DGEdge<DataNode<DataType>, DataEdge<DataType>> SuperType;
   explicit DataEdge(DataNode<DataType> &Node) : SuperType(Node) {}
   DataEdge(const DataEdge &E) : SuperType(E) {}
-  bool SoftEdge = false;
+  bool IsSoft = false;
 };
 
 class GraphVizOutputGraph;
@@ -165,7 +165,7 @@ public:
     else
       Edges = N->getPredecessors();
     for (auto *E : Edges)
-      if (!E->SoftEdge || !IgnoreSoftEdges)
+      if (!E->IsSoft || !IgnoreSoftEdges)
         DataSet.insert(E->getTargetNode().getData());
     return !DataSet.empty();
   }
