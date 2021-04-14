@@ -38,8 +38,6 @@ public:
 
   void connectTo(NodeType &Other, bool SoftEdge = false) {
     auto *BLR = new EdgeType(Other);
-    if (SoftEdge)
-      llvm::errs() << "Adding a soft edge!\n";
     BLR->SoftEdge = SoftEdge;
     this->addEdge(*BLR);
     auto *BRL = new EdgeType(*this);
@@ -169,8 +167,6 @@ public:
     for (auto *E : Edges)
       if (!E->SoftEdge || !IgnoreSoftEdges)
         DataSet.insert(E->getTargetNode().getData());
-      else
-        llvm::errs() << (Succ ? "Successors:" : "Preds") << "Skipped an edge as it was soft!\n";
     return !DataSet.empty();
   }
 

@@ -355,7 +355,7 @@ static std::set<VarAtom *> findBounded(ConstraintsGraph &CG,
     Open.erase(Open.begin());
 
     std::set<Atom *> Neighbors;
-    CG.getNeighbors(Curr, Neighbors, Succs, true);
+    CG.getNeighbors(Curr, Neighbors, Succs, false, true);
     for (Atom *A : Neighbors) {
       VarAtom *VA = dyn_cast<VarAtom>(A);
       if (VA && Bounded.find(VA) == Bounded.end()) {
@@ -441,7 +441,7 @@ bool Constraints::graphBasedSolve() {
       // 1. Find return vars with a lower bound.
       std::set<VarAtom *> ParamVars = Env.filterAtoms(IsParam);
       std::set<VarAtom *> LowerBoundedRet =
-          findBounded(SolPtrTypCG, &ParamVars, true, true);
+          findBounded(SolPtrTypCG, &ParamVars, true);
       filter(IsReturn, LowerBoundedRet);
 
       // 2. Find local vars where one of the return vars is an upper bound.
@@ -452,7 +452,7 @@ bool Constraints::graphBasedSolve() {
 
       // 3. Find local vars upper bounded by a const var.
       std::set<VarAtom *> ConstUpperBoundedLocals =
-          findBounded(SolPtrTypCG, nullptr, false, true);
+          findBounded(SolPtrTypCG, nullptr, false);
       filter(IsNonParamReturn, ConstUpperBoundedLocals);
 
       // 4. Take set difference of 2 and 3 to find bounded vars that do not
