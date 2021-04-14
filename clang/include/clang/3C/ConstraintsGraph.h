@@ -170,7 +170,7 @@ public:
       if (!E->SoftEdge || !IgnoreSoftEdges)
         DataSet.insert(E->getTargetNode().getData());
       else
-        llvm::errs() << "Skipped an edge as it was soft!\n";
+        llvm::errs() << (Succ ? "Successors:" : "Preds") << "Skipped an edge as it was soft!\n";
     return !DataSet.empty();
   }
 
@@ -259,13 +259,16 @@ class GraphVizEdge
     : public llvm::DGEdge<DataNode<Atom *, GraphVizEdge>, GraphVizEdge> {
 public:
   enum EdgeKind { EK_Checked, EK_Ptype };
-  explicit GraphVizEdge(DataNode<Atom *, GraphVizEdge> &Node, EdgeKind Kind)
-      : DGEdge(Node), Kind(Kind), IsBidirectional(false) {}
+  explicit GraphVizEdge(DataNode<Atom *, GraphVizEdge> &Node, EdgeKind Kind,
+                        bool Soft)
+      : DGEdge(Node), Kind(Kind), IsBidirectional(false), IsSoft(Soft) {}
   GraphVizEdge(const GraphVizEdge &E)
-      : DGEdge(E), Kind(E.Kind), IsBidirectional(E.IsBidirectional) {}
+      : DGEdge(E), Kind(E.Kind), IsBidirectional(E.IsBidirectional),
+        IsSoft(E.IsSoft) {}
 
   EdgeKind Kind;
   bool IsBidirectional;
+  bool IsSoft;
 };
 
 // The graph subclass for graphviz output uses the specialized edge class to
