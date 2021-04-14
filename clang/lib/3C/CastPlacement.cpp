@@ -104,6 +104,23 @@ CastPlacementVisitor::CastNeeded CastPlacementVisitor::needCasting(
     ConstraintVariable *SrcInt, ConstraintVariable *SrcExt,
     ConstraintVariable *DstInt, ConstraintVariable *DstExt) {
   Constraints &CS = Info.getConstraints();
+
+  // In this case, the source is internally unchecked (i.e., it has an itype).
+  // Typically, no casting is required, but a CheckedC bug means that we need to
+  // insert a cast. https://github.com/microsoft/checkedc-clang/issues/614
+  if (!SrcInt->isSolutionChecked(CS.getVariables()) &&
+      SrcExt->isSolutionChecked(CS.getVariables()) &&
+      DstExt->isSolutionChecked(CS.getVariables())) {
+    if (auto *DstPVC = dyn_cast<PVConstraint>(DstExt)) {
+      if (!DstPVC->getCvars().empty()) {
+        ConstAtom *CA = Info.getConstraints().getAssignment(
+          DstPVC->getCvars().at(0));
+        if (isa<NTArrAtom>(CA))
+          return CAST_NT_ARRAY;
+      }
+    }
+  }
+
   // No casting is required if the source exactly matches either the
   // destinations itype or the destinations regular type.
   if (SrcExt->solutionEqualTo(CS, DstExt, false) ||
@@ -118,10 +135,12 @@ CastPlacementVisitor::CastNeeded CastPlacementVisitor::needCasting(
   // in the file. Because the function is defined, the internal type can solve
   // to checked, causing to appear fully checked (without itype). This would
   // cause a bounds cast to be inserted on unchecked calls to the function.
-  if (!SrcExt->isChecked(CS.getVariables()) && DstInt->srcHasItype())
+  if (!SrcExt->isSolutionChecked(CS.getVariables()) &&
+      !DstInt->isSolutionFullyChecked(CS.getVariables()) &&
+      DstInt->srcHasItype())
     return NO_CAST;
 
-  if (DstInt->isChecked(CS.getVariables()))
+  if (DstInt->isSolutionChecked(CS.getVariables()))
     return CAST_TO_CHECKED;
 
   return CAST_TO_WILD;
@@ -134,7 +153,10 @@ std::pair<std::string, std::string>
 CastPlacementVisitor::getCastString(ConstraintVariable *Dst,
                                     CastNeeded CastKind) {
   switch (CastKind) {
-  case CAST_TO_WILD:
+  case CAST_NT_ARRAY:
+    return std::make_pair(
+      "((" + Dst->mkString(Info.getConstraints(), false) + ")", ")");
+    case CAST_TO_WILD:
     return std::make_pair("((" + Dst->getRewritableOriginalTy() + ")", ")");
   case CAST_TO_CHECKED: {
     std::string Suffix = ")";
