@@ -178,7 +178,7 @@ public:
   void constrainWildIfMacro(ConstraintVariable *CV, SourceLocation Location,
                             PersistentSourceLoc *PSL = nullptr);
 
-  void ensureNtCorrect(const VarDecl *VD, const ASTContext &C,
+  void ensureNtCorrect(const QualType &QT, const ASTContext &C,
                        PointerVariableConstraint *PV);
 
   void unifyIfTypedef(const clang::Type *, clang::ASTContext &,

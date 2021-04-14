@@ -93,7 +93,7 @@ void Constraints::editConstraintHook(Constraint *C) {
 
 // Add a constraint to the set of constraints. If the constraint is already
 // present (by syntactic equality) return false.
-bool Constraints::addConstraint(Constraint *C) {
+bool Constraints::addConstraint(Constraint *C, bool Soft) {
   // Validate the constraint to be added.
   if (!check(C)) {
     C->dump();
@@ -110,7 +110,7 @@ bool Constraints::addConstraint(Constraint *C) {
       if (G->constraintIsChecked())
         ChkCG->addConstraint(G, *this);
       else
-        PtrTypCG->addConstraint(G, *this);
+        PtrTypCG->addConstraint(G, *this, Soft);
     }
 
     addReasonBasedConstraint(C);
@@ -250,7 +250,7 @@ doSolve(ConstraintsGraph &CG,
         ConstAtom *Cva = Env.getAssignment(Pre->getLHS());
         // Premise is true, so fire the conclusion.
         if (*Cca < *Cva || *Cca == *Cva) {
-          CG.addConstraint(Con, *CS);
+          CG.addConstraint(Con, *CS, false);
           // Keep track of fired constraints, so that we can delete them.
           FiredImplies.insert(Imp);
         }
@@ -385,7 +385,8 @@ bool Constraints::graphBasedSolve() {
       if (G->constraintIsChecked())
         SolChkCG.addConstraint(G, *this);
       else
-        SolPtrTypCG.addConstraint(G, *this);
+        // Need to copy whether or not this constraint into the new graph
+        SolPtrTypCG.addConstraint(G, *this, G->isSoftConstraint());
     }
     // Save the implies to solve them later.
     else if (Implies *Imp = dyn_cast<Implies>(C)) {
@@ -498,7 +499,7 @@ bool Constraints::graphBasedSolve() {
         std::string Rsn = "Bad pointer type solution";
         Geq *ConflictConstraint = createGeq(VA, getWild(), Rsn);
         addConstraint(ConflictConstraint);
-        SolChkCG.addConstraint(ConflictConstraint, *this);
+        SolChkCG.addConstraint(ConflictConstraint, *this, false);
         Rest.insert(VA);
       }
       Conflicts.clear();

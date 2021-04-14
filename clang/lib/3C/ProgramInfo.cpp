@@ -694,6 +694,8 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
     auto RetTy = FD->getReturnType();
     unifyIfTypedef(RetTy.getTypePtr(), *AstContext, FD, F->getExternalReturn());
     unifyIfTypedef(RetTy.getTypePtr(), *AstContext, FD, F->getInternalReturn());
+    ensureNtCorrect(RetTy, *AstContext, F->getExternalReturn());
+    ensureNtCorrect(RetTy, *AstContext, F->getInternalReturn());
 
     // Add mappings from the parameters PLoc to the constraint variables for
     // the parameters.
@@ -704,8 +706,8 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       PVConstraint *PVExternal = F->getExternalParam(I);
       unifyIfTypedef(Ty, *AstContext, PVD, PVInternal);
       unifyIfTypedef(Ty, *AstContext, PVD, PVExternal);
-      ensureNtCorrect(PVD, *AstContext, PVInternal);
-      ensureNtCorrect(PVD, *AstContext, PVExternal);
+      ensureNtCorrect(PVD->getType(), *AstContext, PVInternal);
+      ensureNtCorrect(PVD->getType(), *AstContext, PVExternal);
       PVInternal->setValidDecl();
       PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(PVD, *AstContext);
       // Constraint variable is stored on the parent function, so we need to
@@ -732,7 +734,7 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       NewCV = P;
       std::string VarName(VD->getName());
       unifyIfTypedef(Ty, *AstContext, VD, P);
-      ensureNtCorrect(VD, *AstContext, P);
+      ensureNtCorrect(VD->getType(), *AstContext, P);
       if (VD->hasGlobalStorage()) {
         // If we see a definition for this global variable, indicate so in
         // ExternGVars.
@@ -769,10 +771,10 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
   Variables[PLoc] = NewCV;
 }
 
-void ProgramInfo::ensureNtCorrect(const VarDecl *VD, const ASTContext &C,
+void ProgramInfo::ensureNtCorrect(const QualType &QT, const ASTContext &C,
                                   PointerVariableConstraint *PV) {
-  if (AllTypes && !canBeNtArray(VD->getType())) {
-    PV->constrainOuterTo(CS, CS.getArr(), true);
+  if (AllTypes && !canBeNtArray(QT)) {
+    PV->constrainOuterTo(CS, CS.getArr(), true, true);
   }
 }
 

@@ -36,8 +36,11 @@ public:
 
   DataType getData() const { return Data; }
 
-  void connectTo(NodeType &Other) {
+  void connectTo(NodeType &Other, bool SoftEdge = false) {
     auto *BLR = new EdgeType(Other);
+    if (SoftEdge)
+      llvm::errs() << "Adding a soft edge!\n";
+    BLR->SoftEdge = SoftEdge;
     this->addEdge(*BLR);
     auto *BRL = new EdgeType(*this);
     Other.addPredecessor(*BRL);
@@ -94,6 +97,7 @@ struct DataEdge : public llvm::DGEdge<DataNode<DataType>, DataEdge<DataType>> {
   typedef llvm::DGEdge<DataNode<DataType>, DataEdge<DataType>> SuperType;
   explicit DataEdge(DataNode<DataType> &Node) : SuperType(Node) {}
   DataEdge(const DataEdge &E) : SuperType(E) {}
+  bool SoftEdge = false;
 };
 
 class GraphVizOutputGraph;
@@ -133,10 +137,10 @@ public:
     invalidateBFSCache();
   }
 
-  void addEdge(Data L, Data R) {
+  void addEdge(Data L, Data R, bool SoftEdge = false) {
     NodeType *BL = this->findOrCreateNode(L);
     NodeType *BR = this->findOrCreateNode(R);
-    BL->connectTo(*BR);
+    BL->connectTo(*BR, SoftEdge);
     invalidateBFSCache();
   }
 
@@ -151,7 +155,7 @@ public:
   }
 
   bool getNeighbors(Data D, std::set<Data> &DataSet, bool Succ,
-                    bool Append = false) {
+                    bool Append = false, bool IgnoreSoftEdges = false) {
     NodeType *N = this->findNode(D);
     if (N == nullptr)
       return false;
@@ -163,7 +167,10 @@ public:
     else
       Edges = N->getPredecessors();
     for (auto *E : Edges)
-      DataSet.insert(E->getTargetNode().getData());
+      if (!E->SoftEdge || !IgnoreSoftEdges)
+        DataSet.insert(E->getTargetNode().getData());
+      else
+        llvm::errs() << "Skipped an edge as it was soft!\n";
     return !DataSet.empty();
   }
 
@@ -226,7 +233,7 @@ class ConstraintsGraph : public DataGraph<Atom *> {
 public:
   // Add an edge to the graph according to the Geq constraint. This is an edge
   // RHSAtom -> LHSAtom
-  void addConstraint(Geq *C, const Constraints &CS);
+  void addConstraint(Geq *C, const Constraints &CS, bool Soft = false);
 
   // Const atoms are the starting points for the solving algorithm so, we need
   // be able to retrieve them from the graph.
