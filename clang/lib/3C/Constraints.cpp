@@ -93,7 +93,7 @@ void Constraints::editConstraintHook(Constraint *C) {
 
 // Add a constraint to the set of constraints. If the constraint is already
 // present (by syntactic equality) return false.
-bool Constraints::addConstraint(Constraint *C, bool Soft) {
+bool Constraints::addConstraint(Constraint *C) {
   // Validate the constraint to be added.
   if (!check(C)) {
     C->dump();
@@ -110,7 +110,7 @@ bool Constraints::addConstraint(Constraint *C, bool Soft) {
       if (G->constraintIsChecked())
         ChkCG->addConstraint(G, *this);
       else
-        PtrTypCG->addConstraint(G, *this, Soft);
+        PtrTypCG->addConstraint(G, *this);
     }
 
     addReasonBasedConstraint(C);
@@ -250,7 +250,7 @@ doSolve(ConstraintsGraph &CG,
         ConstAtom *Cva = Env.getAssignment(Pre->getLHS());
         // Premise is true, so fire the conclusion.
         if (*Cca < *Cva || *Cca == *Cva) {
-          CG.addConstraint(Con, *CS, false);
+          CG.addConstraint(Con, *CS);
           // Keep track of fired constraints, so that we can delete them.
           FiredImplies.insert(Imp);
         }
@@ -329,7 +329,8 @@ void filter(VarAtomPred P, std::set<VarAtom *> &S) {
 // atoms.
 static std::set<VarAtom *> findBounded(ConstraintsGraph &CG,
                                        std::set<VarAtom *> *Concrete,
-                                       bool Succs, bool UseConstAtoms = true) {
+                                       bool Succs, bool UseConstAtoms = true,
+                                       bool IgnoreSoft = false) {
   std::set<VarAtom *> Bounded;
   std::set<Atom *> Open;
 
@@ -355,7 +356,7 @@ static std::set<VarAtom *> findBounded(ConstraintsGraph &CG,
     Open.erase(Open.begin());
 
     std::set<Atom *> Neighbors;
-    CG.getNeighbors(Curr, Neighbors, Succs);
+    CG.getNeighbors(Curr, Neighbors, Succs, IgnoreSoft);
     for (Atom *A : Neighbors) {
       VarAtom *VA = dyn_cast<VarAtom>(A);
       if (VA && Bounded.find(VA) == Bounded.end()) {
@@ -386,7 +387,7 @@ bool Constraints::graphBasedSolve() {
         SolChkCG.addConstraint(G, *this);
       else
         // Need to copy whether or not this constraint into the new graph
-        SolPtrTypCG.addConstraint(G, *this, G->isSoftConstraint());
+        SolPtrTypCG.addConstraint(G, *this);
     }
     // Save the implies to solve them later.
     else if (Implies *Imp = dyn_cast<Implies>(C)) {
@@ -441,18 +442,18 @@ bool Constraints::graphBasedSolve() {
       // 1. Find return vars with a lower bound.
       std::set<VarAtom *> ParamVars = Env.filterAtoms(IsParam);
       std::set<VarAtom *> LowerBoundedRet =
-          findBounded(SolPtrTypCG, &ParamVars, true);
+          findBounded(SolPtrTypCG, &ParamVars, true, true, true);
       filter(IsReturn, LowerBoundedRet);
 
       // 2. Find local vars where one of the return vars is an upper bound.
       //    Conversely, these are an alternative lower bound for the return var.
       std::set<VarAtom *> RetUpperBoundedLocals =
-          findBounded(SolPtrTypCG, &LowerBoundedRet, false, false);
+          findBounded(SolPtrTypCG, &LowerBoundedRet, false, false, true);
       filter(IsNonParamReturn, RetUpperBoundedLocals);
 
       // 3. Find local vars upper bounded by a const var.
       std::set<VarAtom *> ConstUpperBoundedLocals =
-          findBounded(SolPtrTypCG, nullptr, false);
+          findBounded(SolPtrTypCG, nullptr, false, true, true);
       filter(IsNonParamReturn, ConstUpperBoundedLocals);
 
       // 4. Take set difference of 2 and 3 to find bounded vars that do not
@@ -499,7 +500,7 @@ bool Constraints::graphBasedSolve() {
         std::string Rsn = "Bad pointer type solution";
         Geq *ConflictConstraint = createGeq(VA, getWild(), Rsn);
         addConstraint(ConflictConstraint);
-        SolChkCG.addConstraint(ConflictConstraint, *this, false);
+        SolChkCG.addConstraint(ConflictConstraint, *this);
         Rest.insert(VA);
       }
       Conflicts.clear();

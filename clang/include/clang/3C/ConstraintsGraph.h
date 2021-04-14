@@ -155,7 +155,7 @@ public:
   }
 
   bool getNeighbors(Data D, std::set<Data> &DataSet, bool Succ,
-                    bool Append = false, bool IgnoreSoftEdges = true) {
+                    bool Append = false, bool IgnoreSoftEdges = false) {
     NodeType *N = this->findNode(D);
     if (N == nullptr)
       return false;
@@ -233,7 +233,7 @@ class ConstraintsGraph : public DataGraph<Atom *> {
 public:
   // Add an edge to the graph according to the Geq constraint. This is an edge
   // RHSAtom -> LHSAtom
-  void addConstraint(Geq *C, const Constraints &CS, bool Soft = false);
+  void addConstraint(Geq *C, const Constraints &CS);
 
   // Const atoms are the starting points for the solving algorithm so, we need
   // be able to retrieve them from the graph.

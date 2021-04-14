@@ -493,7 +493,7 @@ public:
       FuncKeyToConsMap;
 
   bool removeConstraint(Constraint *C);
-  bool addConstraint(Constraint *C, bool Soft = false);
+  bool addConstraint(Constraint *C);
   // It's important to return these by reference. Programs can have
   // 10-100-100000 constraints and variables, and copying them each time
   // a client wants to examine the environment is untenable.
