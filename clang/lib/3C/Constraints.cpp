@@ -329,8 +329,7 @@ void filter(VarAtomPred P, std::set<VarAtom *> &S) {
 // atoms.
 static std::set<VarAtom *> findBounded(ConstraintsGraph &CG,
                                        std::set<VarAtom *> *Concrete,
-                                       bool Succs, bool UseConstAtoms = true,
-                                       bool IgnoreSoft = false) {
+                                       bool Succs, bool UseConstAtoms = true) {
   std::set<VarAtom *> Bounded;
   std::set<Atom *> Open;
 
@@ -356,7 +355,7 @@ static std::set<VarAtom *> findBounded(ConstraintsGraph &CG,
     Open.erase(Open.begin());
 
     std::set<Atom *> Neighbors;
-    CG.getNeighbors(Curr, Neighbors, Succs, IgnoreSoft);
+    CG.getNeighbors(Curr, Neighbors, Succs, true);
     for (Atom *A : Neighbors) {
       VarAtom *VA = dyn_cast<VarAtom>(A);
       if (VA && Bounded.find(VA) == Bounded.end()) {
@@ -442,18 +441,18 @@ bool Constraints::graphBasedSolve() {
       // 1. Find return vars with a lower bound.
       std::set<VarAtom *> ParamVars = Env.filterAtoms(IsParam);
       std::set<VarAtom *> LowerBoundedRet =
-          findBounded(SolPtrTypCG, &ParamVars, true, true, true);
+          findBounded(SolPtrTypCG, &ParamVars, true, true);
       filter(IsReturn, LowerBoundedRet);
 
       // 2. Find local vars where one of the return vars is an upper bound.
       //    Conversely, these are an alternative lower bound for the return var.
       std::set<VarAtom *> RetUpperBoundedLocals =
-          findBounded(SolPtrTypCG, &LowerBoundedRet, false, false, true);
+          findBounded(SolPtrTypCG, &LowerBoundedRet, false, false);
       filter(IsNonParamReturn, RetUpperBoundedLocals);
 
       // 3. Find local vars upper bounded by a const var.
       std::set<VarAtom *> ConstUpperBoundedLocals =
-          findBounded(SolPtrTypCG, nullptr, false, true, true);
+          findBounded(SolPtrTypCG, nullptr, false, true);
       filter(IsNonParamReturn, ConstUpperBoundedLocals);
 
       // 4. Take set difference of 2 and 3 to find bounded vars that do not
