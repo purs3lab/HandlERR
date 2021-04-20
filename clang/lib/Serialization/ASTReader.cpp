@@ -6439,6 +6439,10 @@ class TypeLocReader : public TypeLocVisitor<TypeLocReader> {
     return Reader.readSourceLocation();
   }
 
+  void discardSourceLocation() {
+    Reader.discardSourceLocation();
+  }
+
   TypeSourceInfo *GetTypeSourceInfo() {
     return Reader.readTypeSourceInfo();
   }
@@ -6614,7 +6618,11 @@ void TypeLocReader::VisitTypedefTypeLoc(TypedefTypeLoc TL) {
 }
 
 void TypeLocReader::VisitTypeVariableTypeLoc(TypeVariableTypeLoc TL) {
-  TL.setNameLoc(readSourceLocation());
+  // This is crashing. See if I can bypass it with functionality loss I may not
+  // care about. ~ Matt 2021-04-20
+  //TL.setNameLoc(readSourceLocation());
+  discardSourceLocation();
+  TL.setNameLoc(/*invalid*/ SourceLocation());
 }
 
 void TypeLocReader::VisitExistentialTypeLoc(ExistentialTypeLoc TL) {

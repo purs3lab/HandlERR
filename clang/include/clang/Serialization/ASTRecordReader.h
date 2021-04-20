@@ -277,6 +277,10 @@ public:
     return Reader->ReadSourceLocation(*F, Record, Idx);
   }
 
+  void discardSourceLocation() {
+    Idx++;
+  }
+
   /// Read a source range, advancing Idx.
   SourceRange readSourceRange() {
     return Reader->ReadSourceRange(*F, Record, Idx);
