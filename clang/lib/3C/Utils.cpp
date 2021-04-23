@@ -11,6 +11,8 @@
 #include "clang/3C/Utils.h"
 #include "clang/3C/3CGlobalOptions.h"
 #include "clang/3C/ConstraintVariables.h"
+#include "clang/AST/FormatString.h"
+#include "clang/Sema/Sema.h"
 #include "llvm/Support/Path.h"
 #include <errno.h>
 
@@ -216,6 +218,22 @@ bool isPointerType(clang::ValueDecl *VD) {
 
 bool isPtrOrArrayType(const clang::QualType &QT) {
   return QT->isPointerType() || QT->isArrayType();
+}
+
+bool isNullableType(const clang::QualType &QT) {
+  if (QT.getTypePtrOrNull())
+      return QT->isPointerType() || QT->isArrayType() || QT->isIntegerType();
+  else
+    return false;
+}
+
+bool canBeNtArray(const clang::QualType &QT) {
+  if (const auto &Ptr = dyn_cast<clang::PointerType>(QT))
+    return isNullableType(Ptr->getPointeeType());
+  else if (const auto &Arr = dyn_cast<clang::ArrayType>(QT))
+    return isNullableType(Arr->getElementType());
+  else
+    return false;
 }
 
 bool isStructOrUnionType(clang::DeclaratorDecl *DD) {
@@ -488,4 +506,86 @@ FunctionTypeLoc getFunctionTypeLoc(DeclaratorDecl *Decl) {
 
 bool isKAndRFunctionDecl(FunctionDecl *FD) {
   return !FD->hasPrototype() && FD->getNumParams();
+}
+
+namespace {
+
+// See clang/docs/checkedc/3C/clang-tidy.md#_3c-name-prefix
+// NOLINTNEXTLINE(readability-identifier-naming)
+class _3CFormatStringHandler
+    : public analyze_format_string::FormatStringHandler {
+  unsigned DataStartIdx;
+  std::set<unsigned> &StringArgIndices;
+
+public:
+  _3CFormatStringHandler(unsigned DataStartIdx,
+                         std::set<unsigned> &StringArgIndices)
+      : DataStartIdx(DataStartIdx), StringArgIndices(StringArgIndices) {}
+  bool HandlePrintfSpecifier(const analyze_printf::PrintfSpecifier &FS,
+                             const char *StartSpecifier,
+                             unsigned SpecifierLen) override {
+    if (FS.consumesDataArgument() &&
+        FS.getConversionSpecifier().getKind() ==
+            analyze_printf::PrintfConversionSpecifier::sArg)
+      StringArgIndices.insert(DataStartIdx + FS.getArgIndex());
+    return true;
+  }
+};
+
+} // namespace
+
+// Unfortunately, this duplicates some logic from different parts of
+// SemaChecking.cpp. We handle only the common case. If we get this wrong, it's
+// not a big deal: 3C may just infer some checked pointer types incorrectly.
+void getPrintfStringArgIndices(const CallExpr *CE, const FunctionDecl *Callee,
+                               const clang::ASTContext &Context,
+                               std::set<unsigned> &StringArgIndices) {
+  for (const FormatAttr *Attr : Callee->specific_attrs<FormatAttr>()) {
+    if (Sema::GetFormatStringType(Attr) != Sema::FST_Printf)
+      continue;
+    if (Attr->getFirstArg() == 0)
+      // This means the data arguments are not available to check.
+      continue;
+    unsigned FormatIdx = Attr->getFormatIdx() - 1;
+    unsigned DataStartIdx = Attr->getFirstArg() - 1;
+    if (FormatIdx >= CE->getNumArgs())
+      continue;
+    const Expr *FormatExpr =
+        CE->getArg(FormatIdx)->IgnoreImpCasts()->IgnoreExprTmp();
+    const clang::StringLiteral *FormatLiteral =
+        dyn_cast<clang::StringLiteral>(FormatExpr);
+    if (!FormatLiteral || FormatLiteral->getCharByteWidth() != 1)
+      continue;
+    StringRef Str = FormatLiteral->getString();
+    _3CFormatStringHandler Handler(DataStartIdx, StringArgIndices);
+    analyze_format_string::ParsePrintfString(
+        Handler, Str.data(), Str.data() + Str.size(), Context.getLangOpts(),
+        Context.getTargetInfo(), false);
+  }
+}
+
+int64_t getStmtIdWorkaround(const Stmt *St, const ASTContext &Context) {
+  // Stmt::getID uses Context.getAllocator().identifyKnownAlignedObject(St) to
+  // derive a unique ID for St from its pointer in a way that should be
+  // reproducible if the exact same source file is loaded in the exact same
+  // environment, since if AST building is deterministic, the sequence of memory
+  // allocations should be identical.
+  // Context.getAllocator().identifyKnownObject(St) generates an ID that is
+  // normally the offset of the Stmt object within the allocator's memory slabs,
+  // so it is divisible by alignof(Stmt). identifyKnownAlignedObject wraps
+  // identifyKnownObject to divide the ID by alignof(Stmt) (after asserting that
+  // it is divisible), probably in an effort to produce smaller IDs to make some
+  // data structures more efficient. However, if the Stmt is allocated in a
+  // custom-size slab because it exceeds the default slab size of 4096, then
+  // identifyKnownObject returns -1 minus the offset, which is _not_ divisible
+  // by alignof(Stmt) because of the -1. Unfortunately,
+  // identifyKnownAlignedObject doesn't account for this rare case, and its
+  // assertion fails (https://bugs.llvm.org/show_bug.cgi?id=49926).
+  //
+  // Since 3C doesn't currently use the ID in a data structure that benefits
+  // from smaller IDs, we may as well just use identifyKnownObject. If we wanted
+  // smaller IDs, the solution would probably be to have
+  // identifyKnownAlignedObject fix the alignment of negative IDs by subtracting
+  // (alignof(Stmt) - 1) before dividing.
+  return Context.getAllocator().identifyKnownObject(St);
 }

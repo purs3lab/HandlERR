@@ -707,6 +707,8 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
     auto RetTy = FD->getReturnType();
     unifyIfTypedef(RetTy.getTypePtr(), *AstContext, FD, F->getExternalReturn());
     unifyIfTypedef(RetTy.getTypePtr(), *AstContext, FD, F->getInternalReturn());
+    ensureNtCorrect(RetTy, *AstContext, F->getExternalReturn());
+    ensureNtCorrect(RetTy, *AstContext, F->getInternalReturn());
 
     // Add mappings from the parameters PLoc to the constraint variables for
     // the parameters.
@@ -717,6 +719,8 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       PVConstraint *PVExternal = F->getExternalParam(I);
       unifyIfTypedef(Ty, *AstContext, PVD, PVInternal);
       unifyIfTypedef(Ty, *AstContext, PVD, PVExternal);
+      ensureNtCorrect(PVD->getType(), *AstContext, PVInternal);
+      ensureNtCorrect(PVD->getType(), *AstContext, PVExternal);
       PVInternal->setValidDecl();
       PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(PVD, *AstContext);
       // Constraint variable is stored on the parent function, so we need to
@@ -743,6 +747,7 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       NewCV = P;
       std::string VarName(VD->getName());
       unifyIfTypedef(Ty, *AstContext, VD, P);
+      ensureNtCorrect(VD->getType(), *AstContext, P);
       if (VD->hasGlobalStorage()) {
         // If we see a definition for this global variable, indicate so in
         // ExternGVars.
@@ -780,6 +785,13 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
   Variables[PLoc] = NewCV;
 }
 
+void ProgramInfo::ensureNtCorrect(const QualType &QT, const ASTContext &C,
+                                  PointerVariableConstraint *PV) {
+  if (AllTypes && !canBeNtArray(QT)) {
+    PV->constrainOuterTo(CS, CS.getArr(), true, true);
+  }
+}
+
 void ProgramInfo::unifyIfTypedef(const Type* Ty, ASTContext& Context, DeclaratorDecl* Decl, PVConstraint* P) {
   if (const auto* TDT = dyn_cast<TypedefType>(Ty)) {
     auto* TDecl = TDT->getDecl();
@@ -800,7 +812,7 @@ ProgramInfo::getExprKey(Expr *E, ASTContext *C) const {
   //       is compiled multiple times with different defines
   std::string Name = C->getSourceManager().getFileEntryForID(
     C->getSourceManager().getMainFileID())->getName().str();
-  return std::make_pair(E->getID(*C), Name);
+  return std::make_pair(getStmtIdWorkaround(E, *C), Name);
 }
 
 bool ProgramInfo::hasPersistentConstraints(Expr *E, ASTContext *C) const {
