@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Special preprocessor wrapper that expands macros in source files in-place
 # without inlining `#include`s. This lets 3C rewrite program elements in their
 # original locations without macros getting in the way and without 3C having to
@@ -36,6 +37,7 @@ import logging
 import os
 import re
 import subprocess
+import sys
 from common import TranslationUnitInfo, realpath_cached
 
 
@@ -267,3 +269,22 @@ def expandMacros(opts: ExpandMacrosOptions, compilation_base_dir: str,
             verification_ok = False
     assert verification_ok, (
         'Verification of preprocessed output failed: see diffs above.')
+
+
+if __name__ == '__main__':
+    # TODO Compiler path input
+    try:
+        compiler = sys.argv[1]
+        input_file = sys.argv[2]
+        output_file = sys.argv[3]
+        dirname = sys.argv[4]
+        args = sys.argv[5]
+    except IndexError:
+        print('Usage: %s <compiler> <input file> <output file> <dirname>' % sys.argv[0])
+        exit(1)
+    opts = ExpandMacrosOptions(True, [], [])
+    tud = TranslationUnitInfo(compiler, [args], dirname,  \
+            input_file, output_file)
+    expandMacros(opts, dirname, [tud])
+
+
