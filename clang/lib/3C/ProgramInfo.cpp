@@ -191,15 +191,14 @@ void ProgramInfo::dumpJson(llvm::raw_ostream &O) const {
 // a function, then recurses on the return and parameter
 // constraints.
 static void getVarsFromConstraint(ConstraintVariable *V, CAtoms &R) {
-  if (auto *PVC = dyn_cast<PVConstraint>(V)) {
+  if (auto *PVC = dyn_cast_or_null<PVConstraint>(V)) {
     R.insert(R.begin(), PVC->getCvars().begin(), PVC->getCvars().end());
     if (FVConstraint *FVC = PVC->getFV())
       getVarsFromConstraint(FVC, R);
-  } else if (auto *FVC = dyn_cast<FVConstraint>(V)) {
-    if (FVC->getExternalReturn())
-      getVarsFromConstraint(FVC->getExternalReturn(), R);
+  } else if (auto *FVC = dyn_cast_or_null<FVConstraint>(V)) {
+      getVarsFromConstraint(FVC->getInternalReturn(), R);
     for (unsigned I = 0; I < FVC->numParams(); I++)
-      getVarsFromConstraint(FVC->getExternalParam(I), R);
+      getVarsFromConstraint(FVC->getInternalParam(I), R);
   }
 }
 
