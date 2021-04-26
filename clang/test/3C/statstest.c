@@ -4,7 +4,7 @@
 
 //CHECK: Summary
 //CHECK: TotalConstraints|TotalPtrs|TotalNTArr|TotalArr|TotalWild
-//CHECK: 12|10|0|1|1
+//CHECK: 15|13|0|1|1
 //CHECK: NumPointersNeedBounds:1,
 //CHECK: NumNTNoBounds:0,
 //CHECK: Details:
@@ -21,6 +21,8 @@
 
 #include <stdlib.h>
 
+void f(int *(*fp)(int *));
+
 void f(int *(*fp)(int *)) {
   //CHECK: void f(_Ptr<_Ptr<int> (_Ptr<int>)> fp) _Checked {
   fp(0);
@@ -29,7 +31,7 @@ int *g2(int *x) {
   //CHECK: _Ptr<int> g2(_Ptr<int> x) _Checked {
   return x;
 }
-int *g(_Ptr<int> x) {
+int *g(int *x: itype(_Ptr<int>)) {
   //CHECK: _Ptr<int> g(_Ptr<int> x) _Checked {
   return 0;
 }
