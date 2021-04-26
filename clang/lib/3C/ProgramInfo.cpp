@@ -224,7 +224,7 @@ void ProgramInfo::print_aggregate_stats(const std::set<std::string> &F,
         AllAtoms.insert(FoundVars.begin(), FoundVars.end());
         Tmp = C;
         if (FVConstraint *FV = dyn_cast<FVConstraint>(C)) {
-          Tmp = FV->getExternalReturn();
+          Tmp = FV->getInternalReturn();
         }
         // If this is a var atom?
         if (!FoundVars.empty() && dyn_cast_or_null<VarAtom>(*FoundVars.begin())) {
@@ -1122,12 +1122,12 @@ void ProgramInfo::insertIntoPtrSourceMap(const PersistentSourceLoc *PSL,
     // If the PVConstraint is a function pointer, create mappings for parameter
     // and return variables.
     if (auto *FV = PV->getFV()) {
-      insertIntoPtrSourceMap(PSL, FV->getExternalReturn());
+      insertIntoPtrSourceMap(PSL, FV->getInternalReturn());
       for (unsigned int I = 0; I < FV->numParams(); I++)
-        insertIntoPtrSourceMap(PSL, FV->getExternalParam(I));
+        insertIntoPtrSourceMap(PSL, FV->getInternalParam(I));
     }
   } else if (auto *FV = dyn_cast<FVConstraint>(CV)) {
-    insertIntoPtrSourceMap(PSL, FV->getExternalReturn());
+    insertIntoPtrSourceMap(PSL, FV->getInternalReturn());
   }
 }
 
@@ -1146,9 +1146,9 @@ void ProgramInfo::insertCVAtoms(
     if (FVConstraint *FVC = PVC->getFV())
       insertCVAtoms(FVC, AtomMap);
   } else if (auto *FVC = dyn_cast<FVConstraint>(CV)) {
-    insertCVAtoms(FVC->getExternalReturn(), AtomMap);
+    insertCVAtoms(FVC->getInternalReturn(), AtomMap);
     for (unsigned I = 0; I < FVC->numParams(); I++)
-      insertCVAtoms(FVC->getExternalParam(I), AtomMap);
+      insertCVAtoms(FVC->getInternalParam(I), AtomMap);
   } else {
     llvm_unreachable("Unknown kind of constraint variable.");
   }
