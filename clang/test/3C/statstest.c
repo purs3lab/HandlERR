@@ -4,7 +4,7 @@
 
 //CHECK: Summary
 //CHECK: TotalConstraints|TotalPtrs|TotalNTArr|TotalArr|TotalWild
-//CHECK: 15|13|0|1|1
+//CHECK: 18|14|0|1|3
 //CHECK: NumPointersNeedBounds:1,
 //CHECK: NumNTNoBounds:0,
 //CHECK: Details:
@@ -45,4 +45,14 @@ void h() {
   //CHECK: int *x = (int *)5;
   g(x);
   //CHECK: g(_Assume_bounds_cast<_Ptr<int>>(x));
+}
+
+void i(int *x) {
+//CHECK: void i(int *x : itype(_Ptr<int>)) {
+  x = 1;
+}
+
+void j() {
+  void (*fp)(int *) = i;
+  //CHECK: _Ptr<void (int * : itype(_Ptr<int>))> fp = i;
 }
