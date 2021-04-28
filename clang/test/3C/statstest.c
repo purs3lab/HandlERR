@@ -46,3 +46,13 @@ void h() {
   g(x);
   //CHECK: g(_Assume_bounds_cast<_Ptr<int>>(x));
 }
+
+void i(int *x) {
+//CHECK: void i(int *x : itype(_Ptr<int>)) {
+  x = 1;
+}
+
+void j() {
+  void (*fp)(int *) = i;
+  //CHECK: _Ptr<void (int * : itype(_Ptr<int>))> fp = i;
+}
