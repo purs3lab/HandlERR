@@ -4,7 +4,7 @@
 
 //CHECK: Summary
 //CHECK: TotalConstraints|TotalPtrs|TotalNTArr|TotalArr|TotalWild
-//CHECK: 15|13|0|1|1
+//CHECK: 18|14|0|1|3
 //CHECK: NumPointersNeedBounds:1,
 //CHECK: NumNTNoBounds:0,
 //CHECK: Details:
