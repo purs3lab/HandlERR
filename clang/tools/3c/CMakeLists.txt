@@ -24,6 +24,8 @@ target_link_libraries(3c
 target_include_directories(3c PUBLIC)
 
 # Based on clang/tools/driver/CMakeLists.txt.
+# REVIEW: Should we use add_clang_tool instead of add_clang_executable for 3c?
+# That would give us this for free. Would it break anything else?
 add_dependencies(3c clang-resource-headers)
 
 if (CHECKEDC_IN_TREE)
