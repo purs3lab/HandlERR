@@ -43,6 +43,8 @@ void AVarBoundsStats::print(llvm::raw_ostream &O,
     O << "DataflowMatch:" << Tmp.size() << "\n";
     findIntersection(DeclaredBounds, *InSrcArrs, Tmp);
     O << "Declared:" << Tmp.size() << "\n";
+    findIntersection(DeclaredButNotHandled, *InSrcArrs, Tmp);
+    O << "DeclaredButNotHandled:" << Tmp.size() << "\n";
   } else {
     O << "\"ArrayBoundsInferenceStats\":{";
     findIntersection(NamePrefixMatch, *InSrcArrs, Tmp);
@@ -56,7 +58,9 @@ void AVarBoundsStats::print(llvm::raw_ostream &O,
     findIntersection(DataflowMatch, *InSrcArrs, Tmp);
     O << "\"DataflowMatch\":" << Tmp.size() << ",\n";
     findIntersection(DeclaredBounds, *InSrcArrs, Tmp);
-    O << "\"Declared\":" << Tmp.size() << "\n";
+    O << "\"Declared\":" << Tmp.size() << ",\n";
+    findIntersection(DeclaredButNotHandled, *InSrcArrs, Tmp);
+    O << "\"DeclaredButNotHandled\":" << Tmp.size() << "\n";
     O << "}";
   }
 }
@@ -550,6 +554,7 @@ void AVarBoundsInfo::insertDeclaredBounds(clang::Decl *D, ABounds *B) {
   } else {
     // Set bounds to be invalid.
     InvalidBounds.insert(BK);
+    BoundsInferStats.DeclaredButNotHandled.insert(BK);
   }
 }
 

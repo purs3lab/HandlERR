@@ -11,6 +11,10 @@
 #ifndef LLVM_CLANG_3C_3CSTATS_H
 #define LLVM_CLANG_3C_3CSTATS_H
 
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/RecursiveASTVisitor.h"
+#include "clang/AST/Decl.h"
+#include "clang/AST/Stmt.h"
 #include "llvm/Support/raw_ostream.h"
 
 class PerformanceStats {
@@ -82,6 +86,25 @@ private:
   clock_t RewritingTimeSt;
   clock_t TotalTimeSt;
 
+};
+
+class ProgramInfo;
+
+// Class to record stats by visiting AST.
+class StatsRecorder
+    : public clang::RecursiveASTVisitor<StatsRecorder> {
+public:
+  explicit StatsRecorder(clang::ASTContext *C, ProgramInfo *I)
+      : Context(C), Info(I) {}
+
+  bool VisitCompoundStmt(clang::CompoundStmt *S);
+  bool VisitDecl(clang::Decl *D);
+  bool VisitCStyleCastExpr(clang::CStyleCastExpr *C);
+  bool VisitBoundsCastExpr(clang::BoundsCastExpr *B);
+
+private:
+  clang::ASTContext *Context;
+  ProgramInfo *Info;
 };
 
 #endif
