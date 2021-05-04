@@ -177,12 +177,10 @@ void ProgramInfo::print_aggregate_stats(const std::set<std::string> &F,
           Tmp = FV->getInternalReturn();
         }
         // If this is a var atom?
-        if (!FoundVars.empty()) {
-          if (Tmp->hasNtArr(CS.getVariables(), 0)) {
+        if (Tmp->hasNtArr(CS.getVariables(), 0)) {
             NtArrPtrs.insert(Tmp);
-          } else if (Tmp->hasArr(CS.getVariables(), 0)) {
+        } else if (Tmp->hasArr(CS.getVariables(), 0)) {
             ArrPtrs.insert(Tmp);
-          }
         }
       }
     }

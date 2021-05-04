@@ -1095,15 +1095,18 @@ void AVarBoundsInfo::computerArrPointers(ProgramInfo *PI,
         FV = PI->getExtFuncDefnConstraint(FuncName);
       }
 
-      if (hasArray(FV->getExternalParam(ParmNum), CS)) {
+      if (hasArray(FV->getExternalParam(ParmNum), CS) ||
+          hasArray(FV->getInternalParam(ParmNum), CS)) {
         ArrPointers.insert(Bkey);
       }
       // Does this array belong to a valid program variable?
-      if (isInSrcArray(FV->getExternalParam(ParmNum), CS)) {
+      if (isInSrcArray(FV->getExternalParam(ParmNum), CS) ||
+          isInSrcArray(FV->getInternalParam(ParmNum), CS)) {
         InProgramArrPtrBoundsKeys.insert(Bkey);
       }
 
-      if (hasOnlyNtArray(FV->getExternalParam(ParmNum), CS)) {
+      if (hasOnlyNtArray(FV->getExternalParam(ParmNum), CS) ||
+          hasOnlyNtArray(FV->getInternalParam(ParmNum), CS)) {
         NtArrPointerBoundsKey.insert(Bkey);
       }
 
@@ -1127,15 +1130,18 @@ void AVarBoundsInfo::computerArrPointers(ProgramInfo *PI,
         FV = getOnly(Tmp);
       }
 
-      if (hasArray(FV->getExternalReturn(), CS)) {
+      if (hasArray(FV->getExternalReturn(), CS) ||
+          hasArray(FV->getInternalReturn(), CS)) {
         ArrPointers.insert(Bkey);
       }
       // Does this array belongs to a valid program variable?
-      if (isInSrcArray(FV->getExternalReturn(), CS)) {
+      if (isInSrcArray(FV->getExternalReturn(), CS) ||
+          isInSrcArray(FV->getInternalReturn(), CS)) {
         InProgramArrPtrBoundsKeys.insert(Bkey);
       }
 
-      if (hasOnlyNtArray(FV->getExternalReturn(), CS)) {
+      if (hasOnlyNtArray(FV->getExternalReturn(), CS) ||
+          hasOnlyNtArray(FV->getInternalReturn(), CS)) {
         NtArrPointerBoundsKey.insert(Bkey);
         // If the return value is an nt array pointer
         // and there are no declared bounds? Then, we cannot
