@@ -8,7 +8,7 @@ Issue: https://github.com/correctcomputation/checkedc-clang/issues/573
 // RUN: 3c -base-dir=%S -alltypes %s -- | %clang -c -fcheckedc-extension -x c -o %t1.unusedl -
 // RUN: 3c -base-dir=%S %s -- | %clang -c -fcheckedc-extension -x c -o %t2.unused -
 
-extern _Itype_for_any(T) void *malloc(unsigned long size);
+#include <stdlib.h>
 
 int gsize;
 int *glob;
