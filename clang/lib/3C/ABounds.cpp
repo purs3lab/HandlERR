@@ -93,6 +93,18 @@ BoundsKey CountBound::getBKey() { return this->CountVar; }
 
 ABounds *CountBound::makeCopy(BoundsKey NK) { return new CountBound(NK); }
 
+std::string CountPlusOneBound::mkString(AVarBoundsInfo *ABI, clang::Decl *D) {
+  std::string CVar = ABounds::getBoundsKeyStr(CountVar, ABI, D);
+  return "count(" + CVar + " + 1)";
+}
+bool CountPlusOneBound::areSame(ABounds *O, AVarBoundsInfo *ABI) {
+  if (O != nullptr) {
+    if (CountPlusOneBound *OT = dyn_cast<CountPlusOneBound>(O))
+      return ABI->areSameProgramVar(this->CountVar, OT->CountVar);
+  }
+  return false;
+}
+
 std::string ByteBound::mkString(AVarBoundsInfo *ABI, clang::Decl *D) {
   return "byte_count(" + ABounds::getBoundsKeyStr(ByteVar, ABI, D) + ")";
 }
