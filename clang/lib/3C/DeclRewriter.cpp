@@ -541,6 +541,7 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   // return. If a type has changed, then it must be rewritten. There are then
   // some special circumstances which require rewriting the parameter or return
   // even when the type as not changed.
+  bool RewriteGeneric = false;
   bool RewriteParams = false;
   bool RewriteReturn = false;
 
@@ -553,6 +554,10 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
     // There might be other ways it can be null that I'm not aware of.
     DeclIsTypedef = isa<TypedefType>(TS->getType());
   }
+
+  // If we've made this generic we need add "_Itype_for_any"
+  if (FDConstraint->getGenericParams() > 0 && !FD->isItypeGenericFunction())
+    RewriteGeneric = true;
 
   // Get rewritten parameter variable declarations. Try to use
   // the source for as much as possible.
@@ -614,6 +619,10 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   if (FD->getReturnType()->isFunctionPointerType() && RewriteReturn)
     RewriteParams = true;
 
+  // If we're making this into a generic function, the return must be rewritten
+  // because it's between the generic indicator and parameters
+  if (RewriteGeneric) RewriteReturn = true;
+
   // If the function is declared using a typedef for the function type, then we
   // need to rewrite parameters and the return if either would have been
   // rewritten. What this does is expand the typedef to the full function type
@@ -632,8 +641,17 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   // Combine parameter and return variables rewritings into a single rewriting
   // for the entire function declaration.
   std::string NewSig = "";
+  if (RewriteGeneric) {
+    NewSig += "_Itype_for_any(T";
+    for (int i = 0; i < FDConstraint->getGenericParams() - 1; i++) {
+      assert(i < 2 &&
+             "Need an unexpected number of type variables");
+      NewSig += std::begin({",U",",V"})[i];
+    }
+    NewSig += ") ";
+  }
   if (RewriteReturn)
-    NewSig = getStorageQualifierString(FD) + ReturnVar;
+    NewSig += getStorageQualifierString(FD) + ReturnVar;
 
   if (RewriteReturn && RewriteParams)
     NewSig += FDConstraint->getName();
@@ -657,7 +675,7 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   // Add new declarations to RewriteThese if it has changed
   if (RewriteReturn || RewriteParams) {
     RewriteThese.insert(new FunctionDeclReplacement(FD, NewSig, RewriteReturn,
-                                                      RewriteParams));
+                                                      RewriteParams, RewriteGeneric));
   }
 
   return true;

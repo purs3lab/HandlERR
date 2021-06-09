@@ -140,7 +140,8 @@ PointerVariableConstraint::PointerVariableConstraint(
     this->FV = dyn_cast<FVConstraint>(Ot->FV->getCopy(CS));
   }
   this->Parent = Ot;
-  this->GenericIndex = Ot->GenericIndex;
+  this->BaseGenericIndex = Ot->BaseGenericIndex;
+  this->NewGenericIndex = Ot->NewGenericIndex;
   this->IsZeroWidthArray = Ot->IsZeroWidthArray;
   this->BaseType = Ot->BaseType;
   this->SrcHasItype = Ot->SrcHasItype;
@@ -213,6 +214,7 @@ private:
 PointerVariableConstraint::PointerVariableConstraint(
     const QualType &QT, DeclaratorDecl *D, std::string N, ProgramInfo &I,
     const ASTContext &C, std::string *InFunc, int ForceGenericIndex,
+    bool PotentialGeneric,
     bool VarAtomForChecked, TypeSourceInfo *TSInfo, const QualType &ITypeT)
     : ConstraintVariable(ConstraintVariable::PointerVariable,
                          tyToStr(QT.getTypePtr()), N),
@@ -307,9 +309,9 @@ PointerVariableConstraint::PointerVariableConstraint(
   TypedefLevelInfo = TypedefLevelFinder::find(QTy);
 
   if (ForceGenericIndex >= 0) {
-    GenericIndex = ForceGenericIndex;
+    BaseGenericIndex = ForceGenericIndex;
   } else {
-    GenericIndex = -1;
+    BaseGenericIndex = -1;
     // This makes a lot of assumptions about how the AST will look, and limits
     // it to one level.
     // TODO: Enhance TypedefLevelFinder to get this info.
@@ -318,10 +320,11 @@ PointerVariableConstraint::PointerVariableConstraint(
       if (auto *TypdefTy = dyn_cast_or_null<TypedefType>(PtrTy)) {
         const auto *Tv = dyn_cast<TypeVariableType>(TypdefTy->desugar());
         if (Tv)
-          GenericIndex = Tv->GetIndex();
+          BaseGenericIndex = Tv->GetIndex();
       }
     }
   }
+  NewGenericIndex = BaseGenericIndex;
 
   bool VarCreated = false;
   bool IsArr = false;
@@ -518,7 +521,8 @@ PointerVariableConstraint::PointerVariableConstraint(
   BaseType = extractBaseType(D, TSInfo, QT, Ty, C);
 
   IsVoidPtr = isTypeHasVoid(QT);
-  bool IsWild = !getIsGeneric() && (isVarArgType(BaseType) || IsVoidPtr);
+  bool IsWild = isVarArgType(BaseType) ||
+      (!(PotentialGeneric || getIsGeneric()) && IsVoidPtr);
   if (IsWild) {
     std::string Rsn =
         IsVoidPtr ? "Default void* type" : "Default Var arg list type";
@@ -780,6 +784,15 @@ std::string PointerVariableConstraint::mkString(Constraints &CS,
     EmittedName = true;
   uint32_t TypeIdx = 0;
 
+  // If we're set a GenericIndex for void, it means we're converting it into
+  // a generic function so give it the default generic type name.
+  // Add more type names below if we expect to use a lot.
+  std::string BaseName = BaseType;
+  if (NewGenericIndex > -1 && BaseType == "void") {
+    assert(NewGenericIndex < 3 && "Trying to use unexpected type variable name");
+    BaseName = std::begin({"T","U","V"})[NewGenericIndex];
+  }
+
   auto It = Vars.begin();
   auto I = 0;
   // Skip over first pointer level if only emitting pointee string.
@@ -877,7 +890,7 @@ std::string PointerVariableConstraint::mkString(Constraints &CS,
         if (!EmittedBase) {
           assert(!BaseType.empty());
           EmittedBase = true;
-          Ss << BaseType << " ";
+          Ss << BaseName << " ";
         }
         Ss << "*";
         getQualString(TypeIdx, Ss);
@@ -929,7 +942,7 @@ std::string PointerVariableConstraint::mkString(Constraints &CS,
       auto Name = TypedefLevelInfo.TypedefName;
       Ss << Buf.str() << Name;
     } else {
-      Ss << BaseType;
+      Ss << BaseName;
     }
   }
 
@@ -1047,6 +1060,7 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
     auto PSL = PersistentSourceLoc::mkPSL(D, *TmpCtx);
     FileName = PSL.getFileName();
     IsFunctionPtr = false;
+    TypeParams = FD->getNumTypeVars();
   }
 
   bool ReturnHasItype = false;
@@ -1092,10 +1106,8 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
       std::string PName = ParmVD ? ParmVD->getName().str() : "";
 
       auto ParamVar =
-          FVComponentVariable(QT, ITypeT, ParmVD, PName, I, Ctx, &N, ParamHasItype);
-      int GenericIdx = ParamVar.ExternalConstraint->getGenericIndex();
-      if (GenericIdx >= 0)
-        TypeParams = std::max(TypeParams, GenericIdx + 1);
+          FVComponentVariable(QT, ITypeT, ParmVD, PName, I, Ctx,
+                              &N, true, ParamHasItype);
       ParamVars.push_back(ParamVar);
     }
 
@@ -1109,10 +1121,43 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
   }
 
   // ConstraintVariable for the return.
-  ReturnVar = FVComponentVariable(RT, RTIType, D, RETVAR, I, Ctx, &N, ReturnHasItype);
-  int GenericIdx = ReturnVar.ExternalConstraint->getGenericIndex();
-  if (GenericIdx >= 0)
-    TypeParams = std::max(TypeParams, GenericIdx + 1);
+  ReturnVar = FVComponentVariable(RT, RTIType, D, RETVAR, I, Ctx,
+                                  &N, true, ReturnHasItype);
+
+  // Locate the void* params for potential generic use
+  std::vector<int> Voids;
+  if(ReturnVar.ExternalConstraint->isVoidPtr() &&
+      !ReturnVar.ExternalConstraint->getIsGeneric()) {
+    Voids.push_back(-1);
+  }
+  for(int i=0; i < ParamVars.size();i++) {
+    if(ParamVars[i].ExternalConstraint->isVoidPtr() &&
+        !ParamVars[i].ExternalConstraint->getIsGeneric()) {
+      Voids.push_back(i);
+    }
+  }
+  // Strategy: If there's one void*, turn this into a generic function.
+  // Otherwise, we need to constraint the void*'s to wild
+  if(Voids.size() == 1 && TypeParams == 0){
+    int Index = Voids[0];
+    if(Index == -1) {
+      ReturnVar.setGenericIndex(0);
+    } else {
+      ParamVars[Index].setGenericIndex(0);
+    }
+    TypeParams = 1;
+  } else {
+    auto &CS = I.getConstraints();
+    for(int idx : Voids)
+      if(idx == -1){
+        ReturnVar.ExternalConstraint->constrainToWild(
+            CS,"Default void* type");
+      } else {
+        ParamVars[idx].ExternalConstraint->constrainToWild(
+            CS, "Default void* type");
+      }
+  }
+
 }
 
 void FunctionVariableConstraint::constrainToWild(Constraints &CS,
@@ -1311,6 +1356,9 @@ bool PointerVariableConstraint::anyChanges(const EnvironmentMap &E) const {
     const ConstAtom *SolutionType = getSolution(Vars[I], E);
     PtrChanged |= SrcType != SolutionType;
   }
+
+  // also check if we've make this generic
+  PtrChanged |= isGenericChanged();
 
   if (FV)
     PtrChanged |= FV->anyChanges(E);
@@ -1925,8 +1973,10 @@ void PointerVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
   if (!From->BoundsAnnotationStr.empty())
     BoundsAnnotationStr = From->BoundsAnnotationStr;
 
-  if (From->GenericIndex >= 0)
-    GenericIndex = From->GenericIndex;
+  if (From->BaseGenericIndex >= 0) {
+    BaseGenericIndex = From->BaseGenericIndex;
+    NewGenericIndex = From->NewGenericIndex;
+  }
   if (FV) {
     assert(From->FV);
     FV->mergeDeclaration(From->FV, Info, ReasonFailed);
@@ -2106,11 +2156,15 @@ FVComponentVariable::FVComponentVariable(const QualType &QT,
                                          clang::DeclaratorDecl *D,
                                          std::string N, ProgramInfo &I,
                                          const ASTContext &C,
-                                         std::string *InFunc, bool HasItype) {
-  ExternalConstraint = new PVConstraint(QT, D, N, I, C, InFunc, -1, HasItype,
-                                        nullptr, ITypeT);
-  InternalConstraint = new PVConstraint(QT, D, N, I, C, InFunc, -1, HasItype,
-                                        nullptr, ITypeT);
+                                         std::string *InFunc,
+                                         bool PotentialGeneric,
+                                         bool HasItype) {
+  ExternalConstraint = new PVConstraint(QT, D, N, I, C, InFunc, -1,
+                                        PotentialGeneric ,HasItype, nullptr,
+                                        ITypeT);
+  InternalConstraint = new PVConstraint(QT, D, N, I, C, InFunc, -1,
+                                        PotentialGeneric, HasItype,nullptr,
+                                        ITypeT);
   bool EquateChecked = (QT->isVoidPointerType() || QT->isFunctionPointerType());
   linkInternalExternal(I, EquateChecked);
 
