@@ -68,7 +68,7 @@ how to contribute. Here are the [usage instructions for the `3c` command-line
 tool](clang/tools/3c/README.md).
 
 ## Quick Setup 
-Want to quickly try Checked C and 3C? Here's a quick and simple build setup.
+Want to quickly try Checked C and 3C? Here's a simple build setup for Linux.
 ```
 git clone https://github.com/correctcomputation/checkedc-clangf
 # Get a copy of the Checked C system headers. These provide checked types for the standard library
@@ -78,7 +78,7 @@ mkdir build && cd build
 cmake ../checkedc-clang/llvm -G Ninja -DLLVM_ENABLE_PROJECTS=clang
 ninja TARGET
 ```
-For more detailed build instructions, including flags to speed up the build, please see: [setup](clang/docs/checkedc/3C/INSTALL.md)
+For more detailed build instructions, including flags to speed up the build, as well as instructions for Mac OS, please see: [setup](clang/docs/checkedc/3C/INSTALL.md)
 
 ## More information
 
