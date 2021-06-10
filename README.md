@@ -78,7 +78,7 @@ mkdir build && cd build
 cmake ../checkedc-clang/llvm -G Ninja -DLLVM_ENABLE_PROJECTS=clang
 ninja TARGET
 ```
-For more detailed build instructions, including flags to speed up the build, please see: [setup](clang/docs/checkedc/3C/INSTALL)
+For more detailed build instructions, including flags to speed up the build, please see: [setup](clang/docs/checkedc/3C/INSTALL.md)
 
 ## More information
 
