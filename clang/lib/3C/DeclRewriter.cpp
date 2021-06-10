@@ -747,6 +747,13 @@ void FunctionDeclBuilder::buildDeclVar(const FVComponentVariable *CV,
     ABRewriter.getBoundsString(CV->getExternal(), Decl,
                                !getExistingIType(CV->getExternal()).empty());
 
+  if(CV->getExternal()->isGenericChanged()) {
+    Type = CV->getExternal()->mkString(Info.getConstraints());
+    if (BoundsStr != "")
+      IType = getExistingIType(CV->getExternal()) + BoundsStr;
+    return;
+  }
+
   // Variables that do not need to be rewritten fall through to here.
   // Try to use the source.
   ParmVarDecl *PVD = dyn_cast_or_null<ParmVarDecl>(Decl);
