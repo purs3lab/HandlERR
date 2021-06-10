@@ -520,7 +520,7 @@ PointerVariableConstraint::PointerVariableConstraint(
   // Get a string representing the type without pointer and array indirection.
   BaseType = extractBaseType(D, TSInfo, QT, Ty, C);
 
-  IsVoidPtr = isTypeHasVoid(QT);
+  IsVoidPtr = isPtrOrArrayType(QT) && isTypeHasVoid(QT);
   bool IsWild = isVarArgType(BaseType) ||
       (!(PotentialGeneric || getIsGeneric()) && IsVoidPtr);
   if (IsWild) {
