@@ -845,11 +845,11 @@ void ConstraintsEnv::mergePtrTypes() {
   for (auto &Elem : environment) {
     VarAtom *VA = dyn_cast<VarAtom>(Elem.first);
     ConstAtom *CAssign = Elem.second.first;
-    if (dyn_cast<WildAtom>(CAssign) == nullptr) {
+    //if (dyn_cast<WildAtom>(CAssign) == nullptr) {
       ConstAtom *OAssign = Elem.second.second;
       assert(dyn_cast<WildAtom>(OAssign) == nullptr &&
           "Expected a checked pointer type.");
       assign(VA, OAssign);
-    }
+    //}
   }
 }

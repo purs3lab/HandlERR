@@ -231,6 +231,18 @@ public:
             } else
               ArgumentConstraints = CB.getExprConstraintVars(A);
 
+            if (FuncName == "memcpy" && i < 2) {
+              if (i<2) {
+                auto *AI = A->IgnoreCasts();
+                if (DeclRefExpr *DRE = dyn_cast_or_null<DeclRefExpr>(AI)) {
+                  if (DRE->getType()->isPointerType() &&
+                      DRE->getType()->getPointeeType()->isCharType()) {
+                    constrainVarsTo(ArgumentConstraints.first, CS.getArr());
+                  }
+                }
+              }
+            }
+
 
             if (callUntyped) {
               deferred.push_back(ArgumentConstraints);

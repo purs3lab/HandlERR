@@ -236,7 +236,7 @@ CSetBkeyPair
       QualType SubTypE = IE->getSubExpr()->getType();
       auto CVs = getExprConstraintVars(IE->getSubExpr());
       // if TypE is a pointer type, and the cast is unsafe, return WildPtr
-      if (TypE->isPointerType() &&
+      /*if (TypE->isPointerType() &&
           !(SubTypE->isFunctionType() || SubTypE->isArrayType() ||
             SubTypE->isVoidPointerType()) &&
           !isCastSafe(TypE, SubTypE)) {
@@ -244,7 +244,7 @@ CSetBkeyPair
         constrainConsVarGeq(CVs.first, WildCVar, CS, nullptr, Safe_to_Wild, false,
                             &Info);
         return std::make_pair(WildCVar, CVs.second);
-      }
+      }*/
       // else, return sub-expression's result
       return CVs;
       // variable (x)
@@ -275,10 +275,11 @@ CSetBkeyPair
       if (ExplicitCastExpr *ECE = dyn_cast<ExplicitCastExpr>(E)) {
         assert(ECE->getType() == TypE);
         Expr *TmpE = ECE->getSubExpr();
+        Ret = getExprConstraintVars(TmpE);
         // Is cast internally safe? Return WILD if not.
         // If the cast is NULL, it will otherwise seem invalid, but we want to
         // handle it as usual so the type in the cast can be rewritten.
-        if (!isNULLExpression(ECE, *Context) && TypE->isPointerType()
+        /*if (!isNULLExpression(ECE, *Context) && TypE->isPointerType()
             && !isCastSafe(TypE, TmpE->getType())) {
           CVarSet Vars = getExprConstraintVars(TmpE).first;
           Ret = convertToCSetBKeyPair(getInvalidCastPVCons(ECE));
@@ -299,7 +300,7 @@ CSetBkeyPair
             constrainConsVarGeq(P, Vars, Info.getConstraints(), &PL,
                                 Same_to_Same, false, &Info);
           }
-        }
+        }*/
       }
         // x = y, x+y, x+=y, etc.
       else if (BinaryOperator *BO = dyn_cast<BinaryOperator>(E)) {
