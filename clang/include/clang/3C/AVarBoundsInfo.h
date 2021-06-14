@@ -198,9 +198,9 @@ public:
   bool replaceBounds(BoundsKey L, BoundsPriority P, ABounds *B);
   ABounds *getBounds(BoundsKey L, BoundsPriority ReqP = Invalid,
                      BoundsPriority *RetP = nullptr);
-  bool updatePotentialCountBounds(BoundsKey BK,
+  void updatePotentialCountBounds(BoundsKey BK,
                                   const std::set<BoundsKey> &CntBK);
-  bool updatePotentialCountPOneBounds(BoundsKey BK,
+  void updatePotentialCountPOneBounds(BoundsKey BK,
                                       const std::set<BoundsKey> &CntBK);
 
   // Try and get BoundsKey, into R, for the given declaration. If the

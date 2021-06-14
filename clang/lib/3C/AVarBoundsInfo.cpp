@@ -747,18 +747,16 @@ ABounds *AVarBoundsInfo::getBounds(BoundsKey L, BoundsPriority ReqP,
   return nullptr;
 }
 
-bool
+void
 AVarBoundsInfo::updatePotentialCountBounds(BoundsKey BK,
                                            const std::set<BoundsKey> &CntBK) {
   PotBoundsInfo.addPotentialBounds(BK, CntBK);
-  return true;
 }
 
-bool
+void
 AVarBoundsInfo::updatePotentialCountPOneBounds(BoundsKey BK,
                                                const std::set<BoundsKey> &CntBK) {
   PotBoundsInfo.addPotentialBoundsPOne(BK, CntBK);
-  return true;
 }
 
 void AVarBoundsInfo::insertVariable(clang::Decl *D) {
