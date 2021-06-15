@@ -2050,8 +2050,7 @@ FVComponentVariable::mkTypeStr(Constraints &CS, bool EmitName,
   // if checked or given new name, generate type
   if (hasCheckedSolution(CS) || (EmitName && !UseName.empty())) {
     Ret = ExternalConstraint->mkString(CS, EmitName, false,
-                                       false, false,
-                                          UseName);
+                                       false, false, UseName);
   } else {
     // if no need to generate type, try to use source
     if (!SourceDeclaration.empty())
