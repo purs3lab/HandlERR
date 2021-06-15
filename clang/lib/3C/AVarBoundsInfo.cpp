@@ -531,7 +531,7 @@ bool AvarBoundsInference::inferBounds(BoundsKey K, AVarGraph &BKGraph, bool From
 }
 
 bool AVarBoundsInfo::isValidBoundVariable(clang::Decl *D) {
-  // All parameters, return, and field values are valid bound variables.
+  // All return and field values are valid bound variables.
   if (D && (isa<FunctionDecl>(D) || isa<FieldDecl>(D)))
     return true;
 
