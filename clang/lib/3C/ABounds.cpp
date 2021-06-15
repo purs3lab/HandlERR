@@ -72,6 +72,10 @@ std::string ABounds::getBoundsKeyStr(BoundsKey BK,
     if (FD->getNumParams() > PIdx) {
       auto *NewPVD = FD->getParamDecl(PIdx);
       BKStr = NewPVD->getNameAsString();
+      // If the parameter in the new declaration does not have a name?
+      // then use the old name.
+      if (BKStr.empty())
+        BKStr = PV->mkString();
     }
   }
   return BKStr;
