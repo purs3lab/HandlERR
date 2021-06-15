@@ -536,6 +536,8 @@ bool AVarBoundsInfo::isValidBoundVariable(clang::Decl *D) {
     return true;
 
   // For Parameters, check if they belong to a valid function.
+  // Function pointer types are not considered valid functions, so function
+  // pointer parameters are are disqualified as valid bound variables here.
   if (auto *PD = dyn_cast_or_null<ParmVarDecl>(D))
     return PD->getParentFunctionOrMethod() != nullptr;
  
