@@ -104,7 +104,7 @@ protected:
   virtual void buildDeclVar(const FVComponentVariable *CV, DeclaratorDecl *Decl,
                             std::string &Type, std::string &IType,
                             std::string UseName, bool &RewriteParm,
-                            bool &RewriteRet);
+                            bool &RewriteRet, bool StaticFunc);
   void buildCheckedDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
                         std::string &Type, std::string &IType,
                         std::string UseName, bool &RewriteParm,

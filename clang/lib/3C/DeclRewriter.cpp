@@ -569,7 +569,7 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
       std::string Type, IType;
       this->buildDeclVar(CV, PVDecl, Type, IType,
                          PVDecl->getQualifiedNameAsString(), RewriteParams,
-                         RewriteReturn);
+                         RewriteReturn, FD->isStatic());
       ParmStrs.push_back(Type + IType);
     }
   } else if (FDConstraint->numParams() != 0) {
@@ -579,7 +579,7 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
       const FVComponentVariable *CV = FDConstraint->getCombineParam(I);
       std::string Type, IType;
       this->buildDeclVar(CV, PVDecl, Type, IType, "", RewriteParams,
-                         RewriteReturn);
+                         RewriteReturn, FD->isStatic());
       ParmStrs.push_back(Type + IType);
       // FIXME: when the above FIXME is changed this condition will always
       // be true. This is correct, always rewrite if there were no params
@@ -601,7 +601,7 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   // For now we still need to check if this needs rewriting, see FIXME below
   // if (!DeclIsTypedef)
   this->buildDeclVar(FDConstraint->getCombineReturn(), FD, ReturnVar, ItypeStr,
-                     "", RewriteParams, RewriteReturn);
+                     "", RewriteParams, RewriteReturn, FD->isStatic());
 
   // If the return is a function pointer, we need to rewrite the whole
   // declaration even if no actual changes were made to the parameters because
@@ -708,15 +708,23 @@ void FunctionDeclBuilder::buildItypeDecl(PVConstraint *Defn,
 void FunctionDeclBuilder::buildDeclVar(const FVComponentVariable *CV,
                                        DeclaratorDecl *Decl, std::string &Type,
                                        std::string &IType, std::string UseName,
-                                       bool &RewriteParm, bool &RewriteRet) {
-  if (CV->hasCheckedSolution(Info.getConstraints())) {
-    buildCheckedDecl(CV->getExternal(), Decl, Type, IType, UseName, RewriteParm,
-                     RewriteRet);
-    return;
-  }
-  if (CV->hasItypeSolution(Info.getConstraints())) {
+                                       bool &RewriteParm, bool &RewriteRet,
+                                       bool StaticFunc) {
+
+  bool CheckedSolution = CV->hasCheckedSolution(Info.getConstraints());
+  bool ItypeSolution = CV->hasItypeSolution(Info.getConstraints());
+  // FIXME: ItypesForExtern won't apply to function pointers. This more or less
+  //        fine for porting vsftpd, but I want to keep the logic for adding
+  //        itypes consistent between these two cases since a discrepancy there
+  //        was the source of an earlier bug.
+  if (ItypeSolution || (CheckedSolution && ItypesForExtern && !StaticFunc)) {
     buildItypeDecl(CV->getExternal(), Decl, Type, IType, RewriteParm,
                    RewriteRet);
+    return;
+  }
+  if (CheckedSolution) {
+    buildCheckedDecl(CV->getExternal(), Decl, Type, IType, UseName, RewriteParm,
+                     RewriteRet);
     return;
   }
 
