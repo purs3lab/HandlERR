@@ -23,8 +23,8 @@ void (*g)(int *) = g_impl;
 
 void (*hs[2])(void *);
 void (*h)(void *);
-//CHECK_NOALL: void (*hs[2])(void *);
-//CHECK_NOALL: void (*h)(void *);
+//CHECK_NOALL: void (* hs[2])(void *) = {((void *)0)};
+//CHECK_NOALL: void (*h)(void *) = ((void *)0);
 //CHECK_ALL: _Ptr<void (void *)> hs _Checked[2] = {((void *)0)};
 //CHECK_ALL: _Ptr<void (void *)> h = ((void *)0);
 
