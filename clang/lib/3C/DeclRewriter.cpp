@@ -763,6 +763,7 @@ void FunctionDeclBuilder::buildDeclVar(const FVComponentVariable *CV,
 
   if(CV->getExternal()->isGenericChanged()) {
     Type = CV->getExternal()->mkString(Info.getConstraints());
+    RewriteParm = true;
     if (BoundsStr.empty())
       IType = getExistingIType(CV->getExternal()) + BoundsStr;
     return;
