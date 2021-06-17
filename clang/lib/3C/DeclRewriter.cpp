@@ -563,6 +563,9 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   // the source for as much as possible.
   std::vector<std::string> ParmStrs;
 
+  // Needed to distinguish between Itype_for_any and For_any
+  bool ProtoHasItype = false;
+
   // Typedefs must be expanded for now, so allow interpret them as rewritable
   // by ignoring their special case code.
   // See the FIXME below for more info.
@@ -579,6 +582,7 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
                          PVDecl->getQualifiedNameAsString(),
                          RewriteParams, RewriteReturn);
       ParmStrs.push_back(Type + IType);
+      ProtoHasItype |= !IType.empty();
     }
   } else if (FDConstraint->numParams() != 0) {
     // lacking params but the constraint has them: mirror the constraint
@@ -589,6 +593,7 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
       this->buildDeclVar(CV, PVDecl, Type, IType, "",
                          RewriteParams, RewriteReturn);
       ParmStrs.push_back(Type + IType);
+      ProtoHasItype |= !IType.empty();
       // FIXME: when the above FIXME is changed this condition will always
       // be true. This is correct, always rewrite if there were no params
       // in source but they exist in the constraint variable.
@@ -610,6 +615,8 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   // if (!DeclIsTypedef)
     this->buildDeclVar(FDConstraint->getCombineReturn(), FD, ReturnVar, ItypeStr,
                      "", RewriteParams, RewriteReturn);
+
+    ProtoHasItype |= !ItypeStr.empty();
 
   // If the return is a function pointer, we need to rewrite the whole
   // declaration even if no actual changes were made to the parameters because
@@ -642,7 +649,10 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   // for the entire function declaration.
   std::string NewSig = "";
   if (RewriteGeneric) {
-    NewSig += "_Itype_for_any(T";
+    if (ProtoHasItype)
+      NewSig += "_Itype_for_any(T";
+    else
+      NewSig += "_For_any(T";
     for (int i = 0; i < FDConstraint->getGenericParams() - 1; i++) {
       assert(i < 2 &&
              "Need an unexpected number of type variables");
@@ -652,6 +662,10 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   }
   if (RewriteReturn)
     NewSig += getStorageQualifierString(FD) + ReturnVar;
+
+  // remove an excess space
+  if (RewriteReturn && !RewriteParams)
+    NewSig.pop_back();
 
   if (RewriteReturn && RewriteParams)
     NewSig += FDConstraint->getName();
