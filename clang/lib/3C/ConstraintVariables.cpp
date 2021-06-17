@@ -785,12 +785,13 @@ std::string PointerVariableConstraint::mkString(Constraints &CS,
     EmittedName = true;
   uint32_t TypeIdx = 0;
 
-  // If we're set a GenericIndex for void, it means we're converting it into
+  // If we've set a GenericIndex for void, it means we're converting it into
   // a generic function so give it the default generic type name.
   // Add more type names below if we expect to use a lot.
   std::string BaseName = BaseType;
   if (NewGenericIndex > -1 && BaseType == "void") {
-    assert(NewGenericIndex < 3 && "Trying to use unexpected type variable name");
+    assert(NewGenericIndex < 3
+           && "Trying to use an unexpected type variable name");
     BaseName = std::begin({"T","U","V"})[NewGenericIndex];
   }
 
@@ -819,9 +820,9 @@ std::string PointerVariableConstraint::mkString(Constraints &CS,
 
     Atom::AtomKind K = C->getKind();
 
-    // If this is not an itype
+    // If this is not an itype or generic
     // make this wild as it can hold any pointer type.
-    if (!ForItype && BaseType == "void")
+    if (!ForItype && NewGenericIndex == -1 && BaseType == "void")
       K = Atom::A_Wild;
 
     if (PrevArr && ArrSizes.at(TypeIdx).first != O_SizedArray && !EmittedName) {
@@ -2164,7 +2165,7 @@ FVComponentVariable::FVComponentVariable(const QualType &QT,
                                          bool PotentialGeneric,
                                          bool HasItype) {
   ExternalConstraint = new PVConstraint(QT, D, N, I, C, InFunc, -1,
-                                        PotentialGeneric ,HasItype, nullptr,
+                                        PotentialGeneric, HasItype, nullptr,
                                         ITypeT);
   InternalConstraint = new PVConstraint(QT, D, N, I, C, InFunc, -1,
                                         PotentialGeneric, HasItype,nullptr,

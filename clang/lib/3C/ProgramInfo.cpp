@@ -575,7 +575,6 @@ ProgramInfo::insertNewFVConstraint(FunctionDecl *FD, FVConstraint *NewC,
 
 void ProgramInfo::specialCaseVarIntros(ValueDecl *D, ASTContext *Context) {
   // Special-case for va_list, constrain to wild.
-  bool IsGeneric = false;
   PVConstraint *PVC = nullptr;
 
   CVarOption CVOpt = getVariable(D, Context);
@@ -584,17 +583,11 @@ void ProgramInfo::specialCaseVarIntros(ValueDecl *D, ASTContext *Context) {
     PVC = dyn_cast<PVConstraint>(&CV);
   }
 
-  if (isa<ParmVarDecl>(D))
-    IsGeneric = PVC && PVC->getIsGeneric();
-  if (isVarArgType(D->getType().getAsString()) ||
-      (hasVoidType(D) && !IsGeneric)) {
+  if (PVC != nullptr && isVarArgType(D->getType().getAsString())) {
     // Set the reason for making this variable WILD.
-    std::string Rsn = "Variable type void.";
     PersistentSourceLoc PL = PersistentSourceLoc::mkPSL(D, *Context);
-    if (!D->getType()->isVoidType())
-      Rsn = "Variable type is va_list.";
-    if (PVC != nullptr)
-      PVC->constrainToWild(CS, Rsn, &PL);
+    std::string Rsn = "Variable type is va_list.";
+    PVC->constrainToWild(CS, Rsn, &PL);
   }
 }
 
