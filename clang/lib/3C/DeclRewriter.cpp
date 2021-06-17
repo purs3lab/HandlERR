@@ -50,7 +50,11 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
   for (const auto &D : Context.getTranslationUnitDecl()->decls()) {
     TRV->TraverseDecl(D);
     SVI.TraverseDecl(D);
-    if (const auto &TD = dyn_cast<TypedefDecl>(D)) {
+    const auto &TD = dyn_cast<TypedefDecl>(D);
+    // Don't convert typedefs when -itype-for-extern is passed. Typedefs will
+    // keep their unchecked type but function using the typedef will be given a
+    // checked itype.
+    if (!ItypesForExtern && TD) {
       auto PSL = PersistentSourceLoc::mkPSL(TD, Context);
       // Don't rewrite base types like int
       if (!TD->getUnderlyingType()->isBuiltinType()) {
@@ -695,8 +699,16 @@ void FunctionDeclBuilder::buildItypeDecl(PVConstraint *Defn,
         Type += Name;
     }
   }
-  IType = " : itype(" + Defn->mkString(Info.getConstraints(), false, true) +
-          ")" + ABRewriter.getBoundsString(Defn, Decl, true);
+
+  IType = " : itype(";
+  if (ItypesForExtern && Defn->isTypedef()) {
+    // In -itypes-for-extern mode we do not rewrite typedefs to checked types.
+    // They are given a checked itype instead.
+    IType += Defn->mkString(Info.getConstraints(), false, true, false, true);
+  } else {
+    IType += Defn->mkString(Info.getConstraints(), false, true);
+  }
+  IType += ")" + ABRewriter.getBoundsString(Defn, Decl, true);
   RewriteParm = true;
   RewriteRet |= isa_and_nonnull<FunctionDecl>(Decl);
 }
