@@ -379,7 +379,7 @@ public:
 
   bool getIsGeneric() const { return NewGenericIndex >= 0; }
   int getGenericIndex() const { return NewGenericIndex; }
-  int setGenericIndex(int idx) { NewGenericIndex = idx; }
+  void setGenericIndex(int idx) { NewGenericIndex = idx; }
   bool isGenericChanged() const { return BaseGenericIndex != NewGenericIndex; }
   // Was this variable a checked pointer in the input program?
   // This is important for two reasons: (1) externs that are checked should be

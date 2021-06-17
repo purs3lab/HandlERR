@@ -1134,7 +1134,7 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
        !ReturnVar.ExternalConstraint->getIsGeneric()) {
       Voids.push_back(-1);
     }
-    for(int i=0; i < ParamVars.size();i++) {
+    for(unsigned i=0; i < ParamVars.size();i++) {
       if(ParamVars[i].ExternalConstraint->isVoidPtr() &&
          !ParamVars[i].ExternalConstraint->getIsGeneric()) {
         Voids.push_back(i);
