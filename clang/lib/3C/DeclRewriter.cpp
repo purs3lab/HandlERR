@@ -118,9 +118,33 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
         if (VDLToStmtMap.find(D) != VDLToStmtMap.end())
           DS = VDLToStmtMap[D];
 
-        std::string NewTy = getStorageQualifierString(D) +
-                            PV->mkString(Info.getConstraints()) +
-                            ABRewriter.getBoundsString(PV, D);
+        std::string NewTy = getStorageQualifierString(D);
+        bool IsExternGlobalVar =
+          isa<VarDecl>(D) &&
+          cast<VarDecl>(D)->getFormalLinkage() == Linkage::ExternalLinkage;
+        if (ItypesForExtern && (isa<FieldDecl>(D) || IsExternGlobalVar)) {
+          // Give record fields typedefs when using -itypes-for-extern. Note
+          // that we haven't properly implemented itypes for structures yet.
+          // This just rewrites to an itype instead of a fully checked type when
+          // a checked type could have been used.
+          // TODO: This is duplicating some logic from buildItypeDecl.
+          if (PV->getFV()) {
+            // The result of getFV() is not nullptr, so the declaration is for a
+            // function pointer. This makes rewriting with an itype a bit harder.
+            NewTy += PV->mkString(Info.getConstraints(), true, false, false,
+                                  false, "", /* UseUnchecked = */ true);
+          } else {
+            NewTy += PV->getRewritableOriginalTy() +
+                     cast<DeclaratorDecl>(D)->getNameAsString();
+          }
+          NewTy += " : itype(" +
+                   PV->mkString(Info.getConstraints(), /* EmitName = */ false,
+                                /* ForItype = */ true) + ")" +
+                   ABRewriter.getBoundsString(PV, D, /* IsItype = */ true);
+        } else {
+          NewTy += PV->mkString(Info.getConstraints()) +
+                   ABRewriter.getBoundsString(PV, D);
+        }
         if (auto *VD = dyn_cast<VarDecl>(D))
           RewriteThese.insert(new VarDeclReplacement(VD, DS, NewTy));
         else if (auto *FD = dyn_cast<FieldDecl>(D))
