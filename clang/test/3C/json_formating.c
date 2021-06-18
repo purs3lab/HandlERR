@@ -5,6 +5,8 @@
 
 // Testing that json files output for statistics logging are well formed
 
+#include "json\Uformating.h"
+
 int *a;
 int *b(int *c);
 static int *d() { return 0; }
