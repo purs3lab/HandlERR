@@ -668,10 +668,6 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   if (RewriteReturn)
     NewSig += getStorageQualifierString(FD) + ReturnVar;
 
-  // remove an excess space
-  if (RewriteReturn && !RewriteParams)
-    NewSig.pop_back();
-
   if (RewriteReturn && RewriteParams)
     NewSig += FDConstraint->getName();
 
