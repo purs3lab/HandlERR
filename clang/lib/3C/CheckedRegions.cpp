@@ -27,6 +27,22 @@
 using namespace llvm;
 using namespace clang;
 
+void checkedRegionInference(ASTContext* Context, Rewriter &R, ProgramInfo &Info, TranslationUnitDecl *TUD) {
+  //TODO we may want to split this up into two calls for consistency
+  //TODO right now this is doing both inference and rewriting in the same pass
+  //TODO which is not the same structure as the rest of 3c
+  std::set<llvm::FoldingSetNodeID> Seen;
+  std::map<llvm::FoldingSetNodeID, AnnotationNeeded> NodeMap;
+  CheckedRegionFinder CRF(Context, R, Info, Seen, NodeMap, WarnRootCause);
+  CheckedRegionAdder CRA(Context, R, NodeMap, Info);
+  for (const auto &D : TUD->decls()) {
+    CRF.TraverseDecl(D);
+    CRA.TraverseDecl(D);
+  }
+}
+
+
+
 // If S is a function body, then return the FunctionDecl, otherwise return null.
 // Used in both visitors so abstracted to a function.
 FunctionDecl *getFunctionDeclOfBody(ASTContext *Context, CompoundStmt *S) {
@@ -42,12 +58,11 @@ FunctionDecl *getFunctionDeclOfBody(ASTContext *Context, CompoundStmt *S) {
 bool CheckedRegionAdder::VisitCompoundStmt(CompoundStmt *S) {
   llvm::FoldingSetNodeID Id;
   ast_type_traits::DynTypedNode DTN = ast_type_traits::DynTypedNode::create(*S);
-
   auto &PState = Info.getPerfStats();
   S->Profile(Id, *Context, true);
   switch (Map[Id]) {
   case IS_UNCHECKED:
-    if (isParentChecked(DTN) && getFunctionDeclOfBody(Context, S) == nullptr) {
+    if (isParentChecked(DTN) && !isTopLevel(S)) {
       auto Loc = S->getBeginLoc();
       Writer.InsertTextBefore(Loc, "_Unchecked ");
       PState.incrementNumUnCheckedRegions();
@@ -65,6 +80,10 @@ bool CheckedRegionAdder::VisitCompoundStmt(CompoundStmt *S) {
   }
 
   return true;
+}
+
+bool CheckedRegionAdder::isTopLevel(CompoundStmt* S) {
+  return getFunctionDeclOfBody(Context, S) != nullptr;
 }
 
 bool CheckedRegionAdder::VisitCallExpr(CallExpr *C) {

@@ -26,6 +26,9 @@ typedef enum {
   IS_CONTAINED,
 } AnnotationNeeded;
 
+
+void checkedRegionInference(ASTContext*, Rewriter&, ProgramInfo&, TranslationUnitDecl*);
+
 class CheckedRegionAdder
     : public clang::RecursiveASTVisitor<CheckedRegionAdder> {
 public:
@@ -42,6 +45,7 @@ private:
   findParentCompound(const clang::DynTypedNode &N, int);
   bool isParentChecked(const clang::DynTypedNode &N);
   bool isWrittenChecked(const clang::CompoundStmt *);
+  bool isTopLevel(clang::CompoundStmt*);
   clang::ASTContext *Context;
   clang::Rewriter &Writer;
   std::map<llvm::FoldingSetNodeID, AnnotationNeeded> &Map;

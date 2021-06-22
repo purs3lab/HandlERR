@@ -668,23 +668,14 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   DeclRewriter::rewriteDecls(Context, Info, R);
 
   // Take care of some other rewriting tasks
-  std::set<llvm::FoldingSetNodeID> Seen;
-  std::map<llvm::FoldingSetNodeID, AnnotationNeeded> NodeMap;
-  CheckedRegionFinder CRF(&Context, R, Info, Seen, NodeMap, WarnRootCause);
-  CheckedRegionAdder CRA(&Context, R, NodeMap, Info);
   CastLocatorVisitor CLV(&Context);
   CastPlacementVisitor ECPV(&Context, Info, R, CLV.getExprsWithCast());
   TypeExprRewriter TER(&Context, Info, R);
   TypeArgumentAdder TPA(&Context, Info, R);
   TranslationUnitDecl *TUD = Context.getTranslationUnitDecl();
+  if (AddCheckedRegions)
+    checkedRegionInference(&Context, R, Info, TUD);
   for (const auto &D : TUD->decls()) {
-    if (AddCheckedRegions) {
-      // Adding checked regions enabled?
-      // TODO: Should checked region finding happen somewhere else? This is
-      //       supposed to be rewriting.
-      CRF.TraverseDecl(D);
-      CRA.TraverseDecl(D);
-    }
     TER.TraverseDecl(D);
     // Cast placement must happen after type expression rewriting (i.e. cast and
     // compound literal) so that casts to unchecked pointer on itype function
