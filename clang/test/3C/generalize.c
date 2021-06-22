@@ -9,10 +9,10 @@
 // Basic functionality
 void viewer(void *i) { return; }
 // CHECK: _For_any(T) void viewer(_Ptr<T> i) { return; }
-void viewer_badnum(void *i, int *j : itype(_Ptr<int>)) {
+void viewer_badnum(void *i, int *j) {
 // CHECK: _Itype_for_any(T) void viewer_badnum(_Ptr<T> i, int *j : itype(_Ptr<int>)) {
-j = (int*)3;
-return;
+  j = (int*)3;
+  return;
 }
 void *getNull() { return 0; }
 // CHECK: _For_any(T) _Ptr<T> getNull(void) { return 0; }
@@ -25,8 +25,11 @@ void *getNull() { return 0; }
 #include <limits.h>
 extern void bug(char*);
 extern void die(char*);
-void*
-vsf_sysutil_malloc(unsigned int size)
+
+// generics can be added, but not internally, so the result is unchecked
+// and we don't add generics for unchecked potential params
+void* vsf_sysutil_malloc(unsigned int size)
+// CHECK: void* vsf_sysutil_malloc(unsigned int size)
 {
   void* p_ret;
   /* Paranoia - what if we got an integer overflow/underflow? */
@@ -42,8 +45,9 @@ vsf_sysutil_malloc(unsigned int size)
   return p_ret;
 }
 
-void*
-vsf_sysutil_realloc(void* p_ptr, unsigned int size)
+// current generics strategy only converts protos with 1 `void*`
+void* vsf_sysutil_realloc(void* p_ptr, unsigned int size)
+// CHECK: void* vsf_sysutil_realloc(void* p_ptr, unsigned int size)
 {
   void* p_ret;
   if (size == 0 || size > INT_MAX)
@@ -60,6 +64,7 @@ vsf_sysutil_realloc(void* p_ptr, unsigned int size)
 
 void
 vsf_sysutil_free(void* p_ptr)
+// CHECK: _For_any(T) void vsf_sysutil_free(_Ptr<T> p_ptr)
 {
   if (p_ptr == NULL)
   {
@@ -71,8 +76,10 @@ vsf_sysutil_free(void* p_ptr)
 void run_vsf_sysutil (void) {
   typedef struct {char a; char b;} char_node;
   char_node *node1;
-  node1 = vsf_sysutil_malloc(sizeof(*node1));
-  node1 = vsf_sysutil_realloc(node1, sizeof(*node1));
+  // These currently return unsafe values, which hits a bug in 3c:
+  // https://github.com/correctcomputation/checkedc-clang/issues/622
+  //node1 = vsf_sysutil_malloc(sizeof(*node1));
+  //node1 = vsf_sysutil_realloc(node1, sizeof(*node1));
   vsf_sysutil_free(node1);
+  // CHECK: vsf_sysutil_free<char_node>(node1);
 }
-
