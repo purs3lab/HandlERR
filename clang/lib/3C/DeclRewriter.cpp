@@ -746,15 +746,17 @@ void FunctionDeclBuilder::buildDeclVar(const FVComponentVariable *CV,
                      RewriteParm, RewriteRet);
     return;
   }
+
+  // Don't add generics if one of the potential generic params is wild,
+  // even if it could have an itype
+  if (CV->getExternal()->isGenericChanged())
+    RewriteGen = false;
+
   if (CV->hasItypeSolution(Info.getConstraints())) {
     buildItypeDecl(CV->getExternal(), Decl, Type, IType,
                    RewriteParm, RewriteRet);
     return;
   }
-  // Don't add generics if one of the potential generic params is wild.
-  if (CV->getExternal()->isGenericChanged())
-    RewriteGen = false;
-
   // If the type of the pointer hasn't changed, then neither of the above
   // branches will be taken, but it's still possible for the bounds of an array
   // pointer to change.
