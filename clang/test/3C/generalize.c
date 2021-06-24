@@ -17,6 +17,16 @@ void viewer_badnum(void *i, int *j) {
 void *getNull() { return 0; }
 // CHECK: _For_any(T) _Ptr<T> getNull(void) { return 0; }
 
+// check type parameters
+void call_from_fn() {
+  int *i;
+  viewer(i);
+  // CHECK: viewer<int>(i);
+}
+void call_from_gen_fn(void *i) {
+  viewer(i);
+  // CHECK: viewer<T>(i);
+}
 
 
 
