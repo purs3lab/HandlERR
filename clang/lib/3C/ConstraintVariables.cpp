@@ -521,7 +521,11 @@ PointerVariableConstraint::PointerVariableConstraint(
   // Get a string representing the type without pointer and array indirection.
   BaseType = extractBaseType(D, TSInfo, QT, Ty, C);
 
-  IsVoidPtr = isPtrOrArrayType(QT) && isTypeHasVoid(QT);
+  // check if the type is some depth of pointers to void
+  // TODO: is this what the field should mean? do we want to include other
+  // indirection options like arrays?
+  IsVoidPtr = QT->isPointerType() && isTypeHasVoid(QT);
+  // varargs are always wild, as are void pointers that are not generic
   bool IsWild = isVarArgType(BaseType) ||
       (!(PotentialGeneric || getIsGeneric()) && IsVoidPtr);
   if (IsWild) {
