@@ -14,8 +14,18 @@ void viewer_badnum(void *i, int *j) {
   j = (int*)3;
   return;
 }
+void viewer_update(void *i) {
+// CHECK: void viewer_update(void *i) {
+  i = 2;
+  return;
+}
 void *getNull() { return 0; }
 // CHECK: _For_any(T) _Ptr<T> getNull(void) { return 0; }
+void *getOne() { return 1; }
+// CHECK: void *getOne() { return 1; }
+extern void *glob = 0;
+void *getGlobal() { return glob; }
+// CHECK: void *getGlobal() { return glob; }
 
 // check type parameters
 void call_from_fn() {
