@@ -387,7 +387,20 @@ bool isCastSafe(clang::QualType DstType, clang::QualType SrcType) {
       dyn_cast<clang::PointerType>(DstTypePtr);
   if (!DstPtrTypePtr) // Safe to cast to a non-pointer.
     return true;
-  return castCheck(DstType, SrcType, true);
+  return castCheck(DstType, SrcType, false);
+}
+
+bool isCastAlloc(CastExpr *CE) {
+  Expr *SE = CE->getSubExpr();
+  if (CHKCBindTemporaryExpr *CE = dyn_cast<CHKCBindTemporaryExpr>(SE))
+    SE = CE->getSubExpr();
+  if (auto *CE = dyn_cast_or_null<CallExpr>(SE)) {
+    if (auto *DD = dyn_cast_or_null<DeclaratorDecl>(CE->getCalleeDecl())) {
+      std::string Name = DD->getNameAsString();
+      return Name == "malloc" || Name == "calloc" || Name == "realloc";
+    }
+  }
+  return false;
 }
 
 bool canWrite(const std::string &FilePath) {

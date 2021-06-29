@@ -171,7 +171,8 @@ public:
     // Is cast compatible with LHS type?
     QualType SrcT = C->getSubExpr()->getType();
     QualType DstT = C->getType();
-    if (!isCastSafe(DstT, SrcT) && !Info.hasPersistentConstraints(C, Context)) {
+    if (!isCastAlloc(C) && !isCastSafe(DstT, SrcT)
+      && !Info.hasPersistentConstraints(C, Context)) {
       auto CVs = CB.getExprConstraintVarsSet(C->getSubExpr());
       std::string Rsn = "Cast from " + SrcT.getAsString() +  " to " +
                         DstT.getAsString();

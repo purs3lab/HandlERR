@@ -237,7 +237,7 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
       // If the cast is NULL, it will otherwise seem invalid, but we want to
       // handle it as usual so the type in the cast can be rewritten.
       if (!isNULLExpression(ECE, *Context) && TypE->isPointerType() &&
-          !isCastSafe(TypE, TmpE->getType())) {
+          !isCastSafe(TypE, TmpE->getType()) && !isCastAlloc(ECE)) {
         CVarSet Vars = getExprConstraintVarsSet(TmpE);
         Ret = pairWithEmptyBkey(getInvalidCastPVCons(ECE));
         constrainConsVarGeq(Vars, Ret.first, CS, nullptr, Safe_to_Wild, false,

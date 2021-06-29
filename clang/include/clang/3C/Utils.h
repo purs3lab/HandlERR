@@ -166,7 +166,9 @@ clang::Expr *removeAuxillaryCasts(clang::Expr *SrcExpr);
 // OK to cast from Src to Dst?
 bool isCastSafe(clang::QualType DstType, clang::QualType SrcType);
 
-// Check if the provided file path belongs to the input project
+bool isCastAlloc(clang::CastExpr *CE);
+
+  // Check if the provided file path belongs to the input project
 // and can be rewritten.
 //
 // For accurate results, the path must be canonical. The file name of a
