@@ -1130,24 +1130,23 @@ FunctionVariableConstraint::FunctionVariableConstraint(const Type *Ty,
   ReturnVar = FVComponentVariable(RT, RTIType, D, RETVAR, I, Ctx,
                                   &N, true, ReturnHasItype);
 
-  // Locate the void* params for potential generic use
+  // Locate the void* params for potential generic use, or to mark wild
   std::vector<int> Voids;
-  // but only in local definitions
-  if (hasBody()) {
-    if(ReturnVar.ExternalConstraint->isVoidPtr() &&
-       !ReturnVar.ExternalConstraint->getIsGeneric()) {
-      Voids.push_back(-1);
-    }
-    for(unsigned i=0; i < ParamVars.size();i++) {
-      if(ParamVars[i].ExternalConstraint->isVoidPtr() &&
-         !ParamVars[i].ExternalConstraint->getIsGeneric()) {
-        Voids.push_back(i);
-      }
+  if(ReturnVar.ExternalConstraint->isVoidPtr() &&
+     !ReturnVar.ExternalConstraint->getIsGeneric()) {
+    Voids.push_back(-1);
+  }
+  for(unsigned i=0; i < ParamVars.size();i++) {
+    if(ParamVars[i].ExternalConstraint->isVoidPtr() &&
+       !ParamVars[i].ExternalConstraint->getIsGeneric()) {
+      Voids.push_back(i);
     }
   }
   // Strategy: If there's one void*, turn this into a generic function.
   // Otherwise, we need to constraint the void*'s to wild
-  if(Voids.size() == 1 && TypeParams == 0){
+  // Exclude external functions, function pointers, and source generics for now
+  if(hasBody() && !IsFunctionPtr && TypeParams == 0
+       && Voids.size() == 1){
     int Index = Voids[0];
     if(Index == -1) {
       ReturnVar.setGenericIndex(0);
