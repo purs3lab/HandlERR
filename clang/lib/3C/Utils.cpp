@@ -387,19 +387,6 @@ bool isCastSafe(clang::QualType DstType, clang::QualType SrcType) {
   return castCheck(DstType, SrcType);
 }
 
-bool isCastAlloc(CastExpr *CE) {
-  Expr *SE = CE->getSubExpr();
-  if (CHKCBindTemporaryExpr *CE = dyn_cast<CHKCBindTemporaryExpr>(SE))
-    SE = CE->getSubExpr();
-  if (auto *CE = dyn_cast_or_null<CallExpr>(SE)) {
-    if (auto *DD = dyn_cast_or_null<DeclaratorDecl>(CE->getCalleeDecl())) {
-      std::string Name = DD->getNameAsString();
-      return Name == "malloc" || Name == "calloc" || Name == "realloc";
-    }
-  }
-  return false;
-}
-
 bool canWrite(const std::string &FilePath) {
   // Was this file explicitly provided on the command line?
   if (FilePaths.count(FilePath) > 0)

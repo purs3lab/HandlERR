@@ -237,7 +237,7 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
       // If the cast is NULL, it will otherwise seem invalid, but we want to
       // handle it as usual so the type in the cast can be rewritten.
       if (!isNULLExpression(ECE, *Context) && TypE->isPointerType() &&
-          !isCastSafe(TypE, TmpE->getType()) && !isCastAlloc(ECE)) {
+          !isCastSafe(TypE, TmpE->getType()) && !isCastofGeneric(ECE)) {
         CVarSet Vars = getExprConstraintVarsSet(TmpE);
         Ret = pairWithEmptyBkey(getInvalidCastPVCons(ECE));
         constrainConsVarGeq(Vars, Ret.first, CS, nullptr, Safe_to_Wild, false,
@@ -728,6 +728,28 @@ CVarSet ConstraintResolver::getCalleeConstraintVars(CallExpr *CE) {
     FVCons = getExprConstraintVarsSet(CalledExpr);
   }
   return FVCons;
+}
+
+bool ConstraintResolver::isCastofGeneric(CastExpr *C) {
+  Expr *SE = C->getSubExpr();
+  if (CHKCBindTemporaryExpr *CE = dyn_cast<CHKCBindTemporaryExpr>(SE))
+    SE = CE->getSubExpr();
+  if (auto *CE = dyn_cast_or_null<CallExpr>(SE)) {
+    // check for built-in allocators, in case the standard headers are not used
+    if (auto *DD = dyn_cast_or_null<DeclaratorDecl>(CE->getCalleeDecl())) {
+      std::string Name = DD->getNameAsString();
+      if (Name == "malloc" || Name == "calloc" || Name == "realloc")
+        return true;
+    }
+    // check for a generic function call
+    CVarSet CVS = getCalleeConstraintVars(CE);
+    if (CVS.size() == 1) {
+      if (auto *FVC = dyn_cast<FVConstraint>(*CVS.begin())) {
+        return FVC->getGenericParams() > 0;
+      }
+    }
+  }
+  return false;
 }
 
 // Construct a PVConstraint for an expression that can safely be used when
