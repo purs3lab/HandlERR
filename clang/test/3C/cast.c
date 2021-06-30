@@ -23,15 +23,20 @@ void bar(void) {
   /*int *e = (int *)(a+5);*/
 }
 
-// malloc etc. are exceptions to our policy of unsafe void* casts
+// malloc and generics are exceptions to our policy of unsafe void* casts
 #include<stdlib.h>
-void test_alloc(void) {
+_Itype_for_any(T)
+void *gen_fun(void *i : itype(_Ptr<T>))
+: itype(_Ptr<T>);
+void test_generic_casts(void) {
   int *ptr_cast = (int*)malloc(3 * sizeof(int));
   // CHECK_ALL: _Ptr<int> ptr_cast = (_Ptr<int>)malloc<int>(3 * sizeof(int));
   int *ptr_nocast = malloc(3 * sizeof(int));
   // CHECK_ALL: _Ptr<int> ptr_nocast = malloc<int>(3 * sizeof(int));
   char *ptr_badcast = (int *)malloc(3 * sizeof(int));
   // CHECK_ALL: char *ptr_badcast = (int *)malloc<int>(3 * sizeof(int));
+  int *ptr_custom = (int*)gen_fun<int>(ptr_cast);
+  // CHECK_ALL: _Ptr<int> ptr_custom = (_Ptr<int>)gen_fun<int>(ptr_cast);
 
   int *ptr_cast_c = (int*)calloc(3, sizeof(int));
   // CHECK_ALL: _Ptr<int> ptr_cast_c = (_Ptr<int>)calloc<int>(3, sizeof(int));
