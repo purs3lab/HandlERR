@@ -22,3 +22,20 @@ void bar(void) {
   //CHECK: int *d = (int *)5;
   /*int *e = (int *)(a+5);*/
 }
+
+// malloc etc. are exceptions to our policy of unsafe void* casts
+#include<stdlib.h>
+void test_alloc(void) {
+  int *ptr_cast = (int*)malloc(3 * sizeof(int));
+  // CHECK_ALL: _Ptr<int> ptr_cast = (_Ptr<int>)malloc<int>(3 * sizeof(int));
+  int *ptr_nocast = malloc(3 * sizeof(int));
+  // CHECK_ALL: _Ptr<int> ptr_nocast = malloc<int>(3 * sizeof(int));
+  char *ptr_badcast = (int *)malloc(3 * sizeof(int));
+  // CHECK_ALL: char *ptr_badcast = (int *)malloc<int>(3 * sizeof(int));
+
+  int *ptr_cast_c = (int*)calloc(3, sizeof(int));
+  // CHECK_ALL: _Ptr<int> ptr_cast_c = (_Ptr<int>)calloc<int>(3, sizeof(int));
+  int *ptr_cast_r = (int*)realloc(ptr_cast_c, 3 * sizeof(int));
+  // CHECK_ALL: _Ptr<int> ptr_cast_r = (_Ptr<int>)realloc<int>(ptr_cast_c, 3 * sizeof(int));
+
+}
