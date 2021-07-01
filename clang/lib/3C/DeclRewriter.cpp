@@ -559,8 +559,9 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
     DeclIsTypedef = isa<TypedefType>(TS->getType());
   }
 
-  // If we've made this generic we need add "_Itype_for_any"
-  if (FDConstraint->getGenericParams() > 0 && !FD->isGenericFunction())
+  // If we've made this generic we need add "_For_any" or "_Itype_for_any"
+  if (FDConstraint->getGenericParams() > 0
+      && !FD->isGenericFunction() && !FD->isItypeGenericFunction())
     RewriteGeneric = true;
 
   // Get rewritten parameter variable declarations. Try to use
