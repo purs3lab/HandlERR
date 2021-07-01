@@ -51,8 +51,8 @@ typedef struct {
 } A, *PA;
 // expected-warning@-1 {{2 unchecked pointers: Unable to rewrite a typedef with multiple names}}
 // Two pointers affected by the above root cause. Do not count the typedef
-// itself as a root cause even though that's where the star is written. Count
-// each of the variables below even though no star is actually written.
+// itself as an affected pointer even though that's where the star is written.
+// Count each of the variables below even though no star is actually written.
 PA pa_test0, pa_test1;
 
 // expected-warning@+1 {{1 unchecked pointer: Internal constraint for generic function declaration, for which 3C currently does not support re-solving.}}
