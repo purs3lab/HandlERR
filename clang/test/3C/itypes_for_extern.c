@@ -5,7 +5,7 @@
 // RUN: 3c -base-dir=%S -itypes-for-extern -alltypes -output-dir=%t.checked %s --
 // RUN: 3c -base-dir=%t.checked -itypes-for-extern -alltypes %t.checked/itypes_for_extern.c -- | diff %t.checked/itypes_for_extern.c -
 
-// Simplest test case: a would normaly get a checked type, but is given an
+// Simplest test case: a would normally get a checked type, but is given an
 // itype because of the flag.
 void foo(int *a) {}
 //CHECK: void foo(int *a : itype(_Ptr<int>)) _Checked {}
@@ -15,7 +15,7 @@ void foo(int *a) {}
 static void static_foo(int *a) {}
 //CHECK: static void static_foo(_Ptr<int> a) _Checked {}
 
-// Don't give a funciton an itype if it wouldn't normally be checked
+// Don't give a function an itype if it wouldn't normally be checked
 void undef_foo(int *a);
 //CHECK: void undef_foo(int *a);
 
@@ -81,3 +81,14 @@ struct typedef_struct {
 };
 //CHECK: int_star a : itype(_Ptr<int>);
 //CHECK: fn f : itype(_Ptr<void (_Ptr<int>)>);
+
+// Testing some cases where the itypes already exist. Earlier we made a change
+// that lets itypes re-solve to checked types. That shouldn't happen with this
+// flag. This is also covered by the idempotence check, but I wanted to make it
+// explicit.
+
+void has_itype0(int *a : itype(_Ptr<int>)) { a = 1; }
+//CHECK: void has_itype0(int *a : itype(_Ptr<int>)) { a = 1; }
+
+void has_itype1(int *a : itype(_Ptr<int>)) { a = 0; }
+//CHECK: void has_itype1(int *a : itype(_Ptr<int>)) _Checked { a = 0; }
