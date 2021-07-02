@@ -7,7 +7,7 @@
 // fail.
 
 // RUN: rm -rf %t*
-// RUN: not 3c -base-dir=%S -extra-arg="-Wno-everything" -verify -warn-root-cause %s -- 2>%t.stderr
+// RUN: not 3c -base-dir=%S -warn-root-cause %s -- -Xclang -verify -Wno-everything 2>%t.stderr
 // RUN: grep -q "error: 'warning' diagnostics expected but not seen:" %t.stderr
 // RUN: grep -q "error: 'warning' diagnostics seen but not expected:" %t.stderr
 

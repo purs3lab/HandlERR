@@ -9,7 +9,7 @@
 // those errors and fail, so diag_verifier_{pass,fail}.c only add coverage for
 // unusual problems with the diagnostic verifier that we haven't seen yet.
 
-// RUN: 3c -base-dir=%S -extra-arg="-Wno-everything" -verify -warn-root-cause %s --
+// RUN: 3c -base-dir=%S -warn-root-cause %s -- -Xclang -verify -Wno-everything
 
 // Example warning borrowed from root_cause.c .
 void *x; // expected-warning {{Default void* type}}
