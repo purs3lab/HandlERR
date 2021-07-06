@@ -647,6 +647,12 @@ public:
   int getGenericParams() const {
     return TypeParams;
   }
+  // remove added generics
+  // use when we constrain a potential generic param to wild
+  void resetGenericParams() {
+    TypeParams = 0;
+  }
+
   // The type parameter index of the return
   int getGenericIndex() const {
     return ReturnVar.ExternalConstraint->getGenericIndex();

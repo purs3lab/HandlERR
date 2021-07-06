@@ -437,10 +437,18 @@ public:
       : Context(C), Info(I), Writer(R) {}
 
   bool VisitCallExpr(CallExpr *CE) {
-    if (isa_and_nonnull<FunctionDecl>(CE->getCalleeDecl())) {
+    if (auto *FD = dyn_cast_or_null<FunctionDecl>(CE->getCalleeDecl())) {
       // If the function call already has type arguments, we'll trust that
       // they're correct and not add anything else.
       if (typeArgsProvided(CE))
+        return true;
+
+      // If the function is not generic, we have nothing to do.
+      // This could happen even if it has type param binding if we
+      // reset generics because of wildness
+      auto temp = Info.getFuncConstraint(FD,Context);
+      if (temp->getGenericParams() == 0 &&
+          !FD->isItypeGenericFunction())
         return true;
 
       if (Info.hasTypeParamBindings(CE, Context)) {

@@ -650,6 +650,13 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
     RewriteReturn = true;
   }
 
+  // Mirrors the check above that sets RewriteGeneric to true.
+  // If we've decided against making this generic, remove the generic params
+  // so later rewrites (of typeparams) don't happen
+  if (!RewriteGeneric && FDConstraint->getGenericParams() > 0
+      && !FD->isGenericFunction() && !FD->isItypeGenericFunction())
+    FDConstraint->resetGenericParams();
+
 
   // Combine parameter and return variables rewritings into a single rewriting
   // for the entire function declaration.

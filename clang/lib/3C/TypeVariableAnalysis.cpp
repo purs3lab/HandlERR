@@ -46,12 +46,19 @@ void TypeVariableEntry::updateEntry(QualType Ty, CVarSet &CVs,
                          getType()->getPointeeOrArrayElementType() != PtrTy))
       IsConsistent = false;
   }
-  if (IdentArgumentCV && IdentCV) IsConsistent = false;
-  if (!IdentArgumentCV) IdentArgumentCV = IdentCV;
+  // If these came from two different type params originally and are both
+  // passed to the same type param, we have no way of knowing if they were
+  // the same and in general they will not always be, so this must be marked
+  // inconsistent.
+  if (auto PVC1 = dyn_cast_or_null<PVConstraint>(IdentArgumentCV))
+      if (auto PVC2 = dyn_cast_or_null<PVConstraint>(IdentCV))
+        if (PVC1->getGenericIndex() != PVC2->getGenericIndex())
+          IsConsistent = false;
 
   // Record new constraints for the entry. These are used even when the variable
   // is not consistent.
   insertConstraintVariables(CVs);
+  if (!IdentArgumentCV) IdentArgumentCV = IdentCV;
 }
 
 ConstraintVariable *TypeVariableEntry::getTypeParamConsVar() {
