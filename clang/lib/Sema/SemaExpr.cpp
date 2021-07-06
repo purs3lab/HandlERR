@@ -16717,7 +16717,8 @@ bool Sema::DiagnoseAssignmentResult(AssignConvertType ConvTy,
     }
     Diag(Loc, diag::err_checkedc_void_pointer_assign) << VoidType << NonVoidType <<
       (QualType(NonVoidType->getPointeeOrArrayElementType(), 0));
-    *Complained = true;
+    if (Complained)
+      *Complained = true;
     return true;
   }
   case Incompatible:
