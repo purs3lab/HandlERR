@@ -48,7 +48,12 @@ public:
   // This map holds similar information as the type variable map in
   // ConstraintBuilder.cpp, but it is stored in a form that is usable during
   // rewriting.
-  typedef std::map<unsigned int, ConstraintVariable *> CallTypeParamBindingsT;
+  // The pair of CVs are the type param constraint (first) and an optional
+  // constraint for the single identifier argument, used to get the generic
+  // index if the first is void.
+  typedef std::map<unsigned int,
+                   std::pair<ConstraintVariable *,
+                             ConstraintVariable *>> CallTypeParamBindingsT;
   typedef std::map<PersistentSourceLoc, CallTypeParamBindingsT>
       TypeParamBindingsT;
 
@@ -123,7 +128,8 @@ public:
   }
 
   void setTypeParamBinding(CallExpr *CE, unsigned int TypeVarIdx,
-                           ConstraintVariable *CV, ASTContext *C);
+                           ConstraintVariable *CV,
+                           ConstraintVariable* Ident, ASTContext *C);
   bool hasTypeParamBindings(CallExpr *CE, ASTContext *C) const;
   const CallTypeParamBindingsT &getTypeParamBindings(CallExpr *CE,
                                                      ASTContext *C) const;

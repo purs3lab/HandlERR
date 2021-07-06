@@ -21,7 +21,8 @@ public:
   // Note: does not initialize TyVarType!
   TypeVariableEntry() : IsConsistent(false), TypeParamConsVar(nullptr) {}
   TypeVariableEntry(QualType Ty, std::set<ConstraintVariable *> &CVs
-                    , bool ForceInconsistent = false)
+                    , bool ForceInconsistent = false
+                    , ConstraintVariable *IdentCV = nullptr)
       : TypeParamConsVar(nullptr) {
     // We'll need a name to provide the type arguments during rewriting, so no
     // anonymous types are allowed.
@@ -30,16 +31,19 @@ public:
                    !isTypeAnonymous(Ty->getPointeeOrArrayElementType());
     TyVarType = Ty;
     ArgConsVars = CVs;
+    IdentArgumentCV = IdentCV;
   }
 
   bool getIsConsistent() const;
   QualType getType();
   std::set<ConstraintVariable *> &getConstraintVariables();
   ConstraintVariable *getTypeParamConsVar();
+  ConstraintVariable *getIdentConsVar();
 
   void insertConstraintVariables(std::set<ConstraintVariable *> &CVs);
   void setTypeParamConsVar(ConstraintVariable *CV);
-  void updateEntry(QualType Ty, std::set<ConstraintVariable *> &CVs);
+  void updateEntry(QualType Ty, std::set<ConstraintVariable *> &CVs,
+                   ConstraintVariable *IdentCV);
 
 private:
   // Is this type variable instantiated consistently. True when all uses have
@@ -58,6 +62,12 @@ private:
   // A single constraint variable for solving the checked type of the type
   // variable. It is constrained GEQ all elements of ArgConsVars.
   ConstraintVariable *TypeParamConsVar;
+
+  // If an argument is a single identifier, store the constraint variable
+  // to recognize changes in type from inferred generics. Null otherwise.
+  // Meaningless if `TypeParamConsVar` has a basetype other than void, and
+  // when we have generic index constraints, those should be favored over this
+  ConstraintVariable *IdentArgumentCV;
 };
 
 // Stores the instantiated type for each type variables. This map has
@@ -96,7 +106,8 @@ private:
   TypeVariableMapT TVMap;
 
   void insertBinding(CallExpr *CE, const int TyIdx, QualType Ty,
-                     CVarSet &CVs, bool ForceInconsistent = false);
+                     CVarSet &CVs, bool ForceInconsistent = false,
+                     ConstraintVariable *IdentCV = nullptr);
 };
 
 bool typeArgsProvided(CallExpr *Call);

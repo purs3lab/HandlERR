@@ -31,7 +31,8 @@ void TypeVariableEntry::setTypeParamConsVar(ConstraintVariable *CV) {
   TypeParamConsVar = CV;
 }
 
-void TypeVariableEntry::updateEntry(QualType Ty, CVarSet &CVs) {
+void TypeVariableEntry::updateEntry(QualType Ty, CVarSet &CVs,
+                                    ConstraintVariable *IdentCV) {
   if (!(Ty->isArrayType() || Ty->isPointerType())) {
     // We need to have a pointer or an array type for an instantiation to make
     // sense. Anything else is treated as inconsistent.
@@ -45,6 +46,9 @@ void TypeVariableEntry::updateEntry(QualType Ty, CVarSet &CVs) {
                          getType()->getPointeeOrArrayElementType() != PtrTy))
       IsConsistent = false;
   }
+  if (IdentArgumentCV && IdentCV) IsConsistent = false;
+  if (!IdentArgumentCV) IdentArgumentCV = IdentCV;
+
   // Record new constraints for the entry. These are used even when the variable
   // is not consistent.
   insertConstraintVariables(CVs);
@@ -55,6 +59,12 @@ ConstraintVariable *TypeVariableEntry::getTypeParamConsVar() {
          IsConsistent);
   assert("Accessing null constraint variable" && TypeParamConsVar != nullptr);
   return TypeParamConsVar;
+}
+
+ConstraintVariable *TypeVariableEntry::getIdentConsVar() {
+  assert("Accessing constraint variable for inconsistent Type Variable." &&
+         IsConsistent);
+  return IdentArgumentCV;
 }
 
 QualType TypeVariableEntry::getType() {
@@ -112,6 +122,15 @@ bool TypeVarVisitor::VisitCallExpr(CallExpr *CE) {
         if (TyIdx >= 0) {
           Expr *Uncast = A->IgnoreImpCasts();
           std::set<ConstraintVariable *> CVs = CR.getExprConstraintVarsSet(Uncast);
+          if (auto *DRE = dyn_cast<DeclRefExpr>(Uncast)){
+            CVarOption Var = Info.getVariable(DRE->getFoundDecl(),Context);
+            if (Var.hasValue()) {
+              insertBinding(CE,TyIdx,Uncast->getType(),
+                            CVs,ForcedInconsistent,&Var.getValue());
+              ++I;
+              continue;
+            }
+          }
           insertBinding(CE, TyIdx, Uncast->getType(), CVs, ForcedInconsistent);
         }
         ++I;
@@ -150,17 +169,19 @@ bool TypeVarVisitor::VisitCallExpr(CallExpr *CE) {
 // used and the index of the type variable type in the function declaration.
 void TypeVarVisitor::insertBinding(CallExpr *CE, const int TyIdx,
                                    clang::QualType Ty, CVarSet &CVs,
-                                   bool ForceInconsistent) {
+                                   bool ForceInconsistent,
+                                   ConstraintVariable *IdentCV) {
   assert(TyIdx >= 0 &&
          "Creating a type variable binding without a type variable.");
   auto &CallTypeVarMap = TVMap[CE];
   if (CallTypeVarMap.find(TyIdx) == CallTypeVarMap.end()) {
     // If the type variable hasn't been seen before, add it to the map.
-    TypeVariableEntry TVEntry = TypeVariableEntry(Ty, CVs, ForceInconsistent);
+    TypeVariableEntry TVEntry = TypeVariableEntry(Ty, CVs, ForceInconsistent,
+                                                  IdentCV);
     CallTypeVarMap[TyIdx] = TVEntry;
   } else {
     // Otherwise, update entry with new type and constraints.
-    CallTypeVarMap[TyIdx].updateEntry(Ty, CVs);
+    CallTypeVarMap[TyIdx].updateEntry(Ty, CVs, IdentCV);
   }
 }
 
@@ -186,9 +207,11 @@ void TypeVarVisitor::setProgramInfoTypeVars() {
       if (TVCallEntry.second.getIsConsistent())
         Info.setTypeParamBinding(TVEntry.first, TVCallEntry.first,
                                  TVCallEntry.second.getTypeParamConsVar(),
+                                 TVCallEntry.second.getIdentConsVar(),
                                  Context);
       else
-        Info.setTypeParamBinding(TVEntry.first, TVCallEntry.first, nullptr,
+        Info.setTypeParamBinding(TVEntry.first, TVCallEntry.first,
+                                 nullptr, nullptr,
                                  Context);
   }
 }

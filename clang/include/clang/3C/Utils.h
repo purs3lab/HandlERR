@@ -23,6 +23,7 @@
 #include <unordered_set>
 
 class ConstraintVariable;
+class PointerVariableConstraint;
 class ProgramInfo;
 
 // Maps a Decl to the set of constraint variables for that Decl.
@@ -227,5 +228,8 @@ void getPrintfStringArgIndices(const clang::CallExpr *CE,
 // string literals (https://bugs.llvm.org/show_bug.cgi?id=49926).
 int64_t getStmtIdWorkaround(const clang::Stmt *St,
                             const clang::ASTContext &Context);
+
+//PointerVariableConstraint *findParamCV(clang::ASTContext &Context,
+//                          ProgramInfo &Info, clang::DeclRefExpr *D);
 
 #endif

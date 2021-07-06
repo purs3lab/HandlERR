@@ -1128,16 +1128,18 @@ void ProgramInfo::computePtrLevelStats() {
 }
 
 void ProgramInfo::setTypeParamBinding(CallExpr *CE, unsigned int TypeVarIdx,
-                                      ConstraintVariable *CV, ASTContext *C) {
+                                      ConstraintVariable *CV,
+                                      ConstraintVariable *Ident,
+                                      ASTContext *C) {
 
   auto PSL = PersistentSourceLoc::mkPSL(CE, *C);
   auto CallMap = TypeParamBindings[PSL];
   if (CallMap.find(TypeVarIdx) == CallMap.end()) {
-    TypeParamBindings[PSL][TypeVarIdx] = CV;
+    TypeParamBindings[PSL][TypeVarIdx] = std::make_pair(CV,Ident);
   } else {
     // If this CE/idx is at the same location, it's in a macro,
     // so mark it as inconsistent.
-    TypeParamBindings[PSL][TypeVarIdx] = nullptr;
+    TypeParamBindings[PSL][TypeVarIdx] = std::make_pair(nullptr,nullptr);
   }
 }
 
