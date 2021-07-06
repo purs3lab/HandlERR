@@ -546,7 +546,10 @@ public:
   PVConstraint *getInternal() const { return InternalConstraint; }
   PVConstraint *getExternal() const { return ExternalConstraint; }
 
-  void setGenericIndex(int idx) { ExternalConstraint->setGenericIndex(idx); }
+  void setGenericIndex(int idx) {
+    ExternalConstraint->setGenericIndex(idx);
+    InternalConstraint->setGenericIndex(idx);
+  }
 
   void equateWithItype(ProgramInfo &CS,
                        const std::string &ReasonUnchangeable) const;

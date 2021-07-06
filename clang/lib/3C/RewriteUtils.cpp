@@ -454,10 +454,10 @@ public:
             std::string TyStr;
             PVConstraint *CheckVoid = dyn_cast<PVConstraint>(Entry.second.first);
             if (Entry.second.second != nullptr && CheckVoid->isVoidPtr()) {
-              std::string TyStr = Entry.second.second->mkString(
+              TyStr = Entry.second.second->mkString(
                   Info.getConstraints(), false, false, true);
             } else {
-              std::string TyStr = Entry.second.first->mkString(
+              TyStr = Entry.second.first->mkString(
                   Info.getConstraints(), false, false, true);
             }
             if (TyStr.back() == ' ')
