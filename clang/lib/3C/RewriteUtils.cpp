@@ -446,8 +446,7 @@ public:
       // If the function is not generic, we have nothing to do.
       // This could happen even if it has type param binding if we
       // reset generics because of wildness
-      auto temp = Info.getFuncConstraint(FD,Context);
-      if (temp->getGenericParams() == 0 &&
+      if (Info.getFuncConstraint(FD,Context)->getGenericParams() == 0 &&
           !FD->isItypeGenericFunction())
         return true;
 

@@ -738,7 +738,7 @@ bool ConstraintResolver::isCastofGeneric(CastExpr *C) {
     // check for built-in allocators, in case the standard headers are not used
     if (auto *DD = dyn_cast_or_null<DeclaratorDecl>(CE->getCalleeDecl())) {
       std::string Name = DD->getNameAsString();
-      if (Name == "malloc" || Name == "calloc" || Name == "realloc")
+      if (isFunctionAllocator(Name))
         return true;
     }
     // check for a generic function call
