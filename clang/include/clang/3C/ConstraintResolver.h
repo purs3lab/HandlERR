@@ -80,6 +80,10 @@ private:
   CVarSet getBaseVarPVConstraint(DeclRefExpr *Decl);
 
   PVConstraint *getRewritablePVConstraint(Expr *E);
+
+
+  bool isNonPtrType(QualType &TE);
+
 };
 
 #endif // LLVM_CLANG_3C_CONSTRAINTRESOLVER_H

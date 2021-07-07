@@ -87,7 +87,8 @@ public:
   virtual std::string mkString(Constraints &CS, bool EmitName = true,
                                bool ForItype = false, bool EmitPointee = false,
                                bool UnmaskTypedef = false,
-                               std::string UseName = "") const = 0;
+                               std::string UseName = "",
+                               bool ForItypeBase = false) const = 0;
 
   // Debug printing of the constraint variable.
   virtual void print(llvm::raw_ostream &O) const = 0;
@@ -179,7 +180,8 @@ public:
   // passing a reason for the "root cause of wildness" as ReasonUnchangeable.
   // Otherwise ReasonUnchangeable should be set to the empty string.
   virtual void equateWithItype(ProgramInfo &CS,
-                               const std::string &ReasonUnchangeable) = 0;
+                               const std::string &ReasonUnchangeable,
+                               PersistentSourceLoc *PSL) = 0;
 
   virtual ConstraintVariable *getCopy(Constraints &CS) = 0;
 
@@ -343,8 +345,8 @@ private:
   // Constructor for when we know a CVars and a type string.
   PointerVariableConstraint(CAtoms V, std::vector<ConstAtom *> SV,
                             std::string T, std::string Name,
-                            FunctionVariableConstraint *F,
-                            std::string Is, int Generic = -1)
+                            FunctionVariableConstraint *F, std::string Is,
+                            int Generic = -1)
       : ConstraintVariable(PointerVariable, "" /*not used*/, Name), BaseType(T),
         Vars(V), SrcVars(SV), FV(F), SrcHasItype(!Is.empty()),
         ItypeStr(Is), PartOfFuncPrototype(false), Parent(nullptr),
@@ -352,7 +354,6 @@ private:
         NewGenericIndex(Generic), IsZeroWidthArray(false), IsVoidPtr(false) {}
 
 public:
-
   std::string getTy() const { return BaseType; }
   bool getArrPresent() const;
   // Check if the outermost pointer is an unsized array.
@@ -364,9 +365,7 @@ public:
   void setTypedef(TypedefNameDecl *T, std::string S);
 
   // Return true if this constraint had an itype in the original source code.
-  bool srcHasItype() const override {
-    return SrcHasItype;
-  }
+  bool srcHasItype() const override { return SrcHasItype; }
 
   // Return the string representation of the itype for this constraint if an
   // itype was present in the original source code. Returns empty string
@@ -456,7 +455,8 @@ public:
   std::string mkString(Constraints &CS, bool EmitName = true,
                        bool ForItype = false, bool EmitPointee = false,
                        bool UnmaskTypedef = false,
-                       std::string UseName = "") const override;
+                       std::string UseName = "",
+                       bool ForItypeBase = false) const override;
 
   FunctionVariableConstraint *getFV() const { return FV; }
 
@@ -469,8 +469,8 @@ public:
                        PersistentSourceLoc *PL) const override;
   void constrainOuterTo(Constraints &CS, ConstAtom *C, bool DoLB = false,
                         bool Soft = false);
-  void constrainIdxTo(Constraints &CS, ConstAtom *C,
-                      unsigned int Idx, bool DoLB = false, bool Soft = false);
+  void constrainIdxTo(Constraints &CS, ConstAtom *C, unsigned int Idx,
+                      bool DoLB = false, bool Soft = false);
   bool anyChanges(const EnvironmentMap &E) const override;
   bool anyArgumentIsWild(const EnvironmentMap &E);
   bool hasWild(const EnvironmentMap &E, int AIdx = -1) const override;
@@ -494,8 +494,8 @@ public:
 
   ~PointerVariableConstraint() override{};
 
-  void equateWithItype(ProgramInfo &CS,
-                       const std::string &ReasonUnchangeable) override;
+  void equateWithItype(ProgramInfo &CS, const std::string &ReasonUnchangeable,
+                       PersistentSourceLoc *PSL) override;
 };
 
 typedef PointerVariableConstraint PVConstraint;
@@ -523,8 +523,8 @@ private:
 
 public:
   FVComponentVariable()
-    : InternalConstraint(nullptr), ExternalConstraint(nullptr),
-      SourceDeclaration("") {}
+      : InternalConstraint(nullptr), ExternalConstraint(nullptr),
+        SourceDeclaration("") {}
 
   FVComponentVariable(FVComponentVariable *Ot, Constraints &CS);
 
@@ -535,10 +535,12 @@ public:
 
   void mergeDeclaration(FVComponentVariable *From, ProgramInfo &I,
                         std::string &ReasonFailed);
-  std::string mkItypeStr(Constraints &CS) const;
+  std::string mkItypeStr(Constraints &CS, bool ForItypeBase = false) const;
   std::string mkTypeStr(Constraints &CS, bool EmitName,
-                        std::string UseName = "") const;
-  std::string mkString(Constraints &CS, bool EmitName = true) const;
+                        std::string UseName = "",
+                        bool ForItypeBase = false) const;
+  std::string mkString(Constraints &CS, bool EmitName = true,
+                       bool ForItypeBase = false) const;
 
   bool hasItypeSolution(Constraints &CS) const;
   bool hasCheckedSolution(Constraints &CS) const;
@@ -551,8 +553,8 @@ public:
     InternalConstraint->setGenericIndex(idx);
   }
 
-  void equateWithItype(ProgramInfo &CS,
-                       const std::string &ReasonUnchangeable) const;
+  void equateWithItype(ProgramInfo &CS, const std::string &ReasonUnchangeable,
+                       PersistentSourceLoc *PSL) const;
 
   bool solutionEqualTo(Constraints &CS, const FVComponentVariable *CV,
                        bool ComparePtyp) const;
@@ -607,9 +609,7 @@ public:
     return ReturnVar.InternalConstraint;
   }
 
-  const FVComponentVariable *getCombineReturn() const {
-    return &ReturnVar;
-  }
+  const FVComponentVariable *getCombineReturn() const { return &ReturnVar; }
 
   size_t numParams() const { return ParamVars.size(); }
 
@@ -668,7 +668,8 @@ public:
   std::string mkString(Constraints &CS, bool EmitName = true,
                        bool ForItype = false, bool EmitPointee = false,
                        bool UnmaskTypedef = false,
-                       std::string UseName = "") const override;
+                       std::string UseName = "",
+                       bool ForItypeBase = false) const override;
   void print(llvm::raw_ostream &O) const override;
   void dump() const override { print(llvm::errs()); }
   void dumpJson(llvm::raw_ostream &O) const override;
@@ -689,8 +690,8 @@ public:
   bool isSolutionChecked(const EnvironmentMap &E) const override;
   bool isSolutionFullyChecked(const EnvironmentMap &E) const override;
 
-  void equateWithItype(ProgramInfo &CS,
-                       const std::string &ReasonUnchangeable) override;
+  void equateWithItype(ProgramInfo &CS, const std::string &ReasonUnchangeable,
+                       PersistentSourceLoc *PSL) override;
 
   ~FunctionVariableConstraint() override {}
 };

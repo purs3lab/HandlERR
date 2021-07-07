@@ -155,8 +155,7 @@ clang::SourceLocation getFunctionDeclRParen(clang::FunctionDecl *FD,
                                             clang::SourceManager &S);
 
 clang::SourceLocation locationPrecedingChar(clang::SourceLocation SL,
-                                            clang::SourceManager &S,
-                                            char C);
+                                            clang::SourceManager &S, char C);
 
 // Remove auxillary casts from the provided expression.
 clang::Expr *removeAuxillaryCasts(clang::Expr *SrcExpr);

@@ -72,6 +72,8 @@ struct _3COptions {
   bool AllowUnwritableChanges;
 
   bool AllowRewriteFailures;
+
+  bool ItypesForExtern;
 };
 
 // The main interface exposed by the 3C to interact with the tool.
@@ -159,7 +161,7 @@ private:
   bool isSuccessfulSoFar();
 
   // saved ASTs
-  std::vector< std::unique_ptr< ASTUnit >> ASTs;
+  std::vector<std::unique_ptr<ASTUnit>> ASTs;
 
   // Are constraints already built?
   bool ConstraintsBuilt;
