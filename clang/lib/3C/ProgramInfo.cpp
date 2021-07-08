@@ -582,24 +582,6 @@ ProgramInfo::insertNewFVConstraint(FunctionDecl *FD, FVConstraint *NewC,
   return (*Map)[FuncName];
 }
 
-void ProgramInfo::specialCaseVarIntros(ValueDecl *D, ASTContext *Context) {
-  // Special-case for va_list, constrain to wild.
-  PVConstraint *PVC = nullptr;
-
-  CVarOption CVOpt = getVariable(D, Context);
-  if (CVOpt.hasValue()) {
-    ConstraintVariable &CV = CVOpt.getValue();
-    PVC = dyn_cast<PVConstraint>(&CV);
-  }
-
-  if (PVC != nullptr && isVarArgType(D->getType().getAsString())) {
-    // Set the reason for making this variable WILD.
-    PersistentSourceLoc PL = PersistentSourceLoc::mkPSL(D, *Context);
-    std::string Rsn = "Variable type is va_list.";
-    PVC->constrainToWild(CS, Rsn, &PL);
-  }
-}
-
 // For each pointer type in the declaration of D, add a variable to the
 // constraint system for that pointer type.
 void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
@@ -684,7 +666,6 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       // Constraint variable is stored on the parent function, so we need to
       // constrain to WILD even if we don't end up storing this in the map.
       constrainWildIfMacro(PVExternal, PVD->getLocation());
-      specialCaseVarIntros(PVD, AstContext);
       // If this is "main", constrain its argv parameter to a nested arr
       if (AllTypes && FuncName == "main" && FD->isGlobal() && I == 1) {
         PVInternal->constrainOuterTo(CS, CS.getArr());
@@ -720,7 +701,6 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
         }
         GlobalVariableSymbols[VarName].insert(P);
       }
-      specialCaseVarIntros(D, AstContext);
     }
 
   } else if (FieldDecl *FlD = dyn_cast<FieldDecl>(D)) {
@@ -730,7 +710,6 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       unifyIfTypedef(Ty, *AstContext, FlD, P);
       NewCV = P;
       NewCV->setValidDecl();
-      specialCaseVarIntros(D, AstContext);
     }
   } else
     llvm_unreachable("unknown decl type");

@@ -202,11 +202,6 @@ private:
   // instantiated so they can be inserted during rewriting.
   TypeParamBindingsT TypeParamBindings;
 
-  // Special-case handling for decl introductions. For the moment this covers:
-  //  * void-typed variables
-  //  * va_list-typed variables
-  void specialCaseVarIntros(ValueDecl *D, ASTContext *Context);
-
   // Inserts the given FVConstraint set into the extern or static function map.
   // Returns the merged version if it was a redeclaration, or the constraint
   // parameter if it was new.
