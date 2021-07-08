@@ -102,8 +102,8 @@ private:
   bool RewriteReturn;
   bool RewriteParams;
 
-  SourceLocation getGenericBegin(SourceManager &SM) const;
   SourceLocation getDeclBegin(SourceManager &SM) const;
+  SourceLocation getReturnBegin(SourceManager &SM) const;
   SourceLocation getParamBegin(SourceManager &SM) const;
   SourceLocation getReturnEnd(SourceManager &SM) const;
   SourceLocation getDeclEnd(SourceManager &SM) const;

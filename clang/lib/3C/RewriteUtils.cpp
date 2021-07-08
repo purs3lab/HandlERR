@@ -505,8 +505,8 @@ private:
 };
 
 SourceRange FunctionDeclReplacement::getSourceRange(SourceManager &SM) const {
-  SourceLocation Begin = RewriteGeneric ? getGenericBegin(SM) :
-                      (RewriteReturn ? getDeclBegin(SM) : getParamBegin(SM));
+  SourceLocation Begin = RewriteGeneric ? getDeclBegin(SM) :
+                      (RewriteReturn ? getReturnBegin(SM) : getParamBegin(SM));
   SourceLocation End = RewriteParams ? getDeclEnd(SM) : getReturnEnd(SM);
   // Begin can be equal to End if the SourceRange only contains one token.
   assert("Invalid FunctionDeclReplacement SourceRange!" &&
@@ -514,14 +514,25 @@ SourceRange FunctionDeclReplacement::getSourceRange(SourceManager &SM) const {
   return SourceRange(Begin, End);
 }
 
-SourceLocation FunctionDeclReplacement::getGenericBegin(SourceManager &SM) const {
-  SourceLocation Begin = Decl->getSourceRange().getBegin();
-  return Begin;
-}
-
 SourceLocation FunctionDeclReplacement::getDeclBegin(SourceManager &SM) const {
   SourceLocation Begin = Decl->getBeginLoc();
   return Begin;
+}
+
+SourceLocation FunctionDeclReplacement::getReturnBegin(SourceManager &SM) const {
+  // TODO: more accuracy
+  // This code gets the point after a modifier like "static"
+  // But currently, that leads to multiple "static"s
+  //  SourceRange ReturnSource = Decl->getReturnTypeSourceRange();
+  //  if (ReturnSource.isValid())
+  //    return ReturnSource.getBegin();
+
+  // Invalid return means we're in a macro or typedef, so just get the
+  // starting point. We may overwrite a _For_any(..), but those only
+  // exist in partially converted code, so we're relying on the user
+  // to have it correct anyway.
+
+  return getDeclBegin(SM);
 }
 
 SourceLocation FunctionDeclReplacement::getParamBegin(SourceManager &SM) const {
