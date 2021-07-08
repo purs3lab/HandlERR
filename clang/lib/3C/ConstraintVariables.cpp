@@ -149,9 +149,9 @@ PointerVariableConstraint::PointerVariableConstraint(
 PointerVariableConstraint::PointerVariableConstraint(DeclaratorDecl *D,
                                                      ProgramInfo &I,
                                                      const ASTContext &C)
-  : PointerVariableConstraint(D->getType(), D, std::string(D->getName()), I, C,
-                              nullptr, -1,
-                                false, false, D->getTypeSourceInfo()) {}
+    : PointerVariableConstraint(D->getType(), D, std::string(D->getName()), I,
+                                C, nullptr, -1, false, false,
+                                D->getTypeSourceInfo()) {}
 
 PointerVariableConstraint::PointerVariableConstraint(TypedefDecl *D,
                                                      ProgramInfo &I,
