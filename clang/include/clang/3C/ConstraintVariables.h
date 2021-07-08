@@ -347,10 +347,10 @@ private:
                             FunctionVariableConstraint *F, std::string Is,
                             int Generic = -1)
       : ConstraintVariable(PointerVariable, "" /*not used*/, Name), BaseType(T),
-        Vars(V), SrcVars(SV), FV(F), SrcHasItype(!Is.empty()),
-        ItypeStr(Is), PartOfFuncPrototype(false), Parent(nullptr),
-        BoundsAnnotationStr(""), BaseGenericIndex(Generic),
-        NewGenericIndex(Generic), IsZeroWidthArray(false), IsVoidPtr(false) {}
+        Vars(V), SrcVars(SV), FV(F), SrcHasItype(!Is.empty()), ItypeStr(Is),
+        PartOfFuncPrototype(false), Parent(nullptr), BoundsAnnotationStr(""),
+        BaseGenericIndex(Generic), NewGenericIndex(Generic),
+        IsZeroWidthArray(false), IsVoidPtr(false) {}
 
 public:
   std::string getTy() const { return BaseType; }
