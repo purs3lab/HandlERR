@@ -2183,11 +2183,9 @@ FVComponentVariable::FVComponentVariable(const QualType &QT,
     InternalConstraint = ExternalConstraint;
   } else {
     InternalConstraint =
-        new PVConstraint(QT, D, N, I, C, InFunc, -1,
-                         PotentialGeneric, HasItype, nullptr,
-                         ITypeT);
-    bool EquateChecked =
-        (QT->isVoidPointerType());
+        new PVConstraint(QT, D, N, I, C, InFunc, -1, PotentialGeneric, HasItype,
+                         nullptr, ITypeT);
+    bool EquateChecked = (QT->isVoidPointerType());
     linkInternalExternal(I, EquateChecked);
   }
 
