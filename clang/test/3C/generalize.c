@@ -29,11 +29,13 @@ void *getGlobal() { return glob; }
 
 // check type parameters
 void call_from_fn() {
+  // CHECK: void call_from_fn() _Checked {
   int *i;
   viewer(i);
   // CHECK: viewer<int>(i);
 }
 void call_from_gen_fn(void *i) {
+  // CHECK: _For_any(T) void call_from_gen_fn(_Ptr<T> i) {
   viewer(i);
   // CHECK: viewer<T>(i);
 }

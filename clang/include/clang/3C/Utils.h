@@ -23,7 +23,6 @@
 #include <unordered_set>
 
 class ConstraintVariable;
-class PointerVariableConstraint;
 class ProgramInfo;
 
 // Maps a Decl to the set of constraint variables for that Decl.
@@ -166,7 +165,7 @@ clang::Expr *removeAuxillaryCasts(clang::Expr *SrcExpr);
 // OK to cast from Src to Dst?
 bool isCastSafe(clang::QualType DstType, clang::QualType SrcType);
 
-  // Check if the provided file path belongs to the input project
+// Check if the provided file path belongs to the input project
 // and can be rewritten.
 //
 // For accurate results, the path must be canonical. The file name of a
@@ -227,8 +226,5 @@ void getPrintfStringArgIndices(const clang::CallExpr *CE,
 // string literals (https://bugs.llvm.org/show_bug.cgi?id=49926).
 int64_t getStmtIdWorkaround(const clang::Stmt *St,
                             const clang::ASTContext &Context);
-
-//PointerVariableConstraint *findParamCV(clang::ASTContext &Context,
-//                          ProgramInfo &Info, clang::DeclRefExpr *D);
 
 #endif
