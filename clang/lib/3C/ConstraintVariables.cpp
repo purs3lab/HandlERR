@@ -156,9 +156,9 @@ PointerVariableConstraint::PointerVariableConstraint(DeclaratorDecl *D,
 PointerVariableConstraint::PointerVariableConstraint(TypedefDecl *D,
                                                      ProgramInfo &I,
                                                      const ASTContext &C)
-  : PointerVariableConstraint(D->getUnderlyingType(), nullptr,
-                              D->getNameAsString(), I, C, nullptr, -1,
-                              false, false, D->getTypeSourceInfo()) {}
+    : PointerVariableConstraint(D->getUnderlyingType(), nullptr,
+                                D->getNameAsString(), I, C, nullptr, -1, false,
+                                false, D->getTypeSourceInfo()) {}
 
 PointerVariableConstraint::PointerVariableConstraint(Expr *E, ProgramInfo &I,
                                                      const ASTContext &C)
