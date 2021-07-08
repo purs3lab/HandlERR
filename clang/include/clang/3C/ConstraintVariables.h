@@ -321,7 +321,6 @@ private:
   // Generic types can be used with fewer restrictions, so this field is used
   // stop assignments with generic variables from forcing constraint variables
   // to be wild.
-  //
   // Base is generated from the source code, New is set internally
   int BaseGenericIndex;
   int NewGenericIndex;
