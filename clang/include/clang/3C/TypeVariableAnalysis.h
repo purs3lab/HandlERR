@@ -31,14 +31,14 @@ public:
                    !isTypeAnonymous(Ty->getPointeeOrArrayElementType());
     TyVarType = Ty;
     ArgConsVars = CVs;
-    IdentArgumentCV = IdentCV;
+    GenArgumentCV = IdentCV;
   }
 
   bool getIsConsistent() const;
   QualType getType();
   std::set<ConstraintVariable *> &getConstraintVariables();
   ConstraintVariable *getTypeParamConsVar();
-  ConstraintVariable *getIdentConsVar();
+  ConstraintVariable *getGenArgCV();
 
   void insertConstraintVariables(std::set<ConstraintVariable *> &CVs);
   void setTypeParamConsVar(ConstraintVariable *CV);
@@ -67,7 +67,7 @@ private:
   // to recognize changes in type from inferred generics. Null otherwise.
   // Meaningless if `TypeParamConsVar` has a basetype other than void, and
   // when we have generic index constraints, those should be favored over this
-  ConstraintVariable *IdentArgumentCV;
+  ConstraintVariable *GenArgumentCV;
 };
 
 // Stores the instantiated type for each type variables. This map has

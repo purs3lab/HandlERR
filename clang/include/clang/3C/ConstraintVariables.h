@@ -321,9 +321,9 @@ private:
   // Generic types can be used with fewer restrictions, so this field is used
   // stop assignments with generic variables from forcing constraint variables
   // to be wild.
-  // Base is generated from the source code, New is set internally
-  int BaseGenericIndex;
-  int NewGenericIndex;
+  // Source is generated from the source code, Inferred is set internally
+  int SourceGenericIndex;
+  int InferredGenericIndex;
 
   // Empty array pointers are represented the same as standard pointers. This
   // lets pointers be passed to functions expecting a zero width array. This
@@ -349,7 +349,7 @@ private:
       : ConstraintVariable(PointerVariable, "" /*not used*/, Name), BaseType(T),
         Vars(V), SrcVars(SV), FV(F), SrcHasItype(!Is.empty()), ItypeStr(Is),
         PartOfFuncPrototype(false), Parent(nullptr), BoundsAnnotationStr(""),
-        BaseGenericIndex(Generic), NewGenericIndex(Generic),
+        SourceGenericIndex(Generic), InferredGenericIndex(Generic),
         IsZeroWidthArray(false), IsVoidPtr(false) {}
 
 public:
@@ -375,10 +375,12 @@ public:
   // Get bounds annotation.
   std::string getBoundsStr() const { return BoundsAnnotationStr; }
 
-  bool getIsGeneric() const { return NewGenericIndex >= 0; }
-  int getGenericIndex() const { return NewGenericIndex; }
-  void setGenericIndex(int idx) { NewGenericIndex = idx; }
-  bool isGenericChanged() const { return BaseGenericIndex != NewGenericIndex; }
+  bool isGeneric() const { return InferredGenericIndex >= 0; }
+  int getGenericIndex() const { return InferredGenericIndex; }
+  void setGenericIndex(int idx) { InferredGenericIndex = idx; }
+  bool isGenericChanged() const {
+    return SourceGenericIndex != InferredGenericIndex;
+  }
   // Was this variable a checked pointer in the input program?
   // This is important for two reasons: (1) externs that are checked should be
   // kept that way during solving, (2) nothing that was originally checked

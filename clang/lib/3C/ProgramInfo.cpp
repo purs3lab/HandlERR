@@ -440,14 +440,14 @@ bool ProgramInfo::link() {
       const FVComponentVariable *Ret = G->getCombineReturn();
       Ret->getInternal()->constrainToWild(CS, Rsn);
       if (!Ret->getExternal()->srcHasItype() &&
-          !Ret->getExternal()->getIsGeneric())
+          !Ret->getExternal()->isGeneric())
         Ret->getExternal()->constrainToWild(CS, Rsn);
 
       for (unsigned I = 0; I < G->numParams(); I++) {
         const FVComponentVariable *Param = G->getCombineParam(I);
         Param->getInternal()->constrainToWild(CS, Rsn);
         if (!Param->getExternal()->srcHasItype() &&
-            !Param->getExternal()->getIsGeneric())
+            !Param->getExternal()->isGeneric())
           Param->getExternal()->constrainToWild(CS, Rsn);
       }
     }
@@ -476,10 +476,10 @@ bool ProgramInfo::link() {
 
       if (!G->hasBody()) {
 
-        if (!G->getExternalReturn()->getIsGeneric())
+        if (!G->getExternalReturn()->isGeneric())
           G->getExternalReturn()->constrainToWild(CS, Rsn);
         for (unsigned I = 0; I < G->numParams(); I++)
-          if (!G->getExternalParam(I)->getIsGeneric())
+          if (!G->getExternalParam(I)->isGeneric())
             G->getExternalParam(I)->constrainToWild(CS, Rsn);
       }
     }

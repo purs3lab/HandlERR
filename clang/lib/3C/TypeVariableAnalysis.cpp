@@ -50,7 +50,7 @@ void TypeVariableEntry::updateEntry(QualType Ty, CVarSet &CVs,
   // passed to the same type param, we have no way of knowing if they were
   // the same and in general they will not always be, so this must be marked
   // inconsistent.
-  if (auto PVC1 = dyn_cast_or_null<PVConstraint>(IdentArgumentCV))
+  if (auto PVC1 = dyn_cast_or_null<PVConstraint>(GenArgumentCV))
       if (auto PVC2 = dyn_cast_or_null<PVConstraint>(IdentCV))
         if (PVC1->getGenericIndex() != PVC2->getGenericIndex())
           IsConsistent = false;
@@ -58,7 +58,8 @@ void TypeVariableEntry::updateEntry(QualType Ty, CVarSet &CVs,
   // Record new constraints for the entry. These are used even when the variable
   // is not consistent.
   insertConstraintVariables(CVs);
-  if (!IdentArgumentCV) IdentArgumentCV = IdentCV;
+  if (!GenArgumentCV)
+    GenArgumentCV = IdentCV;
 }
 
 ConstraintVariable *TypeVariableEntry::getTypeParamConsVar() {
@@ -68,10 +69,10 @@ ConstraintVariable *TypeVariableEntry::getTypeParamConsVar() {
   return TypeParamConsVar;
 }
 
-ConstraintVariable *TypeVariableEntry::getIdentConsVar() {
+ConstraintVariable *TypeVariableEntry::getGenArgCV() {
   assert("Accessing constraint variable for inconsistent Type Variable." &&
          IsConsistent);
-  return IdentArgumentCV;
+  return GenArgumentCV;
 }
 
 QualType TypeVariableEntry::getType() {
@@ -214,7 +215,7 @@ void TypeVarVisitor::setProgramInfoTypeVars() {
       if (TVCallEntry.second.getIsConsistent())
         Info.setTypeParamBinding(TVEntry.first, TVCallEntry.first,
                                  TVCallEntry.second.getTypeParamConsVar(),
-                                 TVCallEntry.second.getIdentConsVar(),
+                                 TVCallEntry.second.getGenArgCV(),
                                  Context);
       else
         Info.setTypeParamBinding(TVEntry.first, TVCallEntry.first,

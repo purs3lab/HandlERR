@@ -137,8 +137,8 @@ PointerVariableConstraint::PointerVariableConstraint(
     this->FV = dyn_cast<FVConstraint>(Ot->FV->getCopy(CS));
   }
   this->Parent = Ot;
-  this->BaseGenericIndex = Ot->BaseGenericIndex;
-  this->NewGenericIndex = Ot->NewGenericIndex;
+  this->SourceGenericIndex = Ot->SourceGenericIndex;
+  this->InferredGenericIndex = Ot->InferredGenericIndex;
   this->IsZeroWidthArray = Ot->IsZeroWidthArray;
   this->BaseType = Ot->BaseType;
   this->SrcHasItype = Ot->SrcHasItype;
@@ -307,9 +307,9 @@ PointerVariableConstraint::PointerVariableConstraint(
   TypedefLevelInfo = TypedefLevelFinder::find(QTy);
 
   if (ForceGenericIndex >= 0) {
-    BaseGenericIndex = ForceGenericIndex;
+    SourceGenericIndex = ForceGenericIndex;
   } else {
-    BaseGenericIndex = -1;
+    SourceGenericIndex = -1;
     // This makes a lot of assumptions about how the AST will look, and limits
     // it to one level.
     // TODO: Enhance TypedefLevelFinder to get this info.
@@ -318,11 +318,11 @@ PointerVariableConstraint::PointerVariableConstraint(
       if (auto *TypdefTy = dyn_cast_or_null<TypedefType>(PtrTy)) {
         const auto *Tv = dyn_cast<TypeVariableType>(TypdefTy->desugar());
         if (Tv)
-          BaseGenericIndex = Tv->GetIndex();
+          SourceGenericIndex = Tv->GetIndex();
       }
     }
   }
-  NewGenericIndex = BaseGenericIndex;
+  InferredGenericIndex = SourceGenericIndex;
 
   bool VarCreated = false;
   bool IsArr = false;
@@ -524,10 +524,10 @@ PointerVariableConstraint::PointerVariableConstraint(
   IsVoidPtr = QT->isPointerType() && isTypeHasVoid(QT);
   // varargs are always wild, as are void pointers that are not generic
   bool IsWild = isVarArgType(BaseType) ||
-      (!(PotentialGeneric || getIsGeneric()) && IsVoidPtr);
+      (!(PotentialGeneric || isGeneric()) && IsVoidPtr);
   if (IsWild) {
     std::string Rsn =
-        IsVoidPtr ? "Default void* type" : "Default Var arg list type";
+        IsVoidPtr ? VOID_TYPE_REASON : "Default Var arg list type";
     // TODO: Github issue #61: improve handling of types for variable arguments.
     for (const auto &V : Vars)
       if (VarAtom *VA = dyn_cast<VarAtom>(V))
@@ -775,10 +775,10 @@ std::string PointerVariableConstraint::mkString(Constraints &CS, bool EmitName,
   // a generic function so give it the default generic type name.
   // Add more type names below if we expect to use a lot.
   std::string BaseName = BaseType;
-  if (NewGenericIndex > -1 && BaseType == "void") {
-    assert(NewGenericIndex < 3
+  if (InferredGenericIndex > -1 && BaseType == "void") {
+    assert(InferredGenericIndex < 3
            && "Trying to use an unexpected type variable name");
-    BaseName = std::begin({"T","U","V"})[NewGenericIndex];
+    BaseName = std::begin({"T","U","V"})[InferredGenericIndex];
   }
 
   auto It = Vars.begin();
@@ -810,7 +810,7 @@ std::string PointerVariableConstraint::mkString(Constraints &CS, bool EmitName,
 
     // If this is not an itype or generic
     // make this wild as it can hold any pointer type.
-    if (!ForItype && NewGenericIndex == -1 && BaseType == "void")
+    if (!ForItype && InferredGenericIndex == -1 && BaseType == "void")
       K = Atom::A_Wild;
 
     if (PrevArr && ArrSizes.at(TypeIdx).first != O_SizedArray && !EmittedName) {
@@ -1115,12 +1115,12 @@ FunctionVariableConstraint::FunctionVariableConstraint(
   // Locate the void* params for potential generic use, or to mark wild
   std::vector<int> Voids;
   if(ReturnVar.ExternalConstraint->isVoidPtr() &&
-     !ReturnVar.ExternalConstraint->getIsGeneric()) {
+     !ReturnVar.ExternalConstraint->isGeneric()) {
     Voids.push_back(-1);
   }
   for(unsigned i=0; i < ParamVars.size();i++) {
     if(ParamVars[i].ExternalConstraint->isVoidPtr() &&
-       !ParamVars[i].ExternalConstraint->getIsGeneric()) {
+       !ParamVars[i].ExternalConstraint->isGeneric()) {
       Voids.push_back(i);
     }
   }
@@ -1141,10 +1141,10 @@ FunctionVariableConstraint::FunctionVariableConstraint(
     for(int idx : Voids)
       if(idx == -1){
         ReturnVar.ExternalConstraint->constrainToWild(
-            CS,"Default void* type");
+            CS, VOID_TYPE_REASON);
       } else {
         ParamVars[idx].ExternalConstraint->constrainToWild(
-            CS, "Default void* type");
+            CS, VOID_TYPE_REASON);
       }
   }
 
@@ -1457,7 +1457,7 @@ bool PointerVariableConstraint::solutionEqualTo(Constraints &CS,
   if (CV != nullptr) {
     if (const auto *PV = dyn_cast<PVConstraint>(CV)) {
       auto &OthCVars = PV->Vars;
-      if (getIsGeneric() || PV->getIsGeneric() ||
+      if (isGeneric() || PV->isGeneric() ||
           Vars.size() == OthCVars.size()) {
         Ret = true;
 
@@ -1840,8 +1840,8 @@ void constrainConsVarGeq(ConstraintVariable *LHS, ConstraintVariable *RHS,
 
         // Only generate constraint if LHS is not a base type.
         if (CLHS.size() != 0) {
-          if (CLHS.size() == CRHS.size() || PCLHS->getIsGeneric() ||
-              PCRHS->getIsGeneric()) {
+          if (CLHS.size() == CRHS.size() || PCLHS->isGeneric() ||
+              PCRHS->isGeneric()) {
             unsigned Max = std::max(CLHS.size(), CRHS.size());
             for (unsigned N = 0; N < Max; N++) {
               Atom *IAtom = PCLHS->getAtom(N, CS);
@@ -1972,9 +1972,9 @@ void PointerVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
   if (!From->BoundsAnnotationStr.empty())
     BoundsAnnotationStr = From->BoundsAnnotationStr;
 
-  if (From->BaseGenericIndex >= 0) {
-    BaseGenericIndex = From->BaseGenericIndex;
-    NewGenericIndex = From->NewGenericIndex;
+  if (From->SourceGenericIndex >= 0) {
+    SourceGenericIndex = From->SourceGenericIndex;
+    InferredGenericIndex = From->InferredGenericIndex;
   }
   if (FV) {
     assert(From->FV);
@@ -1991,7 +1991,7 @@ Atom *PointerVariableConstraint::getAtom(unsigned AtomIdx, Constraints &CS) {
     // If index is in bounds, just return the atom.
     return Vars[AtomIdx];
   }
-  if (getIsGeneric() && AtomIdx == Vars.size()) {
+  if (isGeneric() && AtomIdx == Vars.size()) {
     // Polymorphic types don't know how "deep" their pointers are beforehand so,
     // we need to create new atoms for new pointer levels on the fly.
     std::string Stars(Vars.size(), '*');
@@ -2203,7 +2203,7 @@ void FVComponentVariable::equateWithItype(ProgramInfo &I,
                                           PersistentSourceLoc *PSL) const {
   Constraints &CS = I.getConstraints();
   const std::string ReasonUnchangeable2 =
-      (ReasonUnchangeable.empty() && ExternalConstraint->getIsGeneric())
+      (ReasonUnchangeable.empty() && ExternalConstraint->isGeneric())
           ? "Internal constraint for generic function declaration, "
             "for which 3C currently does not support re-solving."
           : ReasonUnchangeable;
