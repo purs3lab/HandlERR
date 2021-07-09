@@ -740,18 +740,25 @@ CVarSet ConstraintResolver::getCalleeConstraintVars(CallExpr *CE) {
   return FVCons;
 }
 
+// This serves as an exception to the unsafety of casting from void*.
+// In most cases, CheckedC can handle generic casts, so we can ignore them.
+// CheckedC can't handle allocators without checked headers, so we add them
+// to this exception for when we're dealing with small examples.
 bool ConstraintResolver::isCastofGeneric(CastExpr *C) {
   Expr *SE = C->getSubExpr();
   if (CHKCBindTemporaryExpr *CE = dyn_cast<CHKCBindTemporaryExpr>(SE))
     SE = CE->getSubExpr();
   if (auto *CE = dyn_cast_or_null<CallExpr>(SE)) {
-    // check for built-in allocators, in case the standard headers are not used
+    // Check for built-in allocators, in case the standard headers are not used.
+    // This is a required exception, because allocators return void*, and casts
+    // from it are unsafe. We assume the cast is appropriate. With checked
+    // headers clang can figure out if it is safe.
     if (auto *DD = dyn_cast_or_null<DeclaratorDecl>(CE->getCalleeDecl())) {
       std::string Name = DD->getNameAsString();
       if (isFunctionAllocator(Name))
         return true;
     }
-    // check for a generic function call
+    // Check for a generic function call.
     CVarSet CVS = getCalleeConstraintVars(CE);
     if (CVS.size() == 1) {
       if (auto *FVC = dyn_cast<FVConstraint>(*CVS.begin())) {
