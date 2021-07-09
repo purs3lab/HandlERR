@@ -760,6 +760,9 @@ bool ConstraintResolver::isCastofGeneric(CastExpr *C) {
     }
     // Check for a generic function call.
     CVarSet CVS = getCalleeConstraintVars(CE);
+    // If there are multiple constraints in the expression we
+    // can't guarantee safety, so only return true if the
+    // cast is directly on a function call.
     if (CVS.size() == 1) {
       if (auto *FVC = dyn_cast<FVConstraint>(*CVS.begin())) {
         return FVC->getGenericParams() > 0;
