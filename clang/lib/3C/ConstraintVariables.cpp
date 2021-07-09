@@ -775,7 +775,7 @@ std::string PointerVariableConstraint::mkString(Constraints &CS, bool EmitName,
   // a generic function so give it the default generic type name.
   // Add more type names below if we expect to use a lot.
   std::string BaseTypeName = BaseType;
-  if (InferredGenericIndex > -1 && BaseType == "void") {
+  if (InferredGenericIndex > -1 && isVoidPtr()) {
     assert(InferredGenericIndex < 3
            && "Trying to use an unexpected type variable name");
     BaseTypeName = std::begin({"T","U","V"})[InferredGenericIndex];
@@ -810,7 +810,7 @@ std::string PointerVariableConstraint::mkString(Constraints &CS, bool EmitName,
 
     // If this is not an itype or generic
     // make this wild as it can hold any pointer type.
-    if (!ForItype && InferredGenericIndex == -1 && BaseType == "void")
+    if (!ForItype && InferredGenericIndex == -1 && isVoidPtr())
       K = Atom::A_Wild;
 
     if (PrevArr && ArrSizes.at(TypeIdx).first != O_SizedArray && !EmittedName) {
