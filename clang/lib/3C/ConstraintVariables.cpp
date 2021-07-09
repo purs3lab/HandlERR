@@ -521,6 +521,7 @@ PointerVariableConstraint::PointerVariableConstraint(
   // check if the type is some depth of pointers to void
   // TODO: is this what the field should mean? do we want to include other
   // indirection options like arrays?
+  // https://github.com/correctcomputation/checkedc-clang/issues/648
   IsVoidPtr = QT->isPointerType() && isTypeHasVoid(QT);
   // varargs are always wild, as are void pointers that are not generic
   bool IsWild = isVarArgType(BaseType) ||
