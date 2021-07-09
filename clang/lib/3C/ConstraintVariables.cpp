@@ -774,11 +774,11 @@ std::string PointerVariableConstraint::mkString(Constraints &CS, bool EmitName,
   // If we've set a GenericIndex for void, it means we're converting it into
   // a generic function so give it the default generic type name.
   // Add more type names below if we expect to use a lot.
-  std::string BaseName = BaseType;
+  std::string BaseTypeName = BaseType;
   if (InferredGenericIndex > -1 && BaseType == "void") {
     assert(InferredGenericIndex < 3
            && "Trying to use an unexpected type variable name");
-    BaseName = std::begin({"T","U","V"})[InferredGenericIndex];
+    BaseTypeName = std::begin({"T","U","V"})[InferredGenericIndex];
   }
 
   auto It = Vars.begin();
@@ -878,9 +878,9 @@ std::string PointerVariableConstraint::mkString(Constraints &CS, bool EmitName,
         getQualString(TypeIdx, FptrInner);
       } else {
         if (!EmittedBase) {
-          assert(!BaseType.empty());
+          assert(!BaseTypeName.empty());
           EmittedBase = true;
-          Ss << BaseName << " ";
+          Ss << BaseTypeName << " ";
         }
         Ss << "*";
         getQualString(TypeIdx, Ss);
@@ -933,7 +933,7 @@ std::string PointerVariableConstraint::mkString(Constraints &CS, bool EmitName,
       auto Name = TypedefLevelInfo.TypedefName;
       Ss << Buf.str() << Name;
     } else {
-      Ss << BaseName;
+      Ss << BaseTypeName;
     }
   }
 
