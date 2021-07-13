@@ -98,29 +98,50 @@ bool isInSrcArray(ConstraintVariable *CK, Constraints &CS) {
 // This class picks variables that are in the same scope as the provided scope.
 class ScopeVisitor {
 public:
-  ScopeVisitor(const ProgramVarScope *S, std::set<BoundsKey> &R,
-               std::set<BoundsKey> &VK, std::map<BoundsKey, ProgramVar *> &VarM,
-               std::set<BoundsKey> &P)
-      : TS(S), Res(R), VisibleKeys(VK), VM(VarM), PtrAtoms(P) {}
-  void visitBoundsKey(BoundsKey V) const {
+  ScopeVisitor(const ProgramVarScope *S,
+               const std::map<BoundsKey, ProgramVar *> &VM,
+               const std::set<BoundsKey> &P)
+    : Scope(S), InScopeKeys(), VisibleKeys(), PVarInfo(VM),
+      PointerBoundsKey(P) {}
+  void visitBoundsKey(BoundsKey V) {
     // If the variable is non-pointer?
-    if (VM.find(V) != VM.end() && PtrAtoms.find(V) == PtrAtoms.end()) {
-      auto *S = VM[V];
+    if (PVarInfo.find(V) != PVarInfo.end() &&
+        PointerBoundsKey.find(V) == PointerBoundsKey.end()) {
+      ProgramVar *S = PVarInfo.at(V);
       // If the variable is constant or in the same scope?
-      if (S->isNumConstant() || (*(TS) == *(S->getScope()))) {
-        Res.insert(V);
+      if (S->isNumConstant() || (*Scope == *(S->getScope()))) {
+        InScopeKeys.insert(V);
         VisibleKeys.insert(V);
-      } else if (TS->isInInnerScope(*(S->getScope()))) {
+      } else if (Scope->isInInnerScope(*(S->getScope()))) {
         VisibleKeys.insert(V);
       }
     }
   }
 
-  const ProgramVarScope *TS;
-  std::set<BoundsKey> &Res;
-  std::set<BoundsKey> &VisibleKeys;
-  std::map<BoundsKey, ProgramVar *> &VM;
-  std::set<BoundsKey> &PtrAtoms;
+  const std::set<BoundsKey> &getInScopeKeys() const { return InScopeKeys; }
+
+  const std::set<BoundsKey> &getVisibleKeys() const { return VisibleKeys; }
+
+private:
+  const ProgramVarScope *Scope;
+
+  // Contains high priority bounds keys. These are either directly in the scope
+  // for this visitor, or they are constant bounds keys.
+  std::set<BoundsKey> InScopeKeys;
+
+  // This set contains all keys in InScopeKeys, but also contains non-constant
+  // bounds keys from scopes where this scope is an inner scope.
+  std::set<BoundsKey> VisibleKeys;
+
+  // A constant reference to PVarInfo frm the AVarBoundsInfo instance. This set
+  // maps each bounds key to variable. BoundsKeys are just a uint_32, so a
+  // corresponding ProgramVar is required find the scope of a key.
+  const std::map<BoundsKey, ProgramVar *> &PVarInfo;
+
+  // A constant reference to the field PointerBoundsKey from the AVarBoundsInfo
+  // instance. This set contains the bounds keys that correspond to pointers.
+  // Used to verify that a visited bounds key is not a pointer.
+  const std::set<BoundsKey> &PointerBoundsKey;
 };
 
 void AvarBoundsInference::mergeReachableProgramVars(
@@ -280,28 +301,21 @@ bool AvarBoundsInference::getReachableBoundKeys(const ProgramVarScope *DstScope,
     PotK.insert(FromVarK);
   }
 
-  // Get all bounds key that are equivalent to FromVarK
-  std::set<BoundsKey> AllFKeys;
-  AllFKeys.clear();
-  AllFKeys.insert(FromVarK);
+  // Find all in scope variables reachable from the FromVarK bounds variable.
+  ScopeVisitor TV(DstScope, BI->PVarInfo, BI->PointerBoundsKey);
+  BKGraph.visitBreadthFirst(FromVarK,
+                            [&TV](BoundsKey BK) { TV.visitBoundsKey(BK); });
+  // Prioritize in scope keys.
+  if (!TV.getInScopeKeys().empty()) {
+    PotK.insert(TV.getInScopeKeys().begin(), TV.getInScopeKeys().end());
+  } else {
+    PotK.insert(TV.getVisibleKeys().begin(), TV.getVisibleKeys().end());
 
-  for (auto CurrVarK : AllFKeys) {
-    // Find all the in scope variables reachable from the CurrVarK
-    // bounds variable.
-    std::set<BoundsKey> InScopeKeys;
-    std::set<BoundsKey> VisibleKeys;
-    if (DstScope->isInInnerScope(*BI->getProgramVar(CurrVarK)->getScope()))
-      VisibleKeys.insert(CurrVarK);
-    ScopeVisitor TV(DstScope, InScopeKeys, VisibleKeys, BI->PVarInfo,
-                    BI->PointerBoundsKey);
-    BKGraph.visitBreadthFirst(CurrVarK,
-                              [&TV](BoundsKey BK) { TV.visitBoundsKey(BK); });
-    // Prioritize in scope keys.
-    if (!InScopeKeys.empty()) {
-      PotK.insert(InScopeKeys.begin(), InScopeKeys.end());
-    } else {
-      PotK.insert(VisibleKeys.begin(), VisibleKeys.end());
-    }
+    // This condition seems to be necessary for array bounds using global
+    // variables, but it's not clear why exactly it's required, and why it's
+    // only added to VisibleKeys and never InScopeKeys.
+    if (DstScope->isInInnerScope(*BI->getProgramVar(FromVarK)->getScope()))
+      PotK.insert(FromVarK);
   }
 
   // This is to get all the constants that are assigned to the variables
