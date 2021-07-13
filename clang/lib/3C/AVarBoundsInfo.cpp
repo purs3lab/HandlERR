@@ -286,10 +286,10 @@ bool AvarBoundsInference::getReachableBoundKeys(const ProgramVarScope *DstScope,
                                                 bool CheckImmediate) {
 
   // First, find all the in-scope variable to which the SBKey flow to.
-  auto *SBVar = BI->getProgramVar(FromVarK);
+  auto *FromProgramVar = BI->getProgramVar(FromVarK);
 
   // If both are in the same scope?
-  if (*DstScope == *SBVar->getScope()) {
+  if (*DstScope == *FromProgramVar->getScope()) {
     PotK.insert(FromVarK);
     if (CheckImmediate) {
       return true;
@@ -297,7 +297,7 @@ bool AvarBoundsInference::getReachableBoundKeys(const ProgramVarScope *DstScope,
   }
 
   // All constants are reachable!
-  if (SBVar->isNumConstant()) {
+  if (FromProgramVar->isNumConstant()) {
     PotK.insert(FromVarK);
   }
 
@@ -320,22 +320,20 @@ bool AvarBoundsInference::getReachableBoundKeys(const ProgramVarScope *DstScope,
 
   // This is to get all the constants that are assigned to the variables
   // reachable from FromVarK.
-  if (!SBVar->isNumConstant()) {
-    std::set<BoundsKey> ReachableCons;
-    std::set<BoundsKey> Pre, CurrBK;
+  if (!FromProgramVar->isNumConstant()) {
+    std::set<BoundsKey> CurrBK;
     CurrBK.insert(PotK.begin(), PotK.end());
     CurrBK.insert(FromVarK);
     for (auto CK : CurrBK) {
-      Pre.clear();
+      std::set<BoundsKey> Pre;
       BKGraph.getPredecessors(CK, Pre);
       for (auto T : Pre) {
         auto *TVar = BI->getProgramVar(T);
         if (TVar != nullptr && TVar->isNumConstant()) {
-          ReachableCons.insert(T);
+          PotK.insert(T);
         }
       }
     }
-    PotK.insert(ReachableCons.begin(), ReachableCons.end());
   }
 
   return !PotK.empty();
