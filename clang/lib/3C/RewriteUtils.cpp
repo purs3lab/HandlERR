@@ -187,7 +187,7 @@ void rewriteSourceRange(Rewriter &R, const CharSourceRange &Range,
   }
 }
 
-static void emit(Rewriter &R, ASTContext &C) {
+void emitFiles(Rewriter &R, ASTContext &C) {
   if (Verbose)
     errs() << "Writing files out\n";
 
@@ -697,7 +697,7 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   }
 
   // Output files.
-  emit(R, Context);
+  emitFiles(R, Context);
 
   Info.getPerfStats().endRewritingTime();
 

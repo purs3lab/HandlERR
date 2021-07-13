@@ -48,6 +48,7 @@ add_clang_library(clang3C
   ProgramInfo.cpp
   ProgramVar.cpp
   RewriteUtils.cpp
+  StructDenester.cpp
   StructInit.cpp
   TypeVariableAnalysis.cpp
   Utils.cpp

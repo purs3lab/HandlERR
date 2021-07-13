@@ -235,6 +235,12 @@ static cl::opt<bool> OptItypesForExtern(
            "unsafe."),
   cl::init(false), cl::cat(_3CCategory));
 
+// Obviously, this will be changed to be more useful in the future.
+static cl::opt<bool> OptDenestStructs(
+    "denest-structs",
+    cl::desc("Perform one pass of struct de-nesting instead of all normal 3C processing."),
+    cl::init(false), cl::cat(_3CCategory));
+
 #ifdef FIVE_C
 static cl::opt<bool> OptRemoveItypes(
     "remove-itypes",
@@ -344,6 +350,15 @@ int main(int argc, const char **argv) {
   // Build AST from source.
   if (!_3CInterface.parseASTs()) {
     errs() << "Failure occurred while parsing source files. Exiting.\n";
+    return _3CInterface.determineExitCode();
+  }
+
+  if (OptDenestStructs) {
+    if (!_3CInterface.denestStructs()) {
+      errs() << "Failure occurred while trying to de-nest structs. Exiting.\n";
+      return _3CInterface.determineExitCode();
+    }
+    // Duplicate this line so we don't have to indent the rest of main... yet.
     return _3CInterface.determineExitCode();
   }
 

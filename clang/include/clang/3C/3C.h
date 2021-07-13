@@ -106,6 +106,10 @@ public:
   // Call clang to provide the data
   bool parseASTs();
 
+  // In the current prototype, this is intended to be called instead of all
+  // other 3C passes.
+  bool denestStructs();
+
   // Constraints
 
   // Create ConstraintVariables to hold constraints

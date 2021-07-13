@@ -214,4 +214,6 @@ void rewriteSourceRange(Rewriter &R, const CharSourceRange &Range,
 void rewriteSourceRange(Rewriter &R, const SourceRange &Range,
                         const std::string &NewText, bool ErrFail = true);
 
+void emitFiles(Rewriter &R, ASTContext &C);
+
 #endif // LLVM_CLANG_3C_REWRITEUTILS_H

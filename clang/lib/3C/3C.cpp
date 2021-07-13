@@ -15,6 +15,7 @@
 #include "clang/3C/ConstraintBuilder.h"
 #include "clang/3C/IntermediateToolHook.h"
 #include "clang/3C/RewriteUtils.h"
+#include "clang/3C/StructDenester.h"
 #include "clang/Frontend/VerifyDiagnosticConsumer.h"
 #include "clang/Tooling/ArgumentsAdjusters.h"
 #include "llvm/Support/TargetSelect.h"
@@ -512,6 +513,15 @@ bool _3CInterface::parseASTs() {
   HadNonDiagnosticError |= (ToolExitStatus != 0);
 
   return isSuccessfulSoFar();
+}
+
+bool _3CInterface::denestStructs() {
+  // TODO: This will need to be enhanced to track PSLs of automatically named
+  // structs and a bunch of other stuff.
+  for (auto &TU : ASTs)
+    ::denestStructs(TU->getASTContext());
+
+  return true;
 }
 
 bool _3CInterface::addVariables() {
