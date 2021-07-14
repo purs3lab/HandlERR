@@ -949,26 +949,18 @@ bool AVarBoundsInfo::addAssignment(BoundsKey L, BoundsKey R) {
   return true;
 }
 
-// Visitor to collect all the variables that are used during the life-time
-// of the visitor.
-// This class also has a flag that gets set when a variable is observed
-// more than once.
+// Visitor to collect all the variables and structure member access that are
+// used during the life-time of the visitor.
 class CollectDeclsVisitor : public RecursiveASTVisitor<CollectDeclsVisitor> {
 public:
-  std::set<VarDecl *> ObservedDecls;
-  std::set<std::string> StructAccess;
+  explicit CollectDeclsVisitor(ASTContext *Ctx)
+    : ObservedDecls(), StructAccess(), C(Ctx) {}
 
-  explicit CollectDeclsVisitor(ASTContext *Ctx) : C(Ctx) {
-    ObservedDecls.clear();
-    StructAccess.clear();
-  }
-  virtual ~CollectDeclsVisitor() { ObservedDecls.clear(); }
+  virtual ~CollectDeclsVisitor() {}
 
   bool VisitDeclRefExpr(DeclRefExpr *DRE) {
-    VarDecl *VD = dyn_cast_or_null<VarDecl>(DRE->getDecl());
-    if (VD != nullptr) {
+    if (auto *VD = dyn_cast_or_null<VarDecl>(DRE->getDecl()))
       ObservedDecls.insert(VD);
-    }
     return true;
   }
 
@@ -981,7 +973,17 @@ public:
     return false;
   }
 
+  const std::set<VarDecl *> &getObservedDecls() { return ObservedDecls; }
+  const std::set<std::string> &getStructAccess() { return StructAccess; }
+
 private:
+  // Contains all VarDecls seen by this visitor
+  std::set<VarDecl *> ObservedDecls;
+
+  // Contains the source representation of all record access (MemberExpression)
+  // seen by this visitor.
+  std::set<std::string> StructAccess;
+
   ASTContext *C;
 };
 
@@ -996,8 +998,10 @@ bool AVarBoundsInfo::handlePointerAssignment(clang::Stmt *St, clang::Expr *L,
 
   std::set<VarDecl *> CommonVars;
   std::set<std::string> CommonStVars;
-  findIntersection(LVarVis.ObservedDecls, RVarVis.ObservedDecls, CommonVars);
-  findIntersection(LVarVis.StructAccess, RVarVis.StructAccess, CommonStVars);
+  findIntersection(LVarVis.getObservedDecls(), RVarVis.getObservedDecls(),
+                   CommonVars);
+  findIntersection(LVarVis.getStructAccess(), RVarVis.getStructAccess(),
+                   CommonStVars);
 
   if (!CommonVars.empty() || CommonStVars.empty()) {
     for (auto *LHSCVar : CR->getExprConstraintVarsSet(L)) {
