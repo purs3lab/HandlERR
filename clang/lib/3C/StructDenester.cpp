@@ -12,6 +12,19 @@ class DenestStructsVisitor : public RecursiveASTVisitor<DenestStructsVisitor> {
 private:
   ASTContext &C;
   Rewriter &R;
+  std::set<Decl *> AlreadyMovingDecls;
+  bool isAncestorAlreadyMoving(Decl *D) {
+    for (;;) {
+      // It seems that a DeclContext is always a Decl? At least
+      // DeclContext::getLexicalParent seems to assume so, and it's what we'd
+      // call here anyway. REVIEW?
+      D = cast_or_null<Decl>(D->getLexicalDeclContext());
+      if (D == nullptr)
+        return false;
+      if (AlreadyMovingDecls.find(D) != AlreadyMovingDecls.end())
+        return true;
+    }
+  }
 public:
   DenestStructsVisitor(ASTContext &C, Rewriter &R) : C(C), R(R) {}
   bool VisitRecordDecl(RecordDecl *RD) {
@@ -24,11 +37,18 @@ public:
     if (RD->getName() == "")
       // We can't handle unnamed RecordDecls yet.
       return true;
+    // Note: It's important that this visitor traverses in preorder; otherwise
+    // we would have to check for descendants already moving, and it would
+    // generally be a mess.
+    if (isAncestorAlreadyMoving(RD))
+      // We don't handle this yet either.
+      return true;
     // Now determine whether we need to de-nest it. Etc.
     // We probably need to handle more contexts and avoid messing up three-level
     // nesting, but this is a starting point for testing.
     DeclContext *DC = RD->getLexicalDeclContext();
     if (RecordDecl *RD2 = dyn_cast<RecordDecl>(DC)) {
+      AlreadyMovingDecls.insert(RD);
       // TODO: Error checking.
       R.InsertText(RD2->getBeginLoc(), getSourceText(RD->getSourceRange(), C) + ";\n");
       rewriteSourceRange(R, RD->getSourceRange(), tyToStr(RD->getTypeForDecl()));
