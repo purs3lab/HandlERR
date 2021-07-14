@@ -106,7 +106,7 @@ public:
 
   // Infer bounds for the given key from the set of given ARR atoms.
   // The flag FromPB requests the inference to use potential length variables.
-  bool inferBounds(BoundsKey K, AVarGraph &BKGraph, bool FromPB = false);
+  bool inferBounds(BoundsKey K, const AVarGraph &BKGraph, bool FromPB = false);
 
   // Get a consistent bound for all the arrays whose bounds have been
   // inferred.
@@ -117,7 +117,8 @@ private:
   // in DstScope
   bool getReachableBoundKeys(const ProgramVarScope *DstScope,
                              BoundsKey FromVarK, std::set<BoundsKey> &PotK,
-                             AVarGraph &BKGraph, bool CheckImmediate = false);
+                             const AVarGraph &BKGraph,
+                             bool CheckImmediate = false);
 
   // Check if bounds specified by Bnds are declared bounds of K.
   bool areDeclaredBounds(
@@ -130,7 +131,7 @@ private:
   // Predict possible bounds for DstArrK from the bounds of  Neighbours.
   // Return true if there is any change in the captured bounds information.
   bool predictBounds(BoundsKey DstArrK, std::set<BoundsKey> &Neighbours,
-                     AVarGraph &BKGraph);
+                     const AVarGraph &BKGraph);
 
   void mergeReachableProgramVars(BoundsKey TarBK, std::set<BoundsKey> &AllVars);
 
@@ -139,7 +140,7 @@ private:
   // Set the given pointer to have impossible bounds.
   void setImpossibleBounds(BoundsKey BK);
   // Infer bounds of the given pointer key from potential bounds.
-  bool inferFromPotentialBounds(BoundsKey BK, AVarGraph &BKGraph);
+  bool inferFromPotentialBounds(BoundsKey BK, const AVarGraph &BKGraph);
 
   AVarBoundsInfo *BI;
 
@@ -374,13 +375,13 @@ private:
 
   // Keep only highest priority bounds for all the provided BoundsKeys
   // returns true if any thing changed, else false.
-  bool keepHighestPriorityBounds(std::set<BoundsKey> &ArrPtrs);
+  bool keepHighestPriorityBounds(const std::set<BoundsKey> &ArrPtrs);
 
   // Perform worklist based inference on the requested array variables using
   // the provided graph and potential length variables.
   bool performWorkListInference(const std::set<BoundsKey> &ArrNeededBounds,
-                                AVarGraph &BKGraph, AvarBoundsInference &BI,
-                                bool FromPB);
+                                const AVarGraph &BKGraph,
+                                AvarBoundsInference &BI, bool FromPB);
 
   void insertParamKey(ParamDeclType ParamDecl, BoundsKey NK);
 };

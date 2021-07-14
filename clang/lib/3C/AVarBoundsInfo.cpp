@@ -282,7 +282,7 @@ void AvarBoundsInference::setImpossibleBounds(BoundsKey BK) {
 bool AvarBoundsInference::getReachableBoundKeys(const ProgramVarScope *DstScope,
                                                 BoundsKey FromVarK,
                                                 std::set<BoundsKey> &PotK,
-                                                AVarGraph &BKGraph,
+                                                const AVarGraph &BKGraph,
                                                 bool CheckImmediate) {
 
   // First, find all the in-scope variable to which the SBKey flow to.
@@ -383,7 +383,7 @@ bool AvarBoundsInference::areDeclaredBounds(
 
 bool AvarBoundsInference::predictBounds(BoundsKey K,
                                         std::set<BoundsKey> &Neighbours,
-                                        AVarGraph &BKGraph) {
+                                        const AVarGraph &BKGraph) {
   BndsKindMap NeighboursBnds, InferredKBnds;
   // Bounds inferred from each of the neighbours.
   std::map<BoundsKey, BndsKindMap> InferredNBnds;
@@ -506,7 +506,7 @@ bool AvarBoundsInference::predictBounds(BoundsKey K,
   }
   return IsChanged;
 }
-bool AvarBoundsInference::inferBounds(BoundsKey K, AVarGraph &BKGraph,
+bool AvarBoundsInference::inferBounds(BoundsKey K, const AVarGraph &BKGraph,
                                       bool FromPB) {
   bool IsChanged = false;
 
@@ -526,7 +526,7 @@ bool AvarBoundsInference::inferBounds(BoundsKey K, AVarGraph &BKGraph,
 }
 
 bool AvarBoundsInference::inferFromPotentialBounds(BoundsKey BK,
-                                                   AVarGraph &BKGraph) {
+                                                   const AVarGraph &BKGraph) {
   bool IsChanged = false;
   bool Handled = false;
   if (CurrIterInferBounds.find(BK) != CurrIterInferBounds.end()) {
@@ -1080,7 +1080,7 @@ void AVarBoundsInfo::insertProgramVar(BoundsKey NK, ProgramVar *PV) {
 }
 
 bool AVarBoundsInfo::performWorkListInference(
-    const std::set<BoundsKey> &ArrNeededBounds, AVarGraph &BKGraph,
+    const std::set<BoundsKey> &ArrNeededBounds, const AVarGraph &BKGraph,
     AvarBoundsInference &BI, bool FromPB) {
   bool RetVal = false;
   std::set<BoundsKey> WorkList;
@@ -1383,11 +1383,11 @@ bool AVarBoundsInfo::performFlowAnalysis(ProgramInfo *PI) {
   return RetVal;
 }
 
-bool AVarBoundsInfo::keepHighestPriorityBounds(std::set<BoundsKey> &ArrPtrs) {
-  bool FoundBounds = false;
+bool
+AVarBoundsInfo::keepHighestPriorityBounds(const std::set<BoundsKey> &ArrPtrs) {
   bool HasChanged = false;
   for (auto BK : ArrPtrs) {
-    FoundBounds = false;
+    bool FoundBounds = false;
     for (BoundsPriority P : PrioList) {
       if (FoundBounds) {
         // We already found bounds. So delete these bounds.
@@ -1413,38 +1413,30 @@ bool AVarBoundsInfo::isFunctionReturn(BoundsKey BK) {
 
 void AVarBoundsInfo::printStats(llvm::raw_ostream &O, const CVarSet &SrcCVarSet,
                                 bool JsonFormat) const {
-  std::set<BoundsKey> InSrcBKeys, InSrcArrBKeys, Tmp;
+  std::set<BoundsKey> InSrcBKeys;
   for (auto *C : SrcCVarSet) {
     if (C->isForValidDecl() && C->hasBoundsKey())
       InSrcBKeys.insert(C->getBoundsKey());
   }
 
   std::set<BoundsKey> NTArraysReqBnds;
-  NTArraysReqBnds.clear();
-  auto &NTA = NtArrPointerBoundsKey;
-  auto &APTRS = ArrPointerBoundsKey;
-
   for (auto NTBK : NtArrPointerBoundsKey) {
-
-    auto *PVG = const_cast<AVarGraph *>(&ProgVarGraph);
-
-    (*PVG).visitBreadthFirst(
-        NTBK, [NTBK, &NTA, &NTArraysReqBnds, &APTRS](BoundsKey BK) {
-          if (NTA.find(BK) == NTA.end() && APTRS.find(BK) != APTRS.end()) {
-            NTArraysReqBnds.insert(NTBK);
-          }
-        });
+    ProgVarGraph.visitBreadthFirst(NTBK, [this, NTBK, &NTArraysReqBnds](BoundsKey BK) {
+      if (NtArrPointerBoundsKey.find(BK) == NtArrPointerBoundsKey.end() &&
+        ArrPointerBoundsKey.find(BK) != ArrPointerBoundsKey.end())
+        NTArraysReqBnds.insert(NTBK);
+    });
   }
 
   std::set<BoundsKey> NTArrayReqNoBounds;
-  NTArrayReqNoBounds.clear();
-
   std::set_difference(
       NtArrPointerBoundsKey.begin(), NtArrPointerBoundsKey.end(),
       NTArraysReqBnds.begin(), NTArraysReqBnds.end(),
       std::inserter(NTArrayReqNoBounds, NTArrayReqNoBounds.begin()));
 
+  std::set<BoundsKey> InSrcArrBKeys;
   findIntersection(InProgramArrPtrBoundsKeys, InSrcBKeys, InSrcArrBKeys);
+  std::set<BoundsKey> Tmp;
   if (!JsonFormat) {
     findIntersection(ArrPointerBoundsKey, InSrcArrBKeys, Tmp);
     O << "NumPointersNeedBounds:" << Tmp.size() << ",\n";
