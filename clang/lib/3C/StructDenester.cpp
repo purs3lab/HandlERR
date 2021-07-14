@@ -1,4 +1,5 @@
 #include "clang/3C/StructDenester.h"
+#include "clang/3C/PersistentSourceLoc.h"
 #include "clang/3C/RewriteUtils.h"
 #include "clang/3C/Utils.h"
 #include "clang/AST/RecursiveASTVisitor.h"
@@ -14,8 +15,14 @@ private:
 public:
   DenestStructsVisitor(ASTContext &C, Rewriter &R) : C(C), R(R) {}
   bool VisitRecordDecl(RecordDecl *RD) {
+    PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(RD, C);
+    if (!canWrite(PSL.getFileName()))
+      return true;
     if (!RD->isCompleteDefinition())
       // Don't do anything with forward declarations.
+      return true;
+    if (RD->getName() == "")
+      // We can't handle unnamed RecordDecls yet.
       return true;
     // Now determine whether we need to de-nest it. Etc.
     // We probably need to handle more contexts and avoid messing up three-level
