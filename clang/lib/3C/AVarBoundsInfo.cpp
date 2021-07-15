@@ -1083,29 +1083,36 @@ void AVarBoundsInfo::performWorkListInference(
   const std::set<BoundsKey> &ArrPointers, const AVarGraph &BKGraph,
   AvarBoundsInference &BI, bool FromPB) {
 
+  // BoundsKeys corresponding to array pointers that need bounds. This will seed
+  // the initial WorkList, and be used to ensure that only BoundsKeys needing
+  // bounds are added to the list in subsequent iterations.
   std::set<BoundsKey> ArrNeededBounds;
   getBoundsNeededArrPointers(ArrPointers, ArrNeededBounds);
 
   std::set<BoundsKey> WorkList(ArrNeededBounds);
-  bool Changed = true;
-  while (Changed) {
-    Changed = false;
+  while (!WorkList.empty()) {
+    // This set will collect BoundsKeys which are successors of a BoundsKey that
+    // was assigned a bound in this iteration. These subset of these that need
+    // bounds will be used as the worklist in the next iteration.
     std::set<BoundsKey> NextIterArrs;
-    // Are there any ARR atoms that need bounds?
-    while (!WorkList.empty()) {
-      BoundsKey CurrArrKey = *WorkList.begin();
-      // Remove the bounds key from the worklist.
-      WorkList.erase(CurrArrKey);
-      // Can we find bounds for this Arr?
+
+    for (BoundsKey CurrArrKey : WorkList) {
+      // inferBounds will return true if a bound was found for CurrArrKey. If a
+      // bound can be found, queue the successor nodes for bounds inferences in
+      // the next iteration of the outer loop.
       if (BI.inferBounds(CurrArrKey, BKGraph, FromPB)) {
-        Changed = true;
         // Get all the successors of the ARR whose bounds we just found.
+        // Successor BoundsKeys are added into NextIterArrs without clearing the
+        // current contents.
         BKGraph.getSuccessors(CurrArrKey, NextIterArrs);
       }
     }
-    if (Changed) {
-      findIntersection(ArrNeededBounds, NextIterArrs, WorkList);
-    }
+
+    // WorkList will be cleared by findIntersection before it is used to store
+    // the intersection of ArrNeededBounds and NextIterArrs. If NextIterArrs is
+    // empty, then the intersection will also be empty, and the loop will
+    // terminate.
+    findIntersection(ArrNeededBounds, NextIterArrs, WorkList);
   }
 
   // From all the sets of bounds computed for various array variables. Intersect
