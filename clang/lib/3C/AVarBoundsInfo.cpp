@@ -339,27 +339,19 @@ bool AvarBoundsInference::getReachableBoundKeys(const ProgramVarScope *DstScope,
   return !PotK.empty();
 }
 
-bool AvarBoundsInference::getRelevantBounds(BoundsKey BK,
+void AvarBoundsInference::getRelevantBounds(BoundsKey BK,
                                             BndsKindMap &ResBounds) {
   // Try to get the bounds of all RBKeys.
-  bool HasBounds = false;
   // If this pointer is used in pointer arithmetic then there
   // are no relevant bounds for this pointer.
   if (!BI->hasPointerArithmetic(BK)) {
     if (CurrIterInferBounds.find(BK) != CurrIterInferBounds.end()) {
       // get the bounds inferred from the current iteration
       ResBounds = CurrIterInferBounds[BK];
-      HasBounds = true;
-    } else {
-      auto *PrevBounds = BI->getBounds(BK);
-      // Does the parent arr has bounds?
-      if (PrevBounds != nullptr) {
-        ResBounds[PrevBounds->getKind()].insert(PrevBounds->getBKey());
-        HasBounds = true;
-      }
+    } else if (ABounds *PrevBounds = BI->getBounds(BK)) {
+      ResBounds[PrevBounds->getKind()].insert(PrevBounds->getBKey());
     }
   }
-  return HasBounds;
 }
 
 bool AvarBoundsInference::areDeclaredBounds(
@@ -382,30 +374,30 @@ bool AvarBoundsInference::areDeclaredBounds(
 }
 
 bool AvarBoundsInference::predictBounds(BoundsKey K,
-                                        std::set<BoundsKey> &Neighbours,
+                                        const std::set<BoundsKey> &Neighbours,
                                         const AVarGraph &BKGraph) {
-  BndsKindMap NeighboursBnds, InferredKBnds;
-  // Bounds inferred from each of the neighbours.
-  std::map<BoundsKey, BndsKindMap> InferredNBnds;
-  bool IsChanged = false;
   bool ErrorOccurred = false;
   bool IsFuncRet = BI->isFunctionReturn(K);
   ProgramVar *KVar = this->BI->getProgramVar(K);
 
-  InferredNBnds.clear();
-  // For reach of the Neighbour, try to infer possible bounds.
+  // Bounds inferred from each of the neighbours.
+  std::map<BoundsKey, BndsKindMap> InferredNBnds;
+  // For each of the Neighbour, try to infer possible bounds.
   for (auto NBK : Neighbours) {
-    NeighboursBnds.clear();
     ErrorOccurred = false;
-    if (getRelevantBounds(NBK, NeighboursBnds) && !NeighboursBnds.empty()) {
-      std::set<BoundsKey> InfBK;
+    BndsKindMap NeighboursBnds;
+    getRelevantBounds(NBK, NeighboursBnds);
+    if (!NeighboursBnds.empty()) {
       for (auto &NKBChoice : NeighboursBnds) {
-        InfBK.clear();
-        for (auto TmpNBK : NKBChoice.second) {
-          getReachableBoundKeys(KVar->getScope(), TmpNBK, InfBK, BKGraph);
-        }
+        ABounds::BoundsKind NeighbourKind = NKBChoice.first;
+        std::set<BoundsKey> NeighbourSet = NKBChoice.second;
+
+        std::set<BoundsKey> InfBK;
+        for (BoundsKey NeighborBK : NeighbourSet)
+          getReachableBoundKeys(KVar->getScope(), NeighborBK, InfBK, BKGraph);
+
         if (!InfBK.empty()) {
-          InferredNBnds[NBK][NKBChoice.first] = InfBK;
+          InferredNBnds[NBK][NeighbourKind] = InfBK;
         } else {
           bool IsDeclaredB = areDeclaredBounds(NBK, NKBChoice);
 
@@ -438,38 +430,37 @@ bool AvarBoundsInference::predictBounds(BoundsKey K,
     }
   }
 
+  bool IsChanged = false;
   if (!InferredNBnds.empty()) {
     // All the possible inferred bounds for K.
-    InferredKBnds.clear();
-    std::set<BoundsKey> TmpBKeys, AllKeys;
+    BndsKindMap InferredKBnds;
     // TODO: Figure out if there is a discrepancy and try to implement
     // root-cause analysis.
 
     // Find intersection of all bounds from neighbours.
     for (auto &IN : InferredNBnds) {
       for (auto &INB : IN.second) {
-        if (InferredKBnds.find(INB.first) == InferredKBnds.end()) {
-          InferredKBnds[INB.first] = INB.second;
+        ABounds::BoundsKind NeighbourKind = INB.first;
+        std::set<BoundsKey> NeighbourSet = INB.second;
+        if (InferredKBnds.find(NeighbourKind) == InferredKBnds.end()) {
+          InferredKBnds[NeighbourKind] = NeighbourSet;
         } else {
-          TmpBKeys.clear();
-          AllKeys.clear();
-          // Find intersection between the current bounds and the
-          // bounds propagated from current neighbour, i.e., INB.first.
-          auto &S1 = InferredKBnds[INB.first];
-          auto &S2 = INB.second;
-          // Find intersection of bounds propagated from all neighbours.
-          findIntersection(S1, S2, TmpBKeys);
+          std::set<BoundsKey> KBoundsOfKind = InferredKBnds[NeighbourKind];
+          // Keep the bounds in the intersection between the current bounds and
+          // the bounds from the neighbor.
+          std::set<BoundsKey> SharedBounds;
+          findIntersection(KBoundsOfKind, NeighbourSet, SharedBounds);
 
-          AllKeys = S1;
-          AllKeys.insert(S2.begin(), S2.end());
-          // Also, add all constants as potential bounds so that we can pick
-          // a constant with least value later.
-          for (auto CK : AllKeys) {
+          // Also keep all constant bounds. Later on we will keep only the
+          // constant bound with the lowest value.
+          std::set<BoundsKey> AllBounds = KBoundsOfKind;
+          AllBounds.insert(NeighbourSet.begin(), NeighbourSet.end());
+          for (auto CK : AllBounds) {
             auto *CKVar = this->BI->getProgramVar(CK);
             if (CKVar != nullptr && CKVar->isNumConstant())
-              TmpBKeys.insert(CK);
+              SharedBounds.insert(CK);
           }
-          InferredKBnds[INB.first] = TmpBKeys;
+          InferredKBnds[NeighbourKind] = SharedBounds;
         }
       }
     }
@@ -477,23 +468,25 @@ bool AvarBoundsInference::predictBounds(BoundsKey K,
     // Now from the newly inferred bounds i.e., InferredKBnds, check
     // if is is different from previously known bounds of K
     for (auto &IKB : InferredKBnds) {
+      ABounds::BoundsKind InferredKind = IKB.first;
+      std::set<BoundsKey> InferredSet = IKB.second;
       bool Handled = false;
       if (CurrIterInferBounds.find(K) != CurrIterInferBounds.end()) {
-        auto &BM = CurrIterInferBounds[K];
-        if (BM.find(IKB.first) != BM.end()) {
+        BndsKindMap &CurrentBoundsMap = CurrIterInferBounds[K];
+        if (CurrentBoundsMap.find(InferredKind) != CurrentBoundsMap.end()) {
           Handled = true;
-          if (BM[IKB.first] != IKB.second) {
-            BM[IKB.first] = IKB.second;
-            if (IKB.second.empty())
-              BM.erase(IKB.first);
+          if (CurrentBoundsMap[InferredKind] != InferredSet) {
+            CurrentBoundsMap[InferredKind] = InferredSet;
+            if (InferredSet.empty())
+              CurrentBoundsMap.erase(InferredKind);
             IsChanged = true;
           }
         }
       }
       if (!Handled) {
-        CurrIterInferBounds[K][IKB.first] = IKB.second;
-        if (IKB.second.empty()) {
-          CurrIterInferBounds[K].erase(IKB.first);
+        CurrIterInferBounds[K][InferredKind] = InferredSet;
+        if (InferredSet.empty()) {
+          CurrIterInferBounds[K].erase(InferredKind);
         } else {
           IsChanged = true;
         }
@@ -506,6 +499,7 @@ bool AvarBoundsInference::predictBounds(BoundsKey K,
   }
   return IsChanged;
 }
+
 bool AvarBoundsInference::inferBounds(BoundsKey K, const AVarGraph &BKGraph,
                                       bool FromPB) {
   bool IsChanged = false;
@@ -516,10 +510,10 @@ bool AvarBoundsInference::inferBounds(BoundsKey K, const AVarGraph &BKGraph,
       IsChanged = inferFromPotentialBounds(K, BKGraph);
     } else {
       // Infer from the flow-graph.
-      std::set<BoundsKey> TmpBkeys;
       // Try to predict bounds from predecessors.
-      BKGraph.getPredecessors(K, TmpBkeys);
-      IsChanged = predictBounds(K, TmpBkeys, BKGraph);
+      std::set<BoundsKey> PredKeys;
+      BKGraph.getPredecessors(K, PredKeys);
+      IsChanged = predictBounds(K, PredKeys, BKGraph);
     }
   }
   return IsChanged;

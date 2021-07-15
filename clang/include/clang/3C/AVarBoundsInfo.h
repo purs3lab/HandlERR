@@ -126,11 +126,11 @@ private:
       const std::pair<ABounds::BoundsKind, std::set<BoundsKey>> &Bnds);
 
   // Get all the bounds of the given array i.e., BK
-  bool getRelevantBounds(BoundsKey BK, BndsKindMap &ResBounds);
+  void getRelevantBounds(BoundsKey BK, BndsKindMap &ResBounds);
 
   // Predict possible bounds for DstArrK from the bounds of  Neighbours.
   // Return true if there is any change in the captured bounds information.
-  bool predictBounds(BoundsKey DstArrK, std::set<BoundsKey> &Neighbours,
+  bool predictBounds(BoundsKey DstArrK, const std::set<BoundsKey> &Neighbours,
                      const AVarGraph &BKGraph);
 
   void mergeReachableProgramVars(BoundsKey TarBK, std::set<BoundsKey> &AllVars);
