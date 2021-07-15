@@ -521,21 +521,16 @@ bool AvarBoundsInference::inferBounds(BoundsKey K, const AVarGraph &BKGraph,
 
 bool AvarBoundsInference::inferFromPotentialBounds(BoundsKey BK,
                                                    const AVarGraph &BKGraph) {
-  bool IsChanged = false;
-  bool Handled = false;
+  // If we have any inferred bounds for K then ignore potential bounds.
+  bool HasInferredBound = false;
   if (CurrIterInferBounds.find(BK) != CurrIterInferBounds.end()) {
     auto &BM = CurrIterInferBounds[BK];
-    // If we have any inferred bounds for K then ignore potential
-    // bounds.
-    for (auto &PosB : BM) {
-      if (!PosB.second.empty()) {
-        Handled = true;
-        break;
-      }
-    }
+    HasInferredBound = llvm::any_of(BM, [](auto InfB) {
+      return !InfB.second.empty();
+    });
   }
 
-  if (!Handled) {
+  if (!HasInferredBound) {
     auto &PotBDs = BI->PotBoundsInfo;
     // Here, the logic is:
     // We first try potential bounds and if there are no potential bounds?
@@ -556,10 +551,10 @@ bool AvarBoundsInference::inferFromPotentialBounds(BoundsKey BK,
     }
     if (!PotentialB.empty()) {
       CurrIterInferBounds[BK][PotKind] = PotentialB;
-      IsChanged = true;
+      return true;
     }
   }
-  return IsChanged;
+  return false;
 }
 
 bool PotentialBoundsInfo::hasPotentialCountBounds(BoundsKey PtrBK) {
