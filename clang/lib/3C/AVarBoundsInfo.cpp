@@ -1241,10 +1241,20 @@ void AVarBoundsInfo::computerArrPointers(ProgramInfo *PI,
   ArrPointers.insert(CtxSensBKeys.begin(), CtxSensBKeys.end());
 }
 
+// Find the set of array pointers that need bounds. This is computed as all
+// array pointers that do not currently have a bound, have an invalid bound,
+// or have an impossible bound. The parameter set ArrPtrs is assumed to the set
+// of all array pointers.
+// TODO: It seems that the parameter ArrPtrs is always the result of
+//       AVarBoundsInfo::computerArrPointers. It would be nice if the set could
+//       be computed in this function rather than threading it through multiple
+//       function calls, but computing it in this function might be expensive
+//       (judging by the size of computerArrPointers). Another option would be
+//       to cache it in a class field, but then we would still have to remember
+//       to invalidate it at the correct point.
 void AVarBoundsInfo::getBoundsNeededArrPointers(
     const std::set<BoundsKey> &ArrPtrs, std::set<BoundsKey> &AB) {
-  // Next, get the ARR pointers that has bounds.
-  // These are pointers with bounds.
+  // Get the ARR pointers that have bounds.
   std::set<BoundsKey> ArrWithBounds;
   for (auto &T : BInfo) {
     ArrWithBounds.insert(T.first);
@@ -1255,7 +1265,8 @@ void AVarBoundsInfo::getBoundsNeededArrPointers(
   ArrWithBounds.insert(PointersWithImpossibleBounds.begin(),
                        PointersWithImpossibleBounds.end());
 
-  // This are the array atoms that need bounds.
+  // Remove the above set of array pointers with bounds from the set of all
+  // array pointers to get the set of array pointers that need bounds.
   // i.e., AB = ArrPtrs - ArrPtrsWithBounds.
   std::set_difference(ArrPtrs.begin(), ArrPtrs.end(), ArrWithBounds.begin(),
                       ArrWithBounds.end(), std::inserter(AB, AB.end()));
