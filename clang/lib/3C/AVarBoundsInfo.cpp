@@ -1079,18 +1079,18 @@ void AVarBoundsInfo::insertProgramVar(BoundsKey NK, ProgramVar *PV) {
   PVarInfo[NK] = PV;
 }
 
-bool AVarBoundsInfo::performWorkListInference(
-    const std::set<BoundsKey> &ArrNeededBounds, const AVarGraph &BKGraph,
-    AvarBoundsInference &BI, bool FromPB) {
-  bool RetVal = false;
-  std::set<BoundsKey> WorkList;
-  std::set<BoundsKey> NextIterArrs;
-  WorkList.clear();
-  WorkList.insert(ArrNeededBounds.begin(), ArrNeededBounds.end());
+void AVarBoundsInfo::performWorkListInference(
+  const std::set<BoundsKey> &ArrPointers, const AVarGraph &BKGraph,
+  AvarBoundsInference &BI, bool FromPB) {
+
+  std::set<BoundsKey> ArrNeededBounds;
+  getBoundsNeededArrPointers(ArrPointers, ArrNeededBounds);
+
+  std::set<BoundsKey> WorkList(ArrNeededBounds);
   bool Changed = true;
   while (Changed) {
     Changed = false;
-    NextIterArrs.clear();
+    std::set<BoundsKey> NextIterArrs;
     // Are there any ARR atoms that need bounds?
     while (!WorkList.empty()) {
       BoundsKey CurrArrKey = *WorkList.begin();
@@ -1098,7 +1098,6 @@ bool AVarBoundsInfo::performWorkListInference(
       WorkList.erase(CurrArrKey);
       // Can we find bounds for this Arr?
       if (BI.inferBounds(CurrArrKey, BKGraph, FromPB)) {
-        RetVal = true;
         Changed = true;
         // Get all the successors of the ARR whose bounds we just found.
         BKGraph.getSuccessors(CurrArrKey, NextIterArrs);
@@ -1108,7 +1107,10 @@ bool AVarBoundsInfo::performWorkListInference(
       findIntersection(ArrNeededBounds, NextIterArrs, WorkList);
     }
   }
-  return RetVal;
+
+  // From all the sets of bounds computed for various array variables. Intersect
+  // them and find the common bound variable.
+  BI.convergeInferredBounds();
 }
 
 BoundsKey AVarBoundsInfo::getCtxSensCEBoundsKey(const PersistentSourceLoc &PSL,
@@ -1276,12 +1278,10 @@ void AVarBoundsInfo::getBoundsNeededArrPointers(
 // In the above case, we use n as a potential count bounds for arr.
 // Note: we only use potential bounds for a variable when none of its
 // predecessors have bounds.
-bool AVarBoundsInfo::performFlowAnalysis(ProgramInfo *PI) {
-  bool RetVal = false;
+void AVarBoundsInfo::performFlowAnalysis(ProgramInfo *PI) {
   auto &PStats = PI->getPerfStats();
 
   PStats.startArrayBoundsInferenceTime();
-  AvarBoundsInference ABI(this);
   // First get all the pointer vars which are ARRs
   std::set<BoundsKey> ArrPointers;
   NtArrPointerBoundsKey.clear();
@@ -1291,9 +1291,8 @@ bool AVarBoundsInfo::performFlowAnalysis(ProgramInfo *PI) {
   ArrPointerBoundsKey.clear();
   ArrPointerBoundsKey.insert(ArrPointers.begin(), ArrPointers.end());
   // All BoundsKey that has bounds are also array pointers.
-  for (auto &T : this->BInfo) {
+  for (auto &T : this->BInfo)
     ArrPointerBoundsKey.insert(T.first);
-  }
 
   // Keep only highest priority bounds.
   // Any thing changed? which means bounds of a variable changed
@@ -1304,65 +1303,47 @@ bool AVarBoundsInfo::performFlowAnalysis(ProgramInfo *PI) {
   for (auto TBK : ArrPointerBoundsKey)
     removeBounds(TBK, FlowInferred);
 
-  std::set<BoundsKey> ArrNeededBounds, ArrNeededBoundsNew, TmpArrNeededBounds;
-  ArrNeededBounds.clear();
-
+  std::set<BoundsKey> ArrNeededBounds;
   getBoundsNeededArrPointers(ArrPointers, ArrNeededBounds);
-
-  bool OuterChanged, InnerChanged;
-  std::vector<bool> FromBVals;
-  // We first infer with using only flow information
-  // i.e., without using any potential bounds.
-  FromBVals.push_back(false);
-  // Next, we try using potential bounds.
-  FromBVals.push_back(true);
 
   // Now compute the bounds information of all the ARR pointers that need it.
   // We iterate until there are no new array variables whose bounds are found.
   // The expectation is every iteration we will find bounds for at least one
   // array variable.
-  TmpArrNeededBounds = ArrNeededBounds;
-  OuterChanged = !ArrNeededBounds.empty();
+  bool OuterChanged = !ArrNeededBounds.empty();
   while (OuterChanged) {
-    TmpArrNeededBounds = ArrNeededBounds;
-    for (auto FromPB : FromBVals) {
-      InnerChanged = !ArrNeededBounds.empty();
+    std::set<BoundsKey> TmpArrNeededBounds = ArrNeededBounds;
+    // We first infer with using only flow information i.e., without using any
+    // potential bounds. Next, we try using potential bounds.
+    // TODO: Doing this with a loop feels kind of silly. I should pull the while
+    //       loop into a new function that takes a bool parameter and just call
+    //       it twice. I'll do this if I can think of a meaningful name for the
+    //       new function.
+    for (bool FromPB : std::vector<bool>({false, true})) {
+      bool InnerChanged = !ArrNeededBounds.empty();
       while (InnerChanged) {
-        // Clear all inferred bounds.
-        ABI.clearInferredBounds();
+        AvarBoundsInference ABI(this);
         // Regular flow inference (with no edges between callers and callees).
-        performWorkListInference(ArrNeededBounds, this->ProgVarGraph, ABI,
+        performWorkListInference(ArrPointers, this->ProgVarGraph, ABI,
                                  FromPB);
 
-        // Converge using local bounds (i.e., within each function).
-        // From all the sets of bounds computed for various array variables.
-        // Intersect them and find the common bound variable.
-        ABI.convergeInferredBounds();
+        // Now propagate the bounds information from context-sensitive keys to
+        // original keys (i.e., edges from callers to callees are present, but no
+        // local edges).
+        performWorkListInference(ArrPointers, this->CtxSensProgVarGraph, ABI,
+                                 FromPB);
 
-        ArrNeededBoundsNew.clear();
-        getBoundsNeededArrPointers(ArrPointers, ArrNeededBoundsNew);
-        // Now propagate the bounds information from context-sensitive keys
-        // to original keys (i.e., edges from callers to callees are present,
-        //   but no local edges)
-        performWorkListInference(ArrNeededBoundsNew, this->CtxSensProgVarGraph,
-                                 ABI, FromPB);
-
-        ABI.convergeInferredBounds();
         // Now clear all inferred bounds so that context-sensitive nodes do not
         // interfere with each other.
         ABI.clearInferredBounds();
-        ArrNeededBoundsNew.clear();
-        // Get array variables that still need bounds.
-        getBoundsNeededArrPointers(ArrPointers, ArrNeededBoundsNew);
 
         // Now propagate the bounds information from normal keys to
         // context-sensitive keys.
-        performWorkListInference(ArrNeededBoundsNew,
-                                 this->RevCtxSensProgVarGraph, ABI, FromPB);
+        performWorkListInference(ArrPointers, this->RevCtxSensProgVarGraph, ABI,
+                                 FromPB);
 
-        ABI.convergeInferredBounds();
-        ArrNeededBoundsNew.clear();
         // Get array variables that still need bounds.
+        std::set<BoundsKey> ArrNeededBoundsNew;
         getBoundsNeededArrPointers(ArrPointers, ArrNeededBoundsNew);
 
         // Did we find bounds for new array variables?
@@ -1380,7 +1361,6 @@ bool AVarBoundsInfo::performFlowAnalysis(ProgramInfo *PI) {
   }
 
   PStats.endArrayBoundsInferenceTime();
-  return RetVal;
 }
 
 bool

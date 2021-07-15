@@ -256,7 +256,7 @@ public:
   ProgramVar *getProgramVar(BoundsKey VK);
 
   // Propagate the array bounds information for all array ptrs.
-  bool performFlowAnalysis(ProgramInfo *PI);
+  void performFlowAnalysis(ProgramInfo *PI);
 
   // Get the context sensitive BoundsKey for the given key at CallSite
   // located at PSL.
@@ -379,7 +379,7 @@ private:
 
   // Perform worklist based inference on the requested array variables using
   // the provided graph and potential length variables.
-  bool performWorkListInference(const std::set<BoundsKey> &ArrNeededBounds,
+  void performWorkListInference(const std::set<BoundsKey> &ArrPointers,
                                 const AVarGraph &BKGraph,
                                 AvarBoundsInference &BI, bool FromPB);
 
