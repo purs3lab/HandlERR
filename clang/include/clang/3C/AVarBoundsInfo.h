@@ -367,20 +367,18 @@ private:
   bool isFunctionReturn(BoundsKey BK);
 
   // Of all the pointer bounds key, find arr pointers.
-  void computerArrPointers(ProgramInfo *PI, std::set<BoundsKey> &Ret);
+  void computeArrPointers(ProgramInfo *PI);
 
   // Get all the array pointers that need bounds.
-  void getBoundsNeededArrPointers(const std::set<BoundsKey> &ArrPtrs,
-                                  std::set<BoundsKey> &AB);
+  void getBoundsNeededArrPointers(std::set<BoundsKey> &AB) const;
 
   // Keep only highest priority bounds for all the provided BoundsKeys
   // returns true if any thing changed, else false.
-  bool keepHighestPriorityBounds(const std::set<BoundsKey> &ArrPtrs);
+  bool keepHighestPriorityBounds();
 
   // Perform worklist based inference on the requested array variables using
   // the provided graph and potential length variables.
-  void performWorkListInference(const std::set<BoundsKey> &ArrPointers,
-                                const AVarGraph &BKGraph,
+  void performWorkListInference(const AVarGraph &BKGraph,
                                 AvarBoundsInference &BI, bool FromPB);
 
   void insertParamKey(ParamDeclType ParamDecl, BoundsKey NK);

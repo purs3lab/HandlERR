@@ -1068,15 +1068,15 @@ void AVarBoundsInfo::insertProgramVar(BoundsKey NK, ProgramVar *PV) {
   PVarInfo[NK] = PV;
 }
 
-void AVarBoundsInfo::performWorkListInference(
-  const std::set<BoundsKey> &ArrPointers, const AVarGraph &BKGraph,
-  AvarBoundsInference &BI, bool FromPB) {
+void AVarBoundsInfo::performWorkListInference(const AVarGraph &BKGraph,
+                                              AvarBoundsInference &BI,
+                                              bool FromPB) {
 
   // BoundsKeys corresponding to array pointers that need bounds. This will seed
   // the initial WorkList, and be used to ensure that only BoundsKeys needing
   // bounds are added to the list in subsequent iterations.
   std::set<BoundsKey> ArrNeededBounds;
-  getBoundsNeededArrPointers(ArrPointers, ArrNeededBounds);
+  getBoundsNeededArrPointers(ArrNeededBounds);
 
   std::set<BoundsKey> WorkList(ArrNeededBounds);
   while (!WorkList.empty()) {
@@ -1114,8 +1114,10 @@ BoundsKey AVarBoundsInfo::getCtxSensCEBoundsKey(const PersistentSourceLoc &PSL,
   return CSBKeyHandler.getCtxSensCEBoundsKey(PSL, BK);
 }
 
-void AVarBoundsInfo::computerArrPointers(ProgramInfo *PI,
-                                         std::set<BoundsKey> &ArrPointers) {
+void AVarBoundsInfo::computeArrPointers(ProgramInfo *PI) {
+  NtArrPointerBoundsKey.clear();
+  ArrPointerBoundsKey.clear();
+
   auto &CS = PI->getConstraints();
   for (auto Bkey : PointerBoundsKey) {
     // Regular variables.
@@ -1123,7 +1125,7 @@ void AVarBoundsInfo::computerArrPointers(ProgramInfo *PI,
     if (BkeyToPSL.find(Bkey) != BkeyToPSL.end()) {
       auto &PSL = BkeyToPSL.at(Bkey);
       if (hasArray(PI->getVarMap().at(PSL), CS)) {
-        ArrPointers.insert(Bkey);
+        ArrPointerBoundsKey.insert(Bkey);
       }
       // Does this array belong to a valid program variable?
       if (isInSrcArray(PI->getVarMap().at(PSL), CS)) {
@@ -1154,7 +1156,7 @@ void AVarBoundsInfo::computerArrPointers(ProgramInfo *PI,
 
       if (hasArray(FV->getExternalParam(ParmNum), CS) ||
           hasArray(FV->getInternalParam(ParmNum), CS)) {
-        ArrPointers.insert(Bkey);
+        ArrPointerBoundsKey.insert(Bkey);
       }
       // Does this array belong to a valid program variable?
       if (isInSrcArray(FV->getExternalParam(ParmNum), CS) ||
@@ -1189,7 +1191,7 @@ void AVarBoundsInfo::computerArrPointers(ProgramInfo *PI,
 
       if (hasArray(FV->getExternalReturn(), CS) ||
           hasArray(FV->getInternalReturn(), CS)) {
-        ArrPointers.insert(Bkey);
+        ArrPointerBoundsKey.insert(Bkey);
       }
       // Does this array belongs to a valid program variable?
       if (isInSrcArray(FV->getExternalReturn(), CS) ||
@@ -1219,7 +1221,7 @@ void AVarBoundsInfo::computerArrPointers(ProgramInfo *PI,
   std::set<BoundsKey> CtxSensBKeys;
   CtxSensBKeys.clear();
   std::set<BoundsKey> TmpBKeys;
-  for (auto BK : ArrPointers) {
+  for (auto BK : ArrPointerBoundsKey) {
     CtxSensProgVarGraph.getSuccessors(BK, TmpBKeys, true);
     CtxSensProgVarGraph.getPredecessors(BK, TmpBKeys, true);
     RevCtxSensProgVarGraph.getSuccessors(BK, TmpBKeys, true);
@@ -1238,22 +1240,17 @@ void AVarBoundsInfo::computerArrPointers(ProgramInfo *PI,
     }
   }
 
-  ArrPointers.insert(CtxSensBKeys.begin(), CtxSensBKeys.end());
+  ArrPointerBoundsKey.insert(CtxSensBKeys.begin(), CtxSensBKeys.end());
+
+  // All BoundsKey that has bounds are also array pointers.
+  for (auto &T : this->BInfo)
+    ArrPointerBoundsKey.insert(T.first);
 }
 
 // Find the set of array pointers that need bounds. This is computed as all
 // array pointers that do not currently have a bound, have an invalid bound,
-// or have an impossible bound. The parameter set ArrPtrs is assumed to the set
-// of all array pointers.
-// TODO: It seems that the parameter ArrPtrs is always the result of
-//       AVarBoundsInfo::computerArrPointers. It would be nice if the set could
-//       be computed in this function rather than threading it through multiple
-//       function calls, but computing it in this function might be expensive
-//       (judging by the size of computerArrPointers). Another option would be
-//       to cache it in a class field, but then we would still have to remember
-//       to invalidate it at the correct point.
-void AVarBoundsInfo::getBoundsNeededArrPointers(
-    const std::set<BoundsKey> &ArrPtrs, std::set<BoundsKey> &AB) {
+// or have an impossible bound.
+void AVarBoundsInfo::getBoundsNeededArrPointers(std::set<BoundsKey> &AB) const {
   // Get the ARR pointers that have bounds.
   std::set<BoundsKey> ArrWithBounds;
   for (auto &T : BInfo) {
@@ -1267,9 +1264,10 @@ void AVarBoundsInfo::getBoundsNeededArrPointers(
 
   // Remove the above set of array pointers with bounds from the set of all
   // array pointers to get the set of array pointers that need bounds.
-  // i.e., AB = ArrPtrs - ArrPtrsWithBounds.
-  std::set_difference(ArrPtrs.begin(), ArrPtrs.end(), ArrWithBounds.begin(),
-                      ArrWithBounds.end(), std::inserter(AB, AB.end()));
+  // i.e., AB = ArrPointerBoundsKey - ArrPtrsWithBounds.
+  std::set_difference(ArrPointerBoundsKey.begin(), ArrPointerBoundsKey.end(),
+                      ArrWithBounds.begin(), ArrWithBounds.end(),
+                      std::inserter(AB, AB.end()));
 }
 
 // We first propagate all the bounds information from explicit
@@ -1287,31 +1285,22 @@ void AVarBoundsInfo::getBoundsNeededArrPointers(
 // predecessors have bounds.
 void AVarBoundsInfo::performFlowAnalysis(ProgramInfo *PI) {
   auto &PStats = PI->getPerfStats();
-
   PStats.startArrayBoundsInferenceTime();
-  // First get all the pointer vars which are ARRs
-  std::set<BoundsKey> ArrPointers;
-  NtArrPointerBoundsKey.clear();
-  computerArrPointers(PI, ArrPointers);
 
-  // Repopulate array bounds key.
-  ArrPointerBoundsKey.clear();
-  ArrPointerBoundsKey.insert(ArrPointers.begin(), ArrPointers.end());
-  // All BoundsKey that has bounds are also array pointers.
-  for (auto &T : this->BInfo)
-    ArrPointerBoundsKey.insert(T.first);
+  // First get all the pointer vars which are ARRs. Results is stored in the
+  // field ArrPointerBoundsKey. This also populates some other sets that seem to
+  // only be used for gather statistics.
+  computeArrPointers(PI);
 
   // Keep only highest priority bounds.
-  // Any thing changed? which means bounds of a variable changed
-  // Which means we need to recompute the flow based bounds for
-  // all arrays that have flow based bounds.
-  keepHighestPriorityBounds(ArrPointerBoundsKey);
+  keepHighestPriorityBounds();
+
   // Remove flow inferred bounds, if exist for all the array pointers.
   for (auto TBK : ArrPointerBoundsKey)
     removeBounds(TBK, FlowInferred);
 
   std::set<BoundsKey> ArrNeededBounds;
-  getBoundsNeededArrPointers(ArrPointers, ArrNeededBounds);
+  getBoundsNeededArrPointers(ArrNeededBounds);
 
   // Now compute the bounds information of all the ARR pointers that need it.
   // We iterate until there are no new array variables whose bounds are found.
@@ -1331,14 +1320,12 @@ void AVarBoundsInfo::performFlowAnalysis(ProgramInfo *PI) {
       while (InnerChanged) {
         AvarBoundsInference ABI(this);
         // Regular flow inference (with no edges between callers and callees).
-        performWorkListInference(ArrPointers, this->ProgVarGraph, ABI,
-                                 FromPB);
+        performWorkListInference(this->ProgVarGraph, ABI, FromPB);
 
         // Now propagate the bounds information from context-sensitive keys to
         // original keys (i.e., edges from callers to callees are present, but no
         // local edges).
-        performWorkListInference(ArrPointers, this->CtxSensProgVarGraph, ABI,
-                                 FromPB);
+        performWorkListInference(this->CtxSensProgVarGraph, ABI, FromPB);
 
         // Now clear all inferred bounds so that context-sensitive nodes do not
         // interfere with each other.
@@ -1346,12 +1333,11 @@ void AVarBoundsInfo::performFlowAnalysis(ProgramInfo *PI) {
 
         // Now propagate the bounds information from normal keys to
         // context-sensitive keys.
-        performWorkListInference(ArrPointers, this->RevCtxSensProgVarGraph, ABI,
-                                 FromPB);
+        performWorkListInference(this->RevCtxSensProgVarGraph, ABI, FromPB);
 
         // Get array variables that still need bounds.
         std::set<BoundsKey> ArrNeededBoundsNew;
-        getBoundsNeededArrPointers(ArrPointers, ArrNeededBoundsNew);
+        getBoundsNeededArrPointers(ArrNeededBoundsNew);
 
         // Did we find bounds for new array variables?
         InnerChanged = (ArrNeededBounds != ArrNeededBoundsNew);
@@ -1370,10 +1356,9 @@ void AVarBoundsInfo::performFlowAnalysis(ProgramInfo *PI) {
   PStats.endArrayBoundsInferenceTime();
 }
 
-bool
-AVarBoundsInfo::keepHighestPriorityBounds(const std::set<BoundsKey> &ArrPtrs) {
+bool AVarBoundsInfo::keepHighestPriorityBounds() {
   bool HasChanged = false;
-  for (auto BK : ArrPtrs) {
+  for (auto BK : ArrPointerBoundsKey) {
     bool FoundBounds = false;
     for (BoundsPriority P : PrioList) {
       if (FoundBounds) {
