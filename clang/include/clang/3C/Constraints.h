@@ -129,7 +129,11 @@ public:
     return false;
   }
 
+  // TODO this should be renamed to something more informative, like "id"
   uint32_t getLoc() const { return Loc; }
+
+
+
   std::string getName() const { return Name; }
   VarKind getVarKind() const { return KindV; }
 

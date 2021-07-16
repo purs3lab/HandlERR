@@ -961,79 +961,98 @@ FVConstraint *ProgramInfo::getStaticFuncConstraint(std::string FuncName,
 bool ProgramInfo::computeInterimConstraintState(
     const std::set<std::string> &FilePaths) {
 
-  // Get all the valid vars of interest i.e., all the Vars that are present
-  // in one of the files being compiled.
-  CAtoms ValidVarsVec;
-  std::set<Atom *> AllValidVars;
+  // We need to compute two sets
+  // 1) The set of _all_ vars that refer to a Decl
+  std::set<Atom*> DeclVars;
+  // 2) The set of all DeclVars vars _in_ this file, which we call _relevant_
+  std::set<Atom *> RelevantVars;
+
+  // Compute the above two sets
   CVarSet Visited;
-  CAtoms Tmp;
   for (const auto &I : Variables) {
     std::string FileName = I.first.getFileName();
     ConstraintVariable *C = I.second;
     if (C->isForValidDecl()) {
-      Tmp.clear();
+      CAtoms Tmp;
       getVarsFromConstraint(C, Tmp, Visited);
-      AllValidVars.insert(Tmp.begin(), Tmp.end());
+      DeclVars.insert(Tmp.begin(), Tmp.end());
       if (canWrite(FileName))
-        ValidVarsVec.insert(ValidVarsVec.begin(), Tmp.begin(), Tmp.end());
+        RelevantVars.insert(Tmp.begin(), Tmp.end());
     }
   }
 
-  // Make that into set, for efficiency.
-  std::set<Atom *> ValidVarsS;
-  ValidVarsS.insert(ValidVarsVec.begin(), ValidVarsVec.end());
 
   auto GetLocOrZero = [](const Atom *Val) {
     if (const auto *VA = dyn_cast<VarAtom>(Val))
       return VA->getLoc();
     return (ConstraintKey)0;
   };
-  CVars ValidVarsKey;
-  std::transform(ValidVarsS.begin(), ValidVarsS.end(),
-                 std::inserter(ValidVarsKey, ValidVarsKey.end()), GetLocOrZero);
-  CVars AllValidVarsKey;
-  std::transform(AllValidVars.begin(), AllValidVars.end(),
-                 std::inserter(AllValidVarsKey, AllValidVarsKey.end()),
+
+  //Map the above two sets into equivalent sets of keys
+  CVars RelevantVarsKey;
+  CVars DeclVarsKey;
+
+  std::transform(RelevantVars.begin(), RelevantVars.end(),
+                 std::inserter(RelevantVarsKey, RelevantVarsKey.end()), GetLocOrZero);
+  std::transform(DeclVars.begin(), DeclVars.end(),
+                 std::inserter(DeclVarsKey, DeclVarsKey.end()),
                  GetLocOrZero);
 
   CState.clear();
+
   std::set<Atom *> DirectWildVarAtoms;
   CS.getChkCG().getSuccessors(CS.getWild(), DirectWildVarAtoms);
 
-  CVars TmpCGrp;
-  CVars OnlyIndirect;
-  for (auto *A : DirectWildVarAtoms) {
-    auto *VA = dyn_cast<VarAtom>(A);
-    if (VA == nullptr)
+  auto IsDeclVar = [&](VarAtom *VA) {
+    return DeclVars.find(VA) != DeclVars.end();
+  };
+
+  auto IsRelevantVar = [&](VarAtom *VA) {
+    return RelevantVarsKey.find(VA->getLoc()) != RelevantVarsKey.end();
+  };
+
+  auto IsDirectlyWild = [&](VarAtom *VA) {
+    return DirectWildVarAtoms.find(VA) != DirectWildVarAtoms.end();
+  };
+
+
+  // TODO this search loop needs optimizing
+  for (auto *WildAtom : DirectWildVarAtoms) {
+    auto *WildVarAtom = dyn_cast<VarAtom>(WildAtom);
+    if (WildVarAtom == nullptr)
       continue;
 
-    TmpCGrp.clear();
-    OnlyIndirect.clear();
+    CVars ConstrainedByThis;
+    CVars IndirectConstraints;
+
 
     auto BFSVisitor = [&](Atom *SearchAtom) {
       auto *SearchVA = dyn_cast<VarAtom>(SearchAtom);
-      if (SearchVA && AllValidVars.find(SearchVA) != AllValidVars.end()) {
-        CState.RCMap[SearchVA->getLoc()].insert(VA->getLoc());
 
-        if (ValidVarsKey.find(SearchVA->getLoc()) != ValidVarsKey.end())
-          TmpCGrp.insert(SearchVA->getLoc());
-        if (DirectWildVarAtoms.find(SearchVA) == DirectWildVarAtoms.end()) {
-          OnlyIndirect.insert(SearchVA->getLoc());
-        }
+      if (SearchVA && IsDeclVar(SearchVA)) {
+        CState.RootCauses[SearchVA->getLoc()].insert(WildVarAtom->getLoc());
+
+        if (IsRelevantVar(SearchVA))
+          ConstrainedByThis.insert(SearchVA->getLoc());
+
+        if (!IsDirectlyWild(SearchVA))
+          IndirectConstraints.insert(SearchVA->getLoc());
+
       }
-    };
-    CS.getChkCG().visitBreadthFirst(VA, BFSVisitor);
 
-    CState.TotalNonDirectWildAtoms.insert(OnlyIndirect.begin(),
-                                          OnlyIndirect.end());
+    };
+    CS.getChkCG().visitBreadthFirst(WildVarAtom, BFSVisitor);
+
+    CState.TotalNonDirectWildAtoms.insert(IndirectConstraints.begin(),
+                                          IndirectConstraints.end());
     // Should we consider only pointers which with in the source files or
     // external pointers that affected pointers within the source files.
-    CState.AllWildAtoms.insert(VA->getLoc());
-    CVars &CGrp = CState.SrcWMap[VA->getLoc()];
-    CGrp.insert(TmpCGrp.begin(), TmpCGrp.end());
+    CState.AllWildAtoms.insert(WildVarAtom->getLoc());
+    CVars &CGrp = CState.ConstrainedBy[WildVarAtom->getLoc()];
+    CGrp.insert(ConstrainedByThis.begin(), ConstrainedByThis.end());
   }
-  findIntersection(CState.AllWildAtoms, ValidVarsKey, CState.InSrcWildAtoms);
-  findIntersection(CState.TotalNonDirectWildAtoms, ValidVarsKey,
+  findIntersection(CState.AllWildAtoms, RelevantVarsKey, CState.InSrcWildAtoms);
+  findIntersection(CState.TotalNonDirectWildAtoms, RelevantVarsKey,
                    CState.InSrcNonDirectWildAtoms);
 
   // The ConstraintVariable for a variable normally appears in Variables for the
@@ -1123,17 +1142,17 @@ void ProgramInfo::computePtrLevelStats() {
     insertCVAtoms(I.second, AtomPtrMap);
 
   // Populate maps with per-pointer root cause information
-  for (auto Entry : CState.RCMap) {
-    assert("RCMap entry is not mapped to a pointer!" &&
+  for (auto Entry : CState.RootCauses) {
+    assert("RootCauses entry is not mapped to a pointer!" &&
            AtomPtrMap.find(Entry.first) != AtomPtrMap.end());
     ConstraintVariable *CV = AtomPtrMap[Entry.first];
     for (auto RC : Entry.second)
-      CState.PtrRCMap[CV].insert(RC);
+      CState.PtrRootCauses[CV].insert(RC);
   }
-  for (auto Entry : CState.SrcWMap) {
+  for (auto Entry : CState.ConstrainedBy) {
     for (auto Key : Entry.second) {
       assert(AtomPtrMap.find(Key) != AtomPtrMap.end());
-      CState.PtrSrcWMap[Entry.first].insert(AtomPtrMap[Key]);
+      CState.PtrConstrainedBy[Entry.first].insert(AtomPtrMap[Key]);
     }
   }
 }

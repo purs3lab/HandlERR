@@ -168,6 +168,7 @@ public:
   std::string getRewritableOriginalTy() const;
   std::string getName() const { return Name; }
 
+  // TODO is the word `valid` doing any real work here? or can it be dropped?
   void setValidDecl() { IsForDecl = true; }
   bool isForValidDecl() const { return IsForDecl; }
 
