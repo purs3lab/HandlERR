@@ -65,9 +65,9 @@ void AVarBoundsStats::print(llvm::raw_ostream &O,
   }
 }
 
-bool hasArray(ConstraintVariable *CK, Constraints &CS) {
+bool hasArray(const ConstraintVariable *CK, const Constraints &CS) {
   auto &E = CS.getVariables();
-  if (PVConstraint *PV = dyn_cast<PVConstraint>(CK)) {
+  if (const auto *PV = dyn_cast<PVConstraint>(CK)) {
     if (PV->hasArr(E, 0) || PV->hasNtArr(E, 0)) {
       return true;
     }
@@ -75,9 +75,9 @@ bool hasArray(ConstraintVariable *CK, Constraints &CS) {
   return false;
 }
 
-bool hasOnlyNtArray(ConstraintVariable *CK, Constraints &CS) {
+bool hasOnlyNtArray(const ConstraintVariable *CK, const Constraints &CS) {
   auto &E = CS.getVariables();
-  if (PVConstraint *PV = dyn_cast<PVConstraint>(CK)) {
+  if (const auto *PV = dyn_cast<PVConstraint>(CK)) {
     if (PV->hasNtArr(E, 0)) {
       return true;
     }
@@ -85,9 +85,9 @@ bool hasOnlyNtArray(ConstraintVariable *CK, Constraints &CS) {
   return false;
 }
 
-bool isInSrcArray(ConstraintVariable *CK, Constraints &CS) {
+bool isInSrcArray(const ConstraintVariable *CK, const Constraints &CS) {
   auto &E = CS.getVariables();
-  if (PVConstraint *PV = dyn_cast<PVConstraint>(CK)) {
+  if (const auto *PV = dyn_cast<PVConstraint>(CK)) {
     if ((PV->hasArr(E, 0) || PV->hasNtArr(E, 0)) && PV->isForValidDecl()) {
       return true;
     }
@@ -1123,101 +1123,74 @@ BoundsKey AVarBoundsInfo::getCtxSensCEBoundsKey(const PersistentSourceLoc &PSL,
   return CSBKeyHandler.getCtxSensCEBoundsKey(PSL, BK);
 }
 
-void AVarBoundsInfo::computeArrPointers(ProgramInfo *PI) {
+void AVarBoundsInfo::computeArrPointers(const ProgramInfo *PI) {
   NtArrPointerBoundsKey.clear();
   ArrPointerBoundsKey.clear();
 
-  auto &CS = PI->getConstraints();
-  for (auto Bkey : PointerBoundsKey) {
-    // Regular variables.
-    auto &BkeyToPSL = DeclVarMap.right();
-    if (BkeyToPSL.find(Bkey) != BkeyToPSL.end()) {
-      auto &PSL = BkeyToPSL.at(Bkey);
-      if (hasArray(PI->getVarMap().at(PSL), CS)) {
-        ArrPointerBoundsKey.insert(Bkey);
-      }
-      // Does this array belong to a valid program variable?
-      if (isInSrcArray(PI->getVarMap().at(PSL), CS)) {
-        InProgramArrPtrBoundsKeys.insert(Bkey);
-      }
+  // Called in following loop to add a BoundsKey to the appropriate sets based
+  // on the pointer type of a corresponding ConstraintVariable.
+  auto AddToArrSets = [this, PI](BoundsKey BK, const ConstraintVariable *CV) {
+    if (hasArray(CV, PI->getConstraints()))
+      ArrPointerBoundsKey.insert(BK);
 
-      if (hasOnlyNtArray(PI->getVarMap().at(PSL), CS)) {
-        NtArrPointerBoundsKey.insert(Bkey);
-      }
+    // Does this array belong to a valid program variable?
+    if (isInSrcArray(CV, PI->getConstraints()))
+      InProgramArrPtrBoundsKeys.insert(BK);
 
-      continue;
+    if (hasOnlyNtArray(CV, PI->getConstraints())) {
+      NtArrPointerBoundsKey.insert(BK);
+      // If the return value is an nt array pointer and there are no declared
+      // bounds? Then, we cannot find bounds for this pointer.
+      // FIXME: This feels wrong. Why does it only apply to NTARR? Why does it
+      //        only apply to the return value? As I understand it, an
+      //        _Nt_array_ptr without bounds actually has bounds `count(0)`,
+      //        so it should be treated as a count bound for inference.
+      if (CV->getName() == RETVAR && getBounds(BK) == nullptr)
+        PointersWithImpossibleBounds.insert(BK);
     }
+  };
 
-    // Function parameters
-    auto &ParmBkeyToPSL = ParamDeclVarMap.right();
-    if (ParmBkeyToPSL.find(Bkey) != ParmBkeyToPSL.end()) {
-      auto &ParmTup = ParmBkeyToPSL.at(Bkey);
+  // Find a FVConstraint in the ProgramInfo function definition maps given a
+  // function name and filename.
+  auto LookupFVCons = [PI](const std::string &FuncName,
+                           const std::string &FileName, bool IsStatic) {
+    if (IsStatic || !PI->getExtFuncDefnConstraint(FuncName))
+      return PI->getStaticFuncConstraint(FuncName, FileName);
+    return PI->getExtFuncDefnConstraint(FuncName);
+  };
+
+  auto &VariableMap = DeclVarMap.right();
+  auto &ParamMap = ParamDeclVarMap.right();
+  auto &ReturnMap = FuncDeclVarMap.right();
+  for (auto Bkey : PointerBoundsKey) {
+    if (VariableMap.find(Bkey) != VariableMap.end()) {
+      // Regular variables.
+      const PersistentSourceLoc &PSL = VariableMap.at(Bkey);
+      const ConstraintVariable *BkeyCV = PI->getVarMap().at(PSL);
+      AddToArrSets(Bkey, BkeyCV);
+
+    } else if (ParamMap.find(Bkey) != ParamMap.end()) {
+      // Function parameters
+      auto &ParmTup = ParamMap.at(Bkey);
       std::string FuncName = std::get<0>(ParmTup);
       std::string FileName = std::get<1>(ParmTup);
       bool IsStatic = std::get<2>(ParmTup);
       unsigned ParmNum = std::get<3>(ParmTup);
-      FVConstraint *FV = nullptr;
-      if (IsStatic || !PI->getExtFuncDefnConstraint(FuncName)) {
-        FV = PI->getStaticFuncConstraint(FuncName, FileName);
-      } else {
-        FV = PI->getExtFuncDefnConstraint(FuncName);
-      }
 
-      if (hasArray(FV->getExternalParam(ParmNum), CS) ||
-          hasArray(FV->getInternalParam(ParmNum), CS)) {
-        ArrPointerBoundsKey.insert(Bkey);
-      }
-      // Does this array belong to a valid program variable?
-      if (isInSrcArray(FV->getExternalParam(ParmNum), CS) ||
-          isInSrcArray(FV->getInternalParam(ParmNum), CS)) {
-        InProgramArrPtrBoundsKeys.insert(Bkey);
-      }
+      FVConstraint *FV = LookupFVCons(FuncName, FileName, IsStatic);
+      PVConstraint *ParamPVC = FV->getExternalParam(ParmNum);
+      AddToArrSets(Bkey, ParamPVC);
 
-      if (hasOnlyNtArray(FV->getExternalParam(ParmNum), CS) ||
-          hasOnlyNtArray(FV->getInternalParam(ParmNum), CS)) {
-        NtArrPointerBoundsKey.insert(Bkey);
-      }
-
-      continue;
-    }
-    // Function returns.
-    auto &FuncKeyToPSL = FuncDeclVarMap.right();
-    if (FuncKeyToPSL.find(Bkey) != FuncKeyToPSL.end()) {
-      auto &FuncRet = FuncKeyToPSL.at(Bkey);
+    } else if (ReturnMap.find(Bkey) != ReturnMap.end()) {
+      // Function returns.
+      auto &FuncRet = ReturnMap.at(Bkey);
       std::string FuncName = std::get<0>(FuncRet);
       std::string FileName = std::get<1>(FuncRet);
       bool IsStatic = std::get<2>(FuncRet);
-      const FVConstraint *FV = nullptr;
-      std::set<FVConstraint *> Tmp;
-      Tmp.clear();
-      if (IsStatic || !PI->getExtFuncDefnConstraint(FuncName)) {
-        Tmp.insert(PI->getStaticFuncConstraint(FuncName, FileName));
-        FV = getOnly(Tmp);
-      } else {
-        Tmp.insert(PI->getExtFuncDefnConstraint(FuncName));
-        FV = getOnly(Tmp);
-      }
 
-      if (hasArray(FV->getExternalReturn(), CS) ||
-          hasArray(FV->getInternalReturn(), CS)) {
-        ArrPointerBoundsKey.insert(Bkey);
-      }
-      // Does this array belongs to a valid program variable?
-      if (isInSrcArray(FV->getExternalReturn(), CS) ||
-          isInSrcArray(FV->getInternalReturn(), CS)) {
-        InProgramArrPtrBoundsKeys.insert(Bkey);
-      }
-
-      if (hasOnlyNtArray(FV->getExternalReturn(), CS) ||
-          hasOnlyNtArray(FV->getInternalReturn(), CS)) {
-        NtArrPointerBoundsKey.insert(Bkey);
-        // If the return value is an nt array pointer
-        // and there are no declared bounds? Then, we cannot
-        // find bounds for this pointer.
-        if (getBounds(Bkey) == nullptr)
-          PointersWithImpossibleBounds.insert(Bkey);
-      }
-      continue;
+      FVConstraint *FV = LookupFVCons(FuncName, FileName, IsStatic);
+      PVConstraint *RetPVC = FV->getExternalReturn();
+      AddToArrSets(Bkey, RetPVC);
     }
   }
 
@@ -1227,8 +1200,6 @@ void AVarBoundsInfo::computeArrPointers(ProgramInfo *PI) {
   // of the regular bounds key, we just get the neighbours (predecessors
   // and successors) of the regular bounds key to get the context-sensitive
   // counterparts.
-  std::set<BoundsKey> CtxSensBKeys;
-  CtxSensBKeys.clear();
   std::set<BoundsKey> TmpBKeys;
   for (auto BK : ArrPointerBoundsKey) {
     CtxSensProgVarGraph.getSuccessors(BK, TmpBKeys, true);
@@ -1238,20 +1209,15 @@ void AVarBoundsInfo::computeArrPointers(ProgramInfo *PI) {
   }
 
   for (auto TBK : TmpBKeys) {
-    ProgramVar *TmpPVar = getProgramVar(TBK);
-    if (TmpPVar != nullptr) {
-      if (isa<CtxFunctionArgScope>(TmpPVar->getScope())) {
-        CtxSensBKeys.insert(TBK);
-      }
-      if (isa<CtxStructScope>(TmpPVar->getScope())) {
-        CtxSensBKeys.insert(TBK);
-      }
+    if (ProgramVar *TmpPVar = getProgramVar(TBK)) {
+      if (isa<CtxFunctionArgScope>(TmpPVar->getScope()))
+        ArrPointerBoundsKey.insert(TBK);
+      if (isa<CtxStructScope>(TmpPVar->getScope()))
+        ArrPointerBoundsKey.insert(TBK);
     }
   }
 
-  ArrPointerBoundsKey.insert(CtxSensBKeys.begin(), CtxSensBKeys.end());
-
-  // All BoundsKey that has bounds are also array pointers.
+  // All BoundsKey that have bounds are also array pointers.
   for (auto &T : this->BInfo)
     ArrPointerBoundsKey.insert(T.first);
 }

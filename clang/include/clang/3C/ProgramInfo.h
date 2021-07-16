@@ -107,6 +107,7 @@ public:
 
   const VariableMap &getVarMap() const { return Variables; }
   Constraints &getConstraints() { return CS; }
+  const Constraints &getConstraints() const { return CS; }
   AVarBoundsInfo &getABoundsInfo() { return ArrBInfo; }
 
   PerformanceStats &getPerfStats() { return PerfS; }

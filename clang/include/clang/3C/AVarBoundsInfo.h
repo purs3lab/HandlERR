@@ -368,7 +368,7 @@ private:
   bool isFunctionReturn(BoundsKey BK);
 
   // Of all the pointer bounds key, find arr pointers.
-  void computeArrPointers(ProgramInfo *PI);
+  void computeArrPointers(const ProgramInfo *PI);
 
   // Get all the array pointers that need bounds.
   void getBoundsNeededArrPointers(std::set<BoundsKey> &AB) const;
