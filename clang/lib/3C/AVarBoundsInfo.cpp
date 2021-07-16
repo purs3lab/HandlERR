@@ -147,30 +147,27 @@ private:
 void AvarBoundsInference::mergeReachableProgramVars(
     BoundsKey TarBK, std::set<BoundsKey> &AllVars) {
   if (AllVars.size() > 1) {
-    ProgramVar *BVar = nullptr;
     bool IsTarNTArr = BI->NtArrPointerBoundsKey.find(TarBK) !=
                       BI->NtArrPointerBoundsKey.end();
     // First, find all variables that are in the SAME scope as TarBK.
     // If there is only one? Then use it.
-    std::set<BoundsKey> SameScopeVars;
-    ProgramVar *TarBVar = BI->getProgramVar(TarBK);
-    if (TarBVar != nullptr) {
-      for (auto TB : AllVars) {
-        if (*(BI->getProgramVar(TB)->getScope()) == *(TarBVar->getScope())) {
+    if (ProgramVar *TarBVar = BI->getProgramVar(TarBK)) {
+      std::set<BoundsKey> SameScopeVars;
+      for (auto TB : AllVars)
+        if (*(BI->getProgramVar(TB)->getScope()) == *(TarBVar->getScope()))
           SameScopeVars.insert(TB);
-        }
-      }
-      // There is only one same scope variable.
-      // Consider only that.
+
+      // There is only one same scope variable. Consider only that.
       if (SameScopeVars.size() == 1) {
-        AllVars.clear();
-        AllVars.insert(*SameScopeVars.begin());
+        AllVars = SameScopeVars;
         return;
       }
     }
+
     // We want to merge all bounds vars. We give preference to
     // non-constants if there are multiple non-constant variables,
     // we give up.
+    ProgramVar *BVar = nullptr;
     for (auto TmpBKey : AllVars) {
       // Convert the bounds key to corresponding program var.
       auto *TmpB = BI->getProgramVar(TmpBKey);
