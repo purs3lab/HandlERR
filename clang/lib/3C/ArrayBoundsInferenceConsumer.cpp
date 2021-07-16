@@ -689,9 +689,9 @@ void addMainFuncHeuristic(ASTContext *C, ProgramInfo &I, FunctionDecl *FD) {
 // Given a variable I, this visitor collects all the variables that are used as
 // RHS operand of < and I >=  expression.
 // i.e., for all I < X expressions, it collects X.
-class ComparisionVisitor : public RecursiveASTVisitor<ComparisionVisitor> {
+class ComparisonVisitor : public RecursiveASTVisitor<ComparisonVisitor> {
 public:
-  explicit ComparisionVisitor(ProgramInfo &In, ASTContext *AC, BoundsKey I)
+  explicit ComparisonVisitor(ProgramInfo &In, ASTContext *AC, BoundsKey I)
       : I(In), C(AC), IndxBKey(I), PossibleBounds(), CurrStmt(nullptr) {}
 
   // Here, we save the most recent statement we have visited.
@@ -757,10 +757,10 @@ private:
 };
 
 LengthVarInference::LengthVarInference(ProgramInfo &In, ASTContext *AC,
-                                       FunctionDecl *F)
-    : I(In), C(AC), FD(F), CurBB(nullptr) {
-
-  Cfg = CFG::buildCFG(nullptr, FD->getBody(), AC, CFG::BuildOptions());
+                                       FunctionDecl *F) :
+    I(In), C(AC), CurBB(nullptr),
+    Cfg(CFG::buildCFG(nullptr, F->getBody(), AC, CFG::BuildOptions())),
+    CDG(Cfg.get()) {
   for (auto *CBlock : *(Cfg.get())) {
     for (auto &CfgElem : *CBlock) {
       if (CfgElem.getKind() == clang::CFGElement::Statement) {
@@ -768,21 +768,6 @@ LengthVarInference::LengthVarInference(ProgramInfo &In, ASTContext *AC,
         StMap[TmpSt] = CBlock;
       }
     }
-  }
-
-  CDG = new ControlDependencyCalculator(Cfg.get());
-
-  CR = new ConstraintResolver(I, C);
-}
-
-LengthVarInference::~LengthVarInference() {
-  if (CDG != nullptr) {
-    delete (CDG);
-    CDG = nullptr;
-  }
-  if (CR != nullptr) {
-    delete (CR);
-    CR = nullptr;
   }
 }
 
@@ -844,23 +829,22 @@ void LengthVarInference::VisitArraySubscriptExpr(ArraySubscriptExpr *ASE) {
     VisitArraySubscriptExpr(SubASE);
     return;
   }
-  //auto BaseCVars = CR->getExprConstraintVars(BE);
+
   // Next get the index used.
   Expr *IdxExpr = ASE->getIdx()->IgnoreParenCasts();
-  //auto IdxCVars = CR->getExprConstraintVars(IdxExpr);
-  BoundsKey BasePtr, IdxKey;
-  auto &ABI = I.getABoundsInfo();
 
   // Get the bounds key of the base and index.
+  BoundsKey BasePtr, IdxKey;
   if (tryGetValidBoundsKey(BE, BasePtr, I, C) &&
       tryGetValidBoundsKey(IdxExpr, IdxKey, I, C)) {
-    ComparisionVisitor CV(I, C, IdxKey);
-    auto &CDNodes = CDG->getControlDependencies(CurBB);
+    auto &ABI = I.getABoundsInfo();
+    auto &CDNodes = CDG.getControlDependencies(CurBB);
     if (!CDNodes.empty()) {
       // Next try to find all the nodes that the CurBB is
       // control dependent on.
       // For each of the control dependent node, check if we are comparing the
       // index variable with another variable.
+      ComparisonVisitor CV(I, C, IdxKey);
       for (auto &CDGNode : CDNodes) {
         // Collect the possible length bounds keys.
         CV.TraverseStmt(CDGNode->getTerminatorStmt());
