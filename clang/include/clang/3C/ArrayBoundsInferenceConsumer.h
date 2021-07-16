@@ -69,11 +69,11 @@ public:
   bool VisitSwitchStmt(SwitchStmt *S);
   bool VisitBinaryOperator(BinaryOperator *O);
   bool VisitArraySubscriptExpr(ArraySubscriptExpr *E);
-  bool isNonLengthParameter(ParmVarDecl *PVD);
+  bool isNonLengthParameter(ParmVarDecl *PVD) const;
 
 private:
   void handleAssignment(BoundsKey LK, QualType LHSType, Expr *RHS);
-  void addUsedParmVarDecl(Expr *CE);
+  void addNonLengthParameter(Expr *CE);
   std::set<ParmVarDecl *> NonLengthParameters;
   ASTContext *Context;
   ProgramInfo &Info;

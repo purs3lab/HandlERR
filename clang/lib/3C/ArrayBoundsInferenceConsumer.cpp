@@ -562,9 +562,6 @@ void LocalVarABVisitor::handleAssignment(BoundsKey LK, QualType LHSType,
 bool LocalVarABVisitor::handleBinAssign(BinaryOperator *O) {
   Expr *LHS = O->getLHS()->IgnoreParenCasts();
   Expr *RHS = O->getRHS()->IgnoreParenCasts();
-  ConstraintResolver CR(Info, Context);
-  std::string FnName;
-  std::vector<Expr *> ArgVals;
   BoundsKey LK;
   // is the RHS expression a call to allocator function?
   if (needArrayBounds(LHS, Info, Context) &&
@@ -572,15 +569,17 @@ bool LocalVarABVisitor::handleBinAssign(BinaryOperator *O) {
     handleAssignment(LK, LHS->getType(), RHS);
   }
 
+  // TODO: Why is this done only for the RHS of assignment? Why not place this
+  //       in a VisitConditionalOperator function?
   // Any parameter directly used as a condition in ternary expression
   // cannot be length.
   if (ConditionalOperator *CO = dyn_cast<ConditionalOperator>(RHS))
-    addUsedParmVarDecl(CO->getCond());
+    addNonLengthParameter(CO->getCond());
 
   return true;
 }
 
-void LocalVarABVisitor::addUsedParmVarDecl(Expr *CE) {
+void LocalVarABVisitor::addNonLengthParameter(Expr *CE) {
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(CE->IgnoreParenCasts()))
     if (ParmVarDecl *PVD = dyn_cast<ParmVarDecl>(DRE->getDecl()))
       NonLengthParameters.insert(PVD);
@@ -614,8 +613,8 @@ bool LocalVarABVisitor::VisitBinaryOperator(BinaryOperator *BO) {
   BinaryOperator::Opcode BOpcode = BO->getOpcode();
   // Is this not a valid bin op for a potential length parameter?
   if (!isValidBinOpForLen(BOpcode)) {
-    addUsedParmVarDecl(BO->getLHS());
-    addUsedParmVarDecl(BO->getRHS());
+    addNonLengthParameter(BO->getLHS());
+    addNonLengthParameter(BO->getRHS());
   }
   if (BOpcode == BinaryOperator::Opcode::BO_Assign) {
     handleBinAssign(BO);
@@ -624,7 +623,7 @@ bool LocalVarABVisitor::VisitBinaryOperator(BinaryOperator *BO) {
 }
 
 bool LocalVarABVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
-  addUsedParmVarDecl(E->getIdx());
+  addNonLengthParameter(E->getIdx());
   return true;
 }
 
@@ -655,7 +654,7 @@ bool LocalVarABVisitor::VisitSwitchStmt(SwitchStmt *S) {
 }
 
 // Check if the provided parameter cannot be a length of an array.
-bool LocalVarABVisitor::isNonLengthParameter(ParmVarDecl *PVD) {
+bool LocalVarABVisitor::isNonLengthParameter(ParmVarDecl *PVD) const {
   if (PVD->getType().getTypePtr()->isEnumeralType())
     return true;
   return NonLengthParameters.find(PVD) != NonLengthParameters.end();
