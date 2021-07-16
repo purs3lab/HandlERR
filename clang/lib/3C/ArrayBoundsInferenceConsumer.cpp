@@ -691,17 +691,8 @@ void addMainFuncHeuristic(ASTContext *C, ProgramInfo &I, FunctionDecl *FD) {
 // i.e., for all I < X expressions, it collects X.
 class ComparisionVisitor : public RecursiveASTVisitor<ComparisionVisitor> {
 public:
-  explicit ComparisionVisitor(ProgramInfo &In, ASTContext *AC, BoundsKey I,
-                              std::set<BoundsKey> &PossB)
-      : I(In), C(AC), IndxBKey(I), PB(PossB), CurrStmt(nullptr) {
-    CR = new ConstraintResolver(In, AC);
-  }
-  virtual ~ComparisionVisitor() {
-    if (CR != nullptr) {
-      delete (CR);
-      CR = nullptr;
-    }
-  }
+  explicit ComparisionVisitor(ProgramInfo &In, ASTContext *AC, BoundsKey I)
+      : I(In), C(AC), IndxBKey(I), PossibleBounds(), CurrStmt(nullptr) {}
 
   // Here, we save the most recent statement we have visited.
   // This is a way to keep track of the statement to which currently
@@ -740,25 +731,26 @@ public:
           //     return -1;
           //  }
           //  arr[i] = ..
-          IsRKeyBound &= (CurrStmt != nullptr && isa<IfStmt>(CurrStmt));
+          IsRKeyBound &= isa_and_nonnull<IfStmt>(CurrStmt);
         }
 
         if (IsRKeyBound)
-          PB.insert(RKey);
+          PossibleBounds.insert(RKey);
       }
     }
     return true;
+  }
+
+  const std::set<BoundsKey> &getPossibleBounds() const {
+    return PossibleBounds;
   }
 
 private:
   ProgramInfo &I;
   ASTContext *C;
   // Index variable used in dereference.
-  BoundsKey IndxBKey;
-  // Possible Bounds.
-  std::set<BoundsKey> &PB;
-  // Helper objects.
-  ConstraintResolver *CR;
+  const BoundsKey IndxBKey;
+  std::set<BoundsKey> PossibleBounds;
   // Current statement: The statement to which the processing
   // node belongs. This is to avoid walking the AST.
   Stmt *CurrStmt;
@@ -862,9 +854,7 @@ void LengthVarInference::VisitArraySubscriptExpr(ArraySubscriptExpr *ASE) {
   // Get the bounds key of the base and index.
   if (tryGetValidBoundsKey(BE, BasePtr, I, C) &&
       tryGetValidBoundsKey(IdxExpr, IdxKey, I, C)) {
-    std::set<BoundsKey> PossibleLens;
-    PossibleLens.clear();
-    ComparisionVisitor CV(I, C, IdxKey, PossibleLens);
+    ComparisionVisitor CV(I, C, IdxKey);
     auto &CDNodes = CDG->getControlDependencies(CurBB);
     if (!CDNodes.empty()) {
       // Next try to find all the nodes that the CurBB is
@@ -875,7 +865,7 @@ void LengthVarInference::VisitArraySubscriptExpr(ArraySubscriptExpr *ASE) {
         // Collect the possible length bounds keys.
         CV.TraverseStmt(CDGNode->getTerminatorStmt());
       }
-      ABI.updatePotentialCountBounds(BasePtr, PossibleLens);
+      ABI.updatePotentialCountBounds(BasePtr, CV.getPossibleBounds());
     } else {
       ABI.updatePotentialCountPOneBounds(BasePtr, {IdxKey});
     }
