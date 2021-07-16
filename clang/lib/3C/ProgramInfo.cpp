@@ -962,6 +962,8 @@ private:
   std::set<Atom*> &DirectWildVarAtoms;
   ConstraintsGraph &CG;
   ConstraintsInfo &CState;
+  // This functions as the memo-pad
+  std::map<ConstraintKey, std::set<ConstraintKey>> ReachableBy;
 
 public:
   RCAFactory(std::set<Atom*> &DVs, CVars &RVs, std::set<Atom*> &DWVs,
@@ -970,6 +972,21 @@ public:
         CG(CG), CState(CState) {}
 
   void analyzeRootCause(VarAtom*);
+
+  void markReachable(VarAtom* FromV, VarAtom *ToV) {
+    auto From = FromV->getLoc(), To = ToV->getLoc();
+
+    ReachableBy[From].insert(To);
+    // Check if To has reachable nodes, if so add them
+    if (ReachableBy.count(To) != 0)
+      ReachableBy[From].insert(ReachableBy[To].begin(), ReachableBy[To].end());
+  }
+
+
+  void forAllReachable(VarAtom *From, std::function<void(int)> &F) {
+    for (auto K : ReachableBy[From->getLoc()])
+      F(K);
+  }
 
 };
 
@@ -1007,9 +1024,9 @@ public:
     traverse(WA);
   }
 
-  void traverse(Atom *ReachableNode) {
-    auto *ReachableVar = dyn_cast<VarAtom>(ReachableNode);
-    if (ReachableVar == nullptr || alreadySeen(ReachableVar))
+  // TODO memoize this
+  void traverse(VarAtom *ReachableVar) {
+    if (alreadySeen(ReachableVar))
       return;
     markSeen(ReachableVar);
     if (isDeclVar(ReachableVar)) {
@@ -1022,8 +1039,14 @@ public:
     }
     std::set<Atom*> Neighbors;
     F->CG.getNeighbors(ReachableVar, Neighbors, true);
-    for (auto *Neighbor : Neighbors)
-      traverse(Neighbor);
+    for (auto *Neighbor : Neighbors) {
+      auto* VarNeighbor = dyn_cast<VarAtom>(Neighbor);
+      if (VarNeighbor == nullptr)
+        continue;
+      traverse(VarNeighbor);
+      // Mark our neighbor (and all transitively reachable nodes) as reachable
+      F->markReachable(ReachableVar, VarNeighbor);
+    }
   }
 
 };

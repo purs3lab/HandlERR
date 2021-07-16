@@ -53,11 +53,19 @@ public:
   std::map<ConstraintKey, const PersistentSourceLoc *> AtomSourceMap;
 
   void addRootCause(VarAtom *Var, VarAtom *RootCause) {
-    RootCauses[Var->getLoc()].insert(RootCause->getLoc());
+    addRootCause(Var->getLoc(), RootCause->getLoc());
+  }
+
+  void addRootCause(ConstraintKey Var, ConstraintKey RootCause) {
+    RootCauses[Var].insert(RootCause);
   }
 
   CVars& getConstrainedBy(VarAtom *Var) {
-    return ConstrainedBy[Var->getLoc()];
+    return getConstrainedBy(Var->getLoc());
+  }
+
+  CVars& getConstrainedBy(ConstraintKey Var) {
+    return ConstrainedBy[Var];
   }
 
 private:
