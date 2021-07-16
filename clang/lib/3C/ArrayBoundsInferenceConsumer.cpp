@@ -885,26 +885,27 @@ void LengthVarInference::VisitArraySubscriptExpr(ArraySubscriptExpr *ASE) {
 
 void handleArrayVariablesBoundsDetection(ASTContext *C, ProgramInfo &I,
                                          bool UseHeuristics) {
-  // Run array bounds
-  for (auto FuncName : AllocatorFunctions) {
+  // This is adding function names provided to --use-malloc to the set of
+  // allocator functions. It assumes that the first argument is always the size,
+  // which should be correct if the function have the same interface as malloc.
+  for (auto FuncName : AllocatorFunctions)
     AllocatorSizeAssoc[FuncName] = {0};
-  }
+
   GlobalABVisitor GlobABV(C, I);
+  LocalVarABVisitor LocABV(C, I);
   TranslationUnitDecl *TUD = C->getTranslationUnitDecl();
-  LocalVarABVisitor LFV = LocalVarABVisitor(C, I);
-  bool GlobalTraversed;
   // First visit all the structure members.
   for (const auto &D : TUD->decls()) {
-    GlobalTraversed = false;
+    bool GlobalTraversed = false;
     if (FunctionDecl *FD = dyn_cast<FunctionDecl>(D)) {
       if (FD->hasBody() && FD->isThisDeclarationADefinition()) {
         // Try to guess the bounds information for function locals.
         Stmt *Body = FD->getBody();
-        LFV.TraverseStmt(Body);
+        LocABV.TraverseStmt(Body);
 
         if (UseHeuristics) {
           // Set information collected after analyzing the function body.
-          GlobABV.setParamHeuristicInfo(&LFV);
+          GlobABV.setParamHeuristicInfo(&LocABV);
           GlobABV.TraverseDecl(D);
         }
         addMainFuncHeuristic(C, I, FD);
