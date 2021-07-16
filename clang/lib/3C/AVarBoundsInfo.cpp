@@ -225,45 +225,57 @@ void AvarBoundsInference::mergeReachableProgramVars(
   }
 }
 
-// Consider all pointers, each of which may have multiple bounds,
-//   and intersect these. If they all converge to one possibility,
-//   use that. If not, give up (no bounds).
-bool AvarBoundsInference::convergeInferredBounds() {
-  bool FoundSome = false;
+// Consider all pointers, each of which may have multiple bounds, and intersect
+// these. If they all converge to one possibility, use that. If not, give up and
+// don't assign any bounds to the pointer.
+void AvarBoundsInference::convergeInferredBounds() {
   for (auto &CInfABnds : CurrIterInferBounds) {
-    auto *AB = BI->getBounds(CInfABnds.first);
+    BoundsKey PtrBoundsKey = CInfABnds.first;
     // If there are no bounds?
-    if (AB == nullptr) {
-      auto BTypeMap = CInfABnds.second;
-      for (auto &TySet : BTypeMap) {
-        mergeReachableProgramVars(CInfABnds.first, TySet.second);
-      }
-      // Order of preference: Count and Byte
-      if (BTypeMap.find(ABounds::CountBoundKind) != BTypeMap.end() &&
-          !BTypeMap[ABounds::CountBoundKind].empty()) {
-        AB = new CountBound(*BTypeMap[ABounds::CountBoundKind].begin());
-      } else if (BTypeMap.find(ABounds::ByteBoundKind) != BTypeMap.end() &&
-                 !BTypeMap[ABounds::ByteBoundKind].empty()) {
-        AB = new ByteBound(*BTypeMap[ABounds::ByteBoundKind].begin());
-      } else if (BTypeMap.find(ABounds::CountPlusOneBoundKind) !=
-                     BTypeMap.end() &&
-                 !BTypeMap[ABounds::CountPlusOneBoundKind].empty()) {
-        AB = new CountPlusOneBound(
-            *BTypeMap[ABounds::CountPlusOneBoundKind].begin());
-      }
+    if (BI->getBounds(PtrBoundsKey) == nullptr) {
+      // Maps ABounds::BoundsKind to the set of possible bounds of this kind for
+      // the current PtrBoundsKey.
+      auto BKindMap = CInfABnds.second;
+      for (auto &TySet : BKindMap)
+        mergeReachableProgramVars(PtrBoundsKey, TySet.second);
 
+      ABounds *NewBound = getPreferredBound(BKindMap);
       // If we found any bounds?
-      if (AB != nullptr) {
+      if (NewBound != nullptr) {
         // Record that we inferred bounds using data-flow.
-        BI->BoundsInferStats.DataflowMatch.insert(CInfABnds.first);
-        BI->replaceBounds(CInfABnds.first, BoundsPriority::FlowInferred, AB);
-        FoundSome = true;
+        BI->BoundsInferStats.DataflowMatch.insert(PtrBoundsKey);
+        BI->replaceBounds(PtrBoundsKey, BoundsPriority::FlowInferred, NewBound);
       } else {
-        BKsFailedFlowInference.insert(CInfABnds.first);
+        BKsFailedFlowInference.insert(PtrBoundsKey);
       }
     }
   }
-  return FoundSome;
+}
+
+// Construct an array bound with the most preferred kind from the bounds kind
+// map. Count bounds have the highest priority, followed by byte count and then
+// count-plus-one bounds. This function assumes that the BoundsKey sets in the
+// map contain either zero or one BoundsKey. This is be achieved by first
+// passing the sets to `mergeReachableProgramVars`.
+ABounds *AvarBoundsInference::getPreferredBound(const BndsKindMap &BKindMap) {
+  // Utility to check if the map contains a non-empty set of bounds for a
+  // particular kind. This makes the following if statements much cleaner.
+  auto HasBoundKind = [&BKindMap](ABounds::BoundsKind Kind) {
+    return BKindMap.find(Kind) != BKindMap.end() && !BKindMap.at(Kind).empty();
+  };
+
+  // Order of preference: Count, Byte, Count-plus-one
+  if (HasBoundKind(ABounds::CountBoundKind))
+    return new CountBound(getOnly(BKindMap.at(ABounds::CountBoundKind)));
+
+  if (HasBoundKind(ABounds::ByteBoundKind))
+    return new ByteBound(getOnly(BKindMap.at(ABounds::ByteBoundKind)));
+
+  if (HasBoundKind(ABounds::CountPlusOneBoundKind))
+    return new CountPlusOneBound(
+      getOnly(BKindMap.at(ABounds::CountPlusOneBoundKind)));
+
+  return nullptr;
 }
 
 bool AvarBoundsInference::hasImpossibleBounds(BoundsKey BK) {

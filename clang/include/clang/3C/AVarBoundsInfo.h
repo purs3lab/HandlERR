@@ -108,9 +108,8 @@ public:
   // The flag FromPB requests the inference to use potential length variables.
   bool inferBounds(BoundsKey K, const AVarGraph &BKGraph, bool FromPB = false);
 
-  // Get a consistent bound for all the arrays whose bounds have been
-  // inferred.
-  bool convergeInferredBounds();
+  // Get a consistent bound for all the arrays whose bounds have been inferred.
+  void convergeInferredBounds();
 
 private:
   // Find all the reachable variables form FromVarK that are visible
@@ -148,6 +147,8 @@ private:
   std::map<BoundsKey, BndsKindMap> CurrIterInferBounds;
   // BoundsKey that failed the flow inference.
   std::set<BoundsKey> BKsFailedFlowInference;
+
+  static ABounds *getPreferredBound(const BndsKindMap &BKindMap);
 };
 
 // Class that maintains information about potential bounds for
