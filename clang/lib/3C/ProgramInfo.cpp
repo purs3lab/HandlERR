@@ -954,6 +954,123 @@ FVConstraint *ProgramInfo::getStaticFuncConstraint(std::string FuncName,
   return nullptr;
 }
 
+class RCAFactory {
+  friend class RootCauseAnalysis;
+private:
+  std::set<Atom*> &DeclVars;
+  CVars &RelevantVarsKeys;
+  std::set<Atom*> &DirectWildVarAtoms;
+  ConstraintsGraph &CG;
+  ConstraintsInfo &CState;
+
+public:
+  RCAFactory(std::set<Atom*> &DVs, CVars &RVs, std::set<Atom*> &DWVs,
+             ConstraintsGraph &CG, ConstraintsInfo &CState)
+  : DeclVars(DVs), RelevantVarsKeys(RVs), DirectWildVarAtoms(DWVs),
+        CG(CG), CState(CState) {}
+
+  void analyzeRootCause(VarAtom*);
+
+};
+
+class RootCauseAnalysis {
+  friend class RCAFactory;
+private:
+  RCAFactory *F;
+  VarAtom *WildAtom;
+  CVars ConstrainedByThis;
+  CVars Indirect;
+  CVars Seen;
+
+  bool isDeclVar(VarAtom *VA) {
+    return F->DeclVars.find(VA) != F->DeclVars.end();
+  }
+
+  bool isRelevantVar(VarAtom *VA) {
+    return F->RelevantVarsKeys.find(VA->getLoc()) != F->RelevantVarsKeys.end();
+  }
+
+  bool isDirectlyWild(VarAtom *VA) {
+    return F->DirectWildVarAtoms.find(VA) != F->DirectWildVarAtoms.end();
+  }
+
+  bool alreadySeen(VarAtom *VA) {
+    return Seen.find(VA->getLoc()) != Seen.end();
+  }
+
+  void markSeen(VarAtom *VA) {
+    Seen.insert(VA->getLoc());
+  }
+
+public:
+  RootCauseAnalysis(RCAFactory *F, VarAtom *WA) : F(F), WildAtom(WA) {
+    traverse(WA);
+  }
+
+  void traverse(Atom *ReachableNode) {
+    auto *ReachableVar = dyn_cast<VarAtom>(ReachableNode);
+    if (ReachableVar == nullptr || alreadySeen(ReachableVar))
+      return;
+    markSeen(ReachableVar);
+    if (isDeclVar(ReachableVar)) {
+      F->CState.addRootCause(ReachableVar, WildAtom);
+
+      if (isRelevantVar(ReachableVar))
+        ConstrainedByThis.insert(ReachableVar->getLoc());
+      if (!isDirectlyWild(ReachableVar))
+        Indirect.insert(ReachableVar->getLoc());
+    }
+    std::set<Atom*> Neighbors;
+    F->CG.getNeighbors(ReachableVar, Neighbors, true);
+    for (auto *Neighbor : Neighbors)
+      traverse(Neighbor);
+  }
+
+};
+
+
+void RCAFactory::analyzeRootCause(VarAtom *DirectWild) {
+  RootCauseAnalysis RCA(this, DirectWild);
+  CState.AllWildAtoms.insert(DirectWild->getLoc());
+  CVars &CGrp = CState.getConstrainedBy(DirectWild);
+  CGrp.insert(RCA.ConstrainedByThis.begin(), RCA.ConstrainedByThis.end());
+}
+
+void ProgramInfo::doRootCauseAnalysis(std::set<Atom*> &DeclVars,
+                                      CVars &RelevantVarsKey,
+                                      std::set<Atom *> &DirectWildVarAtoms,
+                                      ConstraintsGraph &CG) {
+
+  // Quick Helper Functions
+  auto IsDeclVar = [&](VarAtom *VA) {
+    return DeclVars.find(VA) != DeclVars.end();
+  };
+
+  auto IsRelevantVar = [&](VarAtom *VA) {
+    return RelevantVarsKey.find(VA->getLoc()) != RelevantVarsKey.end();
+  };
+
+  auto IsDirectlyWild = [&](VarAtom *VA) {
+    return DirectWildVarAtoms.find(VA) != DirectWildVarAtoms.end();
+  };
+
+  RCAFactory RCAF(DeclVars, RelevantVarsKey, DirectWildVarAtoms, CG, CState);
+
+  // TODO this search loop needs optimizing
+  for (auto *WildAtom : DirectWildVarAtoms) {
+    auto *WildVarAtom = dyn_cast<VarAtom>(WildAtom);
+    // TODO flip this conditional to make the control flow simpler
+    if (WildVarAtom == nullptr)
+      continue;
+    RCAF.analyzeRootCause(WildVarAtom);
+  }
+
+  findIntersection(CState.AllWildAtoms, RelevantVarsKey, CState.InSrcWildAtoms);
+  findIntersection(CState.TotalNonDirectWildAtoms, RelevantVarsKey,
+                   CState.InSrcNonDirectWildAtoms);
+
+}
+
 // From the given constraint graph, this method computes the interim constraint
 // state that contains constraint vars which are directly assigned WILD and
 // other constraint vars that have been determined to be WILD because they
@@ -1003,57 +1120,7 @@ bool ProgramInfo::computeInterimConstraintState(
   std::set<Atom *> DirectWildVarAtoms;
   CS.getChkCG().getSuccessors(CS.getWild(), DirectWildVarAtoms);
 
-  auto IsDeclVar = [&](VarAtom *VA) {
-    return DeclVars.find(VA) != DeclVars.end();
-  };
-
-  auto IsRelevantVar = [&](VarAtom *VA) {
-    return RelevantVarsKey.find(VA->getLoc()) != RelevantVarsKey.end();
-  };
-
-  auto IsDirectlyWild = [&](VarAtom *VA) {
-    return DirectWildVarAtoms.find(VA) != DirectWildVarAtoms.end();
-  };
-
-
-  // TODO this search loop needs optimizing
-  for (auto *WildAtom : DirectWildVarAtoms) {
-    auto *WildVarAtom = dyn_cast<VarAtom>(WildAtom);
-    if (WildVarAtom == nullptr)
-      continue;
-
-    CVars ConstrainedByThis;
-    CVars IndirectConstraints;
-
-
-    auto BFSVisitor = [&](Atom *SearchAtom) {
-      auto *SearchVA = dyn_cast<VarAtom>(SearchAtom);
-
-      if (SearchVA && IsDeclVar(SearchVA)) {
-        CState.RootCauses[SearchVA->getLoc()].insert(WildVarAtom->getLoc());
-
-        if (IsRelevantVar(SearchVA))
-          ConstrainedByThis.insert(SearchVA->getLoc());
-
-        if (!IsDirectlyWild(SearchVA))
-          IndirectConstraints.insert(SearchVA->getLoc());
-
-      }
-
-    };
-    CS.getChkCG().visitBreadthFirst(WildVarAtom, BFSVisitor);
-
-    CState.TotalNonDirectWildAtoms.insert(IndirectConstraints.begin(),
-                                          IndirectConstraints.end());
-    // Should we consider only pointers which with in the source files or
-    // external pointers that affected pointers within the source files.
-    CState.AllWildAtoms.insert(WildVarAtom->getLoc());
-    CVars &CGrp = CState.ConstrainedBy[WildVarAtom->getLoc()];
-    CGrp.insert(ConstrainedByThis.begin(), ConstrainedByThis.end());
-  }
-  findIntersection(CState.AllWildAtoms, RelevantVarsKey, CState.InSrcWildAtoms);
-  findIntersection(CState.TotalNonDirectWildAtoms, RelevantVarsKey,
-                   CState.InSrcNonDirectWildAtoms);
+  doRootCauseAnalysis(DeclVars, RelevantVarsKey, DirectWildVarAtoms, CS.getChkCG());
 
   // The ConstraintVariable for a variable normally appears in Variables for the
   // definition, but it may also be reused directly in ExprConstraintVars for a

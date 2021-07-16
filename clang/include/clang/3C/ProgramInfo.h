@@ -100,6 +100,11 @@ public:
   FVConstraint *getStaticFuncConstraint(std::string FuncName,
                                         std::string FileName) const;
 
+
+  void doRootCauseAnalysis(std::set<Atom*>&, CVars&, std::set<Atom *>&,
+      ConstraintsGraph&);
+
+
   // Called when we are done adding constraints and visiting ASTs.
   // Links information about global symbols together and adds
   // constraints where appropriate.
