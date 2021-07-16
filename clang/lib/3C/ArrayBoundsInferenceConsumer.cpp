@@ -143,9 +143,7 @@ static std::map<std::string, std::set<unsigned>> AllocatorSizeAssoc = {
     {"malloc", {0}}, {"calloc", {0, 1}}};
 
 // Get the name of the function called by this call expression.
-static std::string getCalledFunctionName(const Expr *E) {
-  const CallExpr *CE = dyn_cast<CallExpr>(E);
-  assert(CE && "The provided expression should be a call expression.");
+static std::string getCalledFunctionName(const CallExpr *CE) {
   const FunctionDecl *CalleeDecl = dyn_cast<FunctionDecl>(CE->getCalleeDecl());
   if (CalleeDecl && CalleeDecl->getDeclName().isIdentifier())
     return std::string(CalleeDecl->getName());
@@ -179,24 +177,27 @@ bool tryGetValidBoundsKey(Expr *E, BoundsKey &BK, ProgramInfo &I,
   return Ret;
 }
 
+bool hasValidBoundsKey(Expr *E, ProgramInfo &I, ASTContext *C)  {
+  BoundsKey Unused;
+  return tryGetValidBoundsKey(E, Unused, I, C);
+}
+
 // Check if the provided expression E is a call to one of the known
 // memory allocators. Will only return true if the argument to the call
 // is a simple expression, and then organizes the ArgVals for determining
 // a possible bound
-static bool isAllocatorCall(Expr *E, std::string &FName, ProgramInfo &I,
-                            ASTContext *C, std::vector<Expr *> &ArgVals) {
+static bool isAllocatorCall(Expr *E, ProgramInfo &I, ASTContext *C,
+                            std::vector<Expr *> &ArgVals) {
   bool RetVal = false;
   if (CallExpr *CE = dyn_cast<CallExpr>(removeAuxillaryCasts(E)))
     if (CE->getCalleeDecl() != nullptr) {
       // Is this a call to a named function?
-      FName = getCalledFunctionName(CE);
+      std::string FName = getCalledFunctionName(CE);
       // check if the called function is a known allocator?
       if (AllocatorSizeAssoc.find(FName) != AllocatorSizeAssoc.end()) {
         RetVal = true;
-        BoundsKey Tmp;
         // First get all base expressions.
         std::vector<Expr *> BaseExprs;
-        BaseExprs.clear();
         for (auto Pidx : AllocatorSizeAssoc[FName]) {
           Expr *PExpr = CE->getArg(Pidx)->IgnoreParenCasts();
           BinaryOperator *BO = dyn_cast<BinaryOperator>(PExpr);
@@ -207,7 +208,7 @@ static bool isAllocatorCall(Expr *E, std::string &FName, ProgramInfo &I,
             BaseExprs.push_back(BO->getRHS());
           } else if (UExpr && UExpr->getKind() == UETT_SizeOf) {
             BaseExprs.push_back(UExpr);
-          } else if (tryGetValidBoundsKey(PExpr, Tmp, I, C)) {
+          } else if (hasValidBoundsKey(PExpr, I, C)) {
             BaseExprs.push_back(PExpr);
           } else {
             RetVal = false;
@@ -217,13 +218,13 @@ static bool isAllocatorCall(Expr *E, std::string &FName, ProgramInfo &I,
 
         // Check if each of the expression is either sizeof or a DeclRefExpr
         if (RetVal && !BaseExprs.empty()) {
-          for (auto *TmpE : BaseExprs) {
-            TmpE = TmpE->IgnoreParenCasts();
+          for (auto *BaseE : BaseExprs) {
+            BaseE = BaseE->IgnoreParenCasts();
             UnaryExprOrTypeTraitExpr *UExpr =
-                dyn_cast<UnaryExprOrTypeTraitExpr>(TmpE);
+                dyn_cast<UnaryExprOrTypeTraitExpr>(BaseE);
             if ((UExpr && UExpr->getKind() == UETT_SizeOf) ||
-                tryGetValidBoundsKey(TmpE, Tmp, I, C)) {
-              ArgVals.push_back(TmpE);
+                hasValidBoundsKey(BaseE, I, C)) {
+              ArgVals.push_back(BaseE);
             } else {
               RetVal = false;
               break;
@@ -240,17 +241,18 @@ static void handleAllocatorCall(QualType LHSType, BoundsKey LK, Expr *E,
   auto &AVarBInfo = Info.getABoundsInfo();
   auto &ABStats = AVarBInfo.getBStats();
   ConstraintResolver CR(Info, Context);
-  std::string FnName;
   std::vector<Expr *> ArgVals;
-  // is the RHS expression a call to allocator function?
-  if (isAllocatorCall(E, FnName, Info, Context, ArgVals)) {
+  // Is the RHS expression a call to allocator function? isAllocatorCall
+  // mutates ArgVals, populating it with the argument expressions for the
+  // allocator call.
+  if (isAllocatorCall(E, Info, Context, ArgVals)) {
     BoundsKey RK;
     bool FoundSingleKeyInAllocExpr = false;
     // We consider everything as byte_count unless we see a sizeof
     // expression in which case if the type matches we use count bounds.
     bool IsByteBound = true;
-    for (auto *TmpE : ArgVals) {
-      UnaryExprOrTypeTraitExpr *Arg = dyn_cast<UnaryExprOrTypeTraitExpr>(TmpE);
+    for (auto *ArgE : ArgVals) {
+      UnaryExprOrTypeTraitExpr *Arg = dyn_cast<UnaryExprOrTypeTraitExpr>(ArgE);
       if (Arg && Arg->getKind() == UETT_SizeOf) {
         QualType STy = Context->getPointerType(Arg->getTypeOfArgument());
         // This is a count bound.
@@ -260,7 +262,7 @@ static void handleAllocatorCall(QualType LHSType, BoundsKey LK, Expr *E,
           FoundSingleKeyInAllocExpr = false;
           break;
         }
-      } else if (tryGetValidBoundsKey(TmpE, RK, Info, Context)) {
+      } else if (tryGetValidBoundsKey(ArgE, RK, Info, Context)) {
         // Is this variable?
         if (!FoundSingleKeyInAllocExpr) {
           FoundSingleKeyInAllocExpr = true;
