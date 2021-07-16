@@ -152,16 +152,6 @@ static std::string getCalledFunctionName(const Expr *E) {
   return "";
 }
 
-/*bool tryGetBoundsKeyVar(Expr *E, BoundsKey &BK, ProgramInfo &Info,
-                        ASTContext *Context) {
-  ConstraintResolver CR(Info, Context);
-  CVarSet CVs = CR.getExprConstraintVarsSet(E);
-  auto &ABInfo = Info.getABoundsInfo();
-  return CR.resolveBoundsKey(CVs, BK) ||
-         ABInfo.tryGetVariable(E, *Context, BK);
-
-}*/
-
 bool tryGetBoundsKeyVar(Decl *D, BoundsKey &BK, ProgramInfo &Info,
                         ASTContext *Context) {
   ConstraintResolver CR(Info, Context);
