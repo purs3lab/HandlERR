@@ -52,10 +52,6 @@ public:
   std::set<std::string> ValidSourceFiles;
   std::map<ConstraintKey, const PersistentSourceLoc *> AtomSourceMap;
 
-  void addRootCause(VarAtom *Var, VarAtom *RootCause) {
-    addRootCause(Var->getLoc(), RootCause->getLoc());
-  }
-
   void addRootCause(ConstraintKey Var, ConstraintKey RootCause) {
     RootCauses[Var].insert(RootCause);
   }
