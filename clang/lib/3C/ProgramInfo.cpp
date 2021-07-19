@@ -955,6 +955,7 @@ FVConstraint *ProgramInfo::getStaticFuncConstraint(std::string FuncName,
 }
 
 class RCAFactory {
+  // TODO clean up access control
   friend class RootCauseAnalysis;
 private:
   std::set<Atom*> &DeclVars;
@@ -982,10 +983,27 @@ public:
       ReachableBy[From].insert(ReachableBy[To].begin(), ReachableBy[To].end());
   }
 
+  bool memoized(VarAtom *VA) {
+    return ReachableBy.count(VA->getLoc()) != 0;
+  }
 
-  void forAllReachable(VarAtom *From, std::function<void(int)> &F) {
-    for (auto K : ReachableBy[From->getLoc()])
-      F(K);
+  std::set<ConstraintKey>& getReachable(VarAtom *VA) {
+    assert(memoized(VA));
+    return ReachableBy[VA->getLoc()];
+  }
+
+  bool isDeclVar(VarAtom *VA) {
+    return DeclVars.find(VA) != DeclVars.end();
+  }
+
+  bool isDeclVar(ConstraintKey Key) {
+    auto IsThisKey = [&](auto A) {
+      auto VA = dyn_cast<VarAtom>(A);
+      return VA && VA->getLoc() == Key;
+    };
+
+    // NB: This might need to be optimized
+    return llvm::find_if(DeclVars, IsThisKey) != DeclVars.end();
   }
 
 };
@@ -999,12 +1017,12 @@ private:
   CVars Indirect;
   CVars Seen;
 
-  bool isDeclVar(VarAtom *VA) {
-    return F->DeclVars.find(VA) != F->DeclVars.end();
+  bool isRelevantVar(VarAtom *VA) {
+    return isRelevantVar(VA->getLoc());
   }
 
-  bool isRelevantVar(VarAtom *VA) {
-    return F->RelevantVarsKeys.find(VA->getLoc()) != F->RelevantVarsKeys.end();
+  bool isRelevantVar(ConstraintKey VA) {
+    return F->RelevantVarsKeys.find(VA) != F->RelevantVarsKeys.end();
   }
 
   bool isDirectlyWild(VarAtom *VA) {
@@ -1029,7 +1047,7 @@ public:
     if (alreadySeen(ReachableVar))
       return;
     markSeen(ReachableVar);
-    if (isDeclVar(ReachableVar)) {
+    if (F->isDeclVar(ReachableVar)) {
       F->CState.addRootCause(ReachableVar, WildAtom);
 
       if (isRelevantVar(ReachableVar))
@@ -1037,6 +1055,24 @@ public:
       if (!isDirectlyWild(ReachableVar))
         Indirect.insert(ReachableVar->getLoc());
     }
+
+    if (F->memoized(ReachableVar))
+      traverseMemoizedNode(ReachableVar);
+    else
+      traverseNewNode(ReachableVar);
+  }
+
+  void traverseMemoizedNode(VarAtom *VA) {
+    for (ConstraintKey K : F->getReachable(VA)) {
+      if (F->isDeclVar(K)) {
+        F->CState.addRootCause(K, WildAtom->getLoc());
+        if (isRelevantVar(K))
+          ConstrainedByThis.insert(K);
+      }
+    }
+  }
+
+  void traverseNewNode(VarAtom *ReachableVar) {
     std::set<Atom*> Neighbors;
     F->CG.getNeighbors(ReachableVar, Neighbors, true);
     for (auto *Neighbor : Neighbors) {
@@ -1063,19 +1099,6 @@ void ProgramInfo::doRootCauseAnalysis(std::set<Atom*> &DeclVars,
                                       CVars &RelevantVarsKey,
                                       std::set<Atom *> &DirectWildVarAtoms,
                                       ConstraintsGraph &CG) {
-
-  // Quick Helper Functions
-  auto IsDeclVar = [&](VarAtom *VA) {
-    return DeclVars.find(VA) != DeclVars.end();
-  };
-
-  auto IsRelevantVar = [&](VarAtom *VA) {
-    return RelevantVarsKey.find(VA->getLoc()) != RelevantVarsKey.end();
-  };
-
-  auto IsDirectlyWild = [&](VarAtom *VA) {
-    return DirectWildVarAtoms.find(VA) != DirectWildVarAtoms.end();
-  };
 
   RCAFactory RCAF(DeclVars, RelevantVarsKey, DirectWildVarAtoms, CG, CState);
 
