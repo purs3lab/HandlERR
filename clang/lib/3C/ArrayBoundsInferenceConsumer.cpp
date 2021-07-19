@@ -91,7 +91,7 @@ static bool needArrayBounds(const ConstraintVariable *CV,
                             const EnvironmentMap &E) {
   if (CV->hasArr(E, 0)) {
     const PVConstraint *PV = dyn_cast<PVConstraint>(CV);
-    return !PV || PV->isTopCvarUnsizedArr();
+    return !PV || PV->isTopAtomUnsizedArr();
   }
   return false;
 }
@@ -100,7 +100,7 @@ static bool needNTArrayBounds(const ConstraintVariable *CV,
                               const EnvironmentMap &E) {
   if (CV->hasNtArr(E, 0)) {
     const PVConstraint *PV = dyn_cast<PVConstraint>(CV);
-    return !PV || PV->isTopCvarUnsizedArr();
+    return !PV || PV->isTopAtomUnsizedArr();
   }
   return false;
 }

@@ -361,7 +361,7 @@ public:
   std::string getTy() const { return BaseType; }
   bool getArrPresent() const;
   // Check if the outermost pointer is an unsized array.
-  bool isTopCvarUnsizedArr() const;
+  bool isTopAtomUnsizedArr() const;
   // Check if any of the pointers is either a sized or unsized arr.
   bool hasSomeSizedArr() const;
 
