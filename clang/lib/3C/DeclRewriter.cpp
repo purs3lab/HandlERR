@@ -357,6 +357,18 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
       // If it is an inline struct, the first thing we have to do
       // is separate the RecordDecl from the VarDecl.
       ReplaceText = "};\n";
+      // Between the beginning of the VarDecls and the beginning of the
+      // RecordDecl, there could be a `static` keyword that applies to the
+      // VarDecls but is not meaningful on the RecordDecl after it is separated.
+      // So remove anything in that range. (Can other things besides `static`
+      // appear there? We hope it makes sense to remove them too.) Unlike the
+      // usual interpretation of SourceRange, `getCharRange` gives a range that
+      // excludes the first token of the RecordDecl.
+      assert(SameLineDecls.size() >= 2 &&
+             "DeclRewriter::rewriteMultiDecl called with an inline struct but "
+             "no other decls?");
+      R.RemoveText(CharSourceRange::getCharRange(
+          SameLineDecls[1]->getBeginLoc(), DL->getBeginLoc()));
     } else if (IsFirst) {
       // Rewriting the first declaration is easy. Nothing should change if its
       // type does not to be rewritten. When rewriting is required, it is

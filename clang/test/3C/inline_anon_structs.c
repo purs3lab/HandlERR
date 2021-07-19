@@ -12,6 +12,10 @@ an inlinestruct and its associated VarDecl have different locations*/
 int valuable;
 
 static struct foo {
+  // When an inline struct definition is separated from variable declarations,
+  // if there was a `static` keyword that applied to the variables, we should
+  // remove it from the separated struct (where it is not meaningful).
+  //CHECK_ALL: struct foo {
   const char *name;
   //CHECK_NOALL: const char *name;
   //CHECK_ALL:   _Ptr<const char> name;
