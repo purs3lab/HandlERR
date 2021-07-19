@@ -367,8 +367,8 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
       assert(SameLineDecls.size() >= 2 &&
              "DeclRewriter::rewriteMultiDecl called with an inline struct but "
              "no other decls?");
-      R.RemoveText(CharSourceRange::getCharRange(
-          SameLineDecls[1]->getBeginLoc(), DL->getBeginLoc()));
+      rewriteSourceRange(R, CharSourceRange::getCharRange(
+          SameLineDecls[1]->getBeginLoc(), DL->getBeginLoc()), "");
     } else if (IsFirst) {
       // Rewriting the first declaration is easy. Nothing should change if its
       // type does not to be rewritten. When rewriting is required, it is
