@@ -333,7 +333,6 @@ PointerVariableConstraint::PointerVariableConstraint(
   bool VarCreated = false;
   bool IsArr = false;
   bool IsIncompleteArr = false;
-  bool IsTopMost = true;
   uint32_t TypeIdx = 0;
   std::string Npre = InFunc ? ((*InFunc) + ":") : "";
   VarAtom::VarKind VK =
@@ -445,13 +444,6 @@ PointerVariableConstraint::PointerVariableConstraint(
               ArrSizeStrs[TypeIdx] = SizeStr;
           }
         }
-
-        // If this is the top-most pointer variable?
-        if (hasBoundsKey() && IsTopMost) {
-          BoundsKey CBKey = ABInfo.getConstKey(CAT->getSize().getZExtValue());
-          ABounds *NB = new CountBound(CBKey);
-          ABInfo.insertDeclaredBounds(D, NB);
-        }
       } else {
         ArrSizes[TypeIdx] =
             std::pair<OriginalArrType, uint64_t>(O_UnSizedArray, 0);
@@ -500,7 +492,6 @@ PointerVariableConstraint::PointerVariableConstraint(
     Npre = Npre + "*";
     VK = VarAtom::
         V_Other; // only the outermost pointer considered a param/return
-    IsTopMost = false;
     if (!TLoc.isNull())
       TLoc = TLoc.getNextTypeLoc();
   }
@@ -1483,9 +1474,28 @@ bool PointerVariableConstraint::hasNtArr(const EnvironmentMap &E,
   return false;
 }
 
-bool PointerVariableConstraint::getArrPresent() const {
-  return llvm::any_of(ArrSizes,
-                      [](auto E) { return E.second.first != O_Pointer; });
+bool PointerVariableConstraint::isNtConstantArr(const EnvironmentMap &E) const {
+  // First check that this pointer is a constant sized array. This function is
+  // only looking for constant sized arrays, so other array pointers should
+  // return false.
+  if (isConstantArr()) {
+    assert("Atoms vector for array type can't be empty." && !Vars.empty());
+    // This is a constant sized array. It might have solved to WILD, ARR, or
+    // NTARR, but we should only return true if we know it's NTARR.
+    const ConstAtom *PtrType = getSolution(Vars[0], E);
+    return isa<NTArrAtom>(PtrType);
+  }
+  return  false;
+}
+
+bool PointerVariableConstraint::isConstantArr() const {
+  return ArrSizes.find(0) != ArrSizes.end() &&
+         ArrSizes.at(0).first == O_SizedArray;
+}
+
+unsigned long PointerVariableConstraint::getConstantArrSize() const {
+  assert("Pointer must be a constant array to get size." && isConstantArr());
+  return ArrSizes.at(0).second;
 }
 
 bool PointerVariableConstraint::isTopAtomUnsizedArr() const {
