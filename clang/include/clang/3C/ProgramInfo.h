@@ -101,7 +101,7 @@ public:
                                         std::string FileName) const;
 
 
-  void doRootCauseAnalysis(std::set<Atom*>&, CVars&, std::set<Atom *>&,
+  void doRootCauseAnalysis(CVars&, CVars&, std::set<Atom *>&,
       ConstraintsGraph&);
 
 

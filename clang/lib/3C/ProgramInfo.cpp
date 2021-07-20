@@ -959,7 +959,7 @@ FVConstraint *ProgramInfo::getStaticFuncConstraint(std::string FuncName,
 class RCAFactory {
 private:
   // Set of vars that map to a decl
-  std::set<Atom*> &DeclVars;
+  CVars &DeclVars;
   // Set of vars in this file
   CVars &RelevantVarsKeys;
   // Set of vars that are directly wild
@@ -972,11 +972,14 @@ private:
   // This functions as the memo-pad
   std::map<ConstraintKey, std::set<ConstraintKey>> ReachableBy;
 
+
 public:
-  RCAFactory(std::set<Atom*> &DVs, CVars &RVs, std::set<Atom*> &DWVs,
+  RCAFactory(CVars &DVs, CVars &RVs, std::set<Atom*> &DWVs,
              ConstraintsGraph &CG, ConstraintsInfo &CState)
   : DeclVars(DVs), RelevantVarsKeys(RVs), DirectWildVarAtoms(DWVs),
         CG(CG), CState(CState) {}
+
+
 
   void analyzeRootCause(VarAtom*);
 
@@ -1002,18 +1005,12 @@ public:
   }
 
   bool isDeclVar(VarAtom *VA) {
-    return DeclVars.find(VA) != DeclVars.end();
+    return DeclVars.find(VA->getLoc()) != DeclVars.end();
   }
 
   bool isDeclVar(ConstraintKey Key) {
-    auto IsThisKey = [&](auto A) {
-      auto VA = dyn_cast<VarAtom>(A);
-      return VA && VA->getLoc() == Key;
-    };
-
-    // NB: This might need to be optimized
-    return llvm::find_if(DeclVars, IsThisKey) != DeclVars.end();
-  }
+    return DeclVars.find(Key) != DeclVars.end();
+  };
 
   bool isRelevantVar(VarAtom *VA) {
     return isRelevantVar(VA->getLoc());
@@ -1135,12 +1132,12 @@ void RCAFactory::analyzeRootCause(VarAtom *DirectWild) {
   TotalConstrainedBy.insert(NewConstraints.begin(), NewConstraints.end());
 }
 
-void ProgramInfo::doRootCauseAnalysis(std::set<Atom*> &DeclVars,
+void ProgramInfo::doRootCauseAnalysis(CVars &DeclVarsKey,
                                       CVars &RelevantVarsKey,
                                       std::set<Atom *> &DirectWildVarAtoms,
                                       ConstraintsGraph &CG) {
 
-  RCAFactory RCAF(DeclVars, RelevantVarsKey, DirectWildVarAtoms, CG, CState);
+  RCAFactory RCAF(DeclVarsKey, RelevantVarsKey, DirectWildVarAtoms, CG, CState);
 
   for (auto *WildAtom : DirectWildVarAtoms)
     if (auto *WildVarAtom = dyn_cast<VarAtom>(WildAtom))
@@ -1195,13 +1192,14 @@ bool ProgramInfo::computeInterimConstraintState(
   std::transform(DeclVars.begin(), DeclVars.end(),
                  std::inserter(DeclVarsKey, DeclVarsKey.end()),
                  GetLocOrZero);
+  DeclVarsKey.erase(0); // Remove all failed conversions
 
   CState.clear();
 
   std::set<Atom *> DirectWildVarAtoms;
   CS.getChkCG().getSuccessors(CS.getWild(), DirectWildVarAtoms);
 
-  doRootCauseAnalysis(DeclVars, RelevantVarsKey, DirectWildVarAtoms, CS.getChkCG());
+  doRootCauseAnalysis(DeclVarsKey, RelevantVarsKey, DirectWildVarAtoms, CS.getChkCG());
 
   // The ConstraintVariable for a variable normally appears in Variables for the
   // definition, but it may also be reused directly in ExprConstraintVars for a
