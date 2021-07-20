@@ -369,6 +369,7 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
              "no other decls?");
       rewriteSourceRange(R, CharSourceRange::getCharRange(
           SameLineDecls[1]->getBeginLoc(), DL->getBeginLoc()), "");
+      // TODO: If the struct is unnamed, insert its assigned name.
     } else if (IsFirst) {
       // Rewriting the first declaration is easy. Nothing should change if its
       // type does not to be rewritten. When rewriting is required, it is

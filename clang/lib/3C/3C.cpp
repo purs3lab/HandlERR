@@ -522,6 +522,13 @@ bool _3CInterface::addVariables() {
 
   std::lock_guard<std::mutex> Lock(InterfaceMutex);
 
+  // Unnamed RecordDecl stuff.
+  // REVIEW: Move to a separate _3CInterface pass?
+  for (auto &TU : ASTs)
+    GlobalProgramInfo.findUsedRecordNames(TU->getASTContext().getTranslationUnitDecl(), TU->getASTContext());
+  for (auto &TU : ASTs)
+    GlobalProgramInfo.nameUnnamedRecords(TU->getASTContext().getTranslationUnitDecl(), TU->getASTContext());
+
   // 1. Add Variables.
   VariableAdderConsumer VA = VariableAdderConsumer(GlobalProgramInfo, nullptr);
   for (auto &TU : ASTs)

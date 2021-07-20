@@ -522,7 +522,7 @@ PointerVariableConstraint::PointerVariableConstraint(
                           TSInfo);
 
   // Get a string representing the type without pointer and array indirection.
-  BaseType = extractBaseType(D, TSInfo, QT, Ty, C);
+  BaseType = extractBaseType(D, TSInfo, QT, Ty, C, I);
 
   // check if the type is some depth of pointers to void
   // TODO: is this what the field should mean? do we want to include other
@@ -606,7 +606,25 @@ std::string PointerVariableConstraint::extractBaseType(DeclaratorDecl *D,
                                                        TypeSourceInfo *TSI,
                                                        QualType QT,
                                                        const Type *Ty,
-                                                       const ASTContext &C) {
+                                                       const ASTContext &C,
+                                                       ProgramInfo &Info) {
+  // If the base type is an unnamed RecordType to which we assigned a name, use
+  // that name.
+  const Type *UnelaboratedTy = Ty;
+  if (const ElaboratedType *ETy = dyn_cast<ElaboratedType>(Ty))
+    UnelaboratedTy = ETy->getNamedType().getTypePtr();
+  if (const RecordType *RTy = dyn_cast<RecordType>(UnelaboratedTy)) {
+    RecordDecl *RD = RTy->getDecl();
+    if (RD->getName().empty()) {
+      // REVIEW: Can this const_cast be avoided?
+      PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(RD, const_cast<ASTContext &>(C));
+      auto Iter = Info.AssignedRecordNames.find(PSL);
+      if (Iter != Info.AssignedRecordNames.end())
+        return std::string(RD->getKindName()) + " " + Iter->second;
+      // XXX: Can we get here in writable code? We should have named all unnamed RecordDecls in writable code.
+    }
+  }
+
   std::string BaseTypeStr = tryExtractBaseType(D, TSI, QT, Ty, C);
   // Fall back to rebuilding the base type based on type passed to constructor
   if (BaseTypeStr.empty())

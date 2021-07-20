@@ -345,7 +345,7 @@ private:
   // is regenerated from the type in the clang AST.
   static std::string extractBaseType(DeclaratorDecl *D, TypeSourceInfo *TSI,
                                      QualType QT, const Type *Ty,
-                                     const ASTContext &C);
+                                     const ASTContext &C, ProgramInfo &Info);
 
   // Try to extract string representation of the base type for a declaration
   // from the source code. If the base type cannot be extracted from source, an
