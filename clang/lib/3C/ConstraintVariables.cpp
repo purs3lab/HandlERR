@@ -330,10 +330,6 @@ PointerVariableConstraint::PointerVariableConstraint(
   }
   InferredGenericIndex = SourceGenericIndex;
 
-  bool VarCreated = false;
-  bool IsArr = false;
-  bool IsIncompleteArr = false;
-  bool IsSizeZeroConstArr = false;
   uint32_t TypeIdx = 0;
   std::string Npre = InFunc ? ((*InFunc) + ":") : "";
   VarAtom::VarKind VK =
@@ -355,6 +351,8 @@ PointerVariableConstraint::PointerVariableConstraint(
     TLoc = D->getTypeSourceInfo()->getTypeLoc();
 
   while (Ty->isPointerType() || Ty->isArrayType()) {
+    bool VarCreated = false;
+
     // Is this a VarArg type?
     std::string TyName = tyToStr(Ty);
     if (isVarArgType(TyName)) {
@@ -404,9 +402,6 @@ PointerVariableConstraint::PointerVariableConstraint(
     }
 
     if (Ty->isArrayType() || Ty->isIncompleteArrayType()) {
-      IsArr = true;
-      IsIncompleteArr = Ty->isIncompleteArrayType();
-
       // Boil off the typedefs in the array case.
       // TODO this will need to change to properly account for typedefs
       bool Boiling = true;
@@ -434,13 +429,8 @@ PointerVariableConstraint::PointerVariableConstraint(
 
       // See if there is a constant size to this array type at this position.
       if (const ConstantArrayType *CAT = dyn_cast<ConstantArrayType>(Ty)) {
-        unsigned int ArrSize = CAT->getSize().getZExtValue();
         ArrSizes[TypeIdx] = std::pair<OriginalArrType, uint64_t>(
-            O_SizedArray, ArrSize);
-
-        // This is used later to ensure that empty array won't become null
-        // terminated arrays.
-        IsSizeZeroConstArr = (ArrSize == 0);
+            O_SizedArray, CAT->getSize().getZExtValue());
 
         if (!TLoc.isNull()) {
           auto ArrTLoc = TLoc.getAs<ArrayTypeLoc>();
@@ -477,34 +467,29 @@ PointerVariableConstraint::PointerVariableConstraint(
     }
 
     // This type is not a constant atom. We need to create a VarAtom for this.
-
     if (!VarCreated) {
       VarAtom *VA = CS.getFreshVar(Npre + N, VK);
       Vars.push_back(VA);
       SrcVars.push_back(CS.getWild());
 
-      // Incomplete arrays are lower bounded to ARR because the transformation
-      // int[] -> _Ptr<int> is permitted while int[1] -> _Ptr<int> is not.
-      if (IsIncompleteArr)
-        CS.addConstraint(CS.createGeq(VA, CS.getArr(), false));
-      else if (IsArr) {
+      // Incomplete arrays are not given ARR as an upper bound because the
+      // transformation int[] -> _Ptr<int> is permitted but int[1] -> _Ptr<int>
+      // is not.
+      if (ArrSizes[TypeIdx].first == O_SizedArray) {
         CS.addConstraint(CS.createGeq(CS.getArr(), VA, false));
         // A constant array declared with size 0 cannot be _Nt_checked. Checked
         // C requires that _Nt_checked arrays are not empty since the declared
         // size of the array includes the null terminator.
-        if (IsSizeZeroConstArr)
+        if (ArrSizes[TypeIdx].second == 0)
           CS.addConstraint(CS.createGeq(VA, CS.getArr(), false));
       }
     }
 
     // Prepare for next level of pointer
-    VarCreated = false;
-    IsArr = false;
-    IsSizeZeroConstArr = false;
     TypeIdx++;
     Npre = Npre + "*";
-    VK = VarAtom::
-        V_Other; // only the outermost pointer considered a param/return
+    // Only the outermost pointer considered a param/return
+    VK = VarAtom::V_Other;
     if (!TLoc.isNull())
       TLoc = TLoc.getNextTypeLoc();
   }
