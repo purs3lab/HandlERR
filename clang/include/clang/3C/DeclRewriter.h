@@ -26,8 +26,8 @@ using namespace clang;
 
 class DeclRewriter {
 public:
-  DeclRewriter(Rewriter &R, ASTContext &A, GlobalVariableGroups &GP)
-      : R(R), A(A), GP(GP) {}
+  DeclRewriter(Rewriter &R, ProgramInfo &Info, ASTContext &A, GlobalVariableGroups &GP)
+      : R(R), Info(Info), A(A), GP(GP) {}
 
   // The publicly accessible interface for performing declaration rewriting.
   // All declarations for variables with checked types in the variable map of
@@ -44,6 +44,7 @@ private:
   static std::map<Decl *, Decl *> VDToRDMap;
   static std::set<Decl *> InlineVarDecls;
   Rewriter &R;
+  ProgramInfo &Info;
   ASTContext &A;
   GlobalVariableGroups &GP;
 

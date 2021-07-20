@@ -233,7 +233,7 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
   }
 
   // Do the declaration rewriting
-  DeclRewriter DeclR(R, Context, GVG);
+  DeclRewriter DeclR(R, Info, Context, GVG);
   DeclR.rewrite(RewriteThese);
 
   for (auto Pair : RewriteThese)
@@ -276,7 +276,7 @@ void DeclRewriter::rewriteTypedefDecl(TypedefDeclReplacement *TDR,
 // SourceLocations will be generated incorrectly if we rewrite it as a
 // normal multidecl.
 bool isInlineStruct(std::vector<Decl *> &InlineDecls) {
-  if (InlineDecls.size() >= 2 && _3COpts.AllTypes)
+  if (InlineDecls.size() >= 2)
     return isa<RecordDecl>(InlineDecls[0]) &&
            std::all_of(InlineDecls.begin() + 1, InlineDecls.end(),
                        [](Decl *D) { return isa<VarDecl>(D); });
@@ -304,9 +304,7 @@ void DeclRewriter::rewriteFieldOrVarDecl(DRType *N, RSet &ToRewrite) {
   } else if (!IsVisitedMultiDeclMember) {
     std::vector<Decl *> SameLineDecls;
     getDeclsOnSameLine(N, SameLineDecls);
-    if (isInlineStruct(SameLineDecls))
-      SameLineDecls.erase(SameLineDecls.begin());
-    rewriteMultiDecl(N, ToRewrite, SameLineDecls, false);
+    rewriteMultiDecl(N, ToRewrite, SameLineDecls, isInlineStruct(SameLineDecls));
   } else {
     // Anything that reaches this case should be a multi-declaration that has
     // already been rewritten.
@@ -369,7 +367,20 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
              "no other decls?");
       rewriteSourceRange(R, CharSourceRange::getCharRange(
           SameLineDecls[1]->getBeginLoc(), DL->getBeginLoc()), "");
-      // TODO: If the struct is unnamed, insert its assigned name.
+      RecordDecl *RD = cast<RecordDecl>(DL);
+      // If the record is unnamed, insert the name that we assigned it.
+      if (RD->getName().empty()) {
+        PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(RD, A);
+        auto Iter = Info.AssignedRecordNames.find(PSL);
+        if (Iter != Info.AssignedRecordNames.end()) {
+          // We hope that the token we are inserting after is the tag kind
+          // keyword, e.g., `struct`. TODO: Verify this? And is that always the
+          // correct place to insert the name?
+          // TODO: Use a wrapper like rewriteSourceRange that reports failures
+          // and tries harder to cope with macros.
+          R.InsertTextAfterToken(DL->getBeginLoc(), " " + Iter->second);
+        }
+      }
     } else if (IsFirst) {
       // Rewriting the first declaration is easy. Nothing should change if its
       // type does not to be rewritten. When rewriting is required, it is
@@ -503,9 +514,7 @@ void DeclRewriter::detectInlineStruct(Decl *D, SourceManager &SM) {
       auto Begin = VD->getBeginLoc();
       auto End = VD->getEndLoc();
       bool IsInLineStruct = SM.isPointWithin(LastRecordLocation, Begin, End);
-      bool IsNamedInLineStruct =
-          IsInLineStruct && LastRecordDecl->getNameAsString() != "";
-      if (IsNamedInLineStruct) {
+      if (IsInLineStruct) {
         VDToRDMap[VD] = LastRecordDecl;
         InlineVarDecls.insert(VD);
       }
