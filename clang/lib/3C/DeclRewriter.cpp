@@ -402,36 +402,27 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
         // When the type hasn't changed, we still need to insert the original
         // type for the variable.
 
-        // This is a bit of trickery needed to get a string representation of
-        // the declaration without the initializer. We don't want to rewrite to
-        // initializer because this causes problems when rewriting casts and
-        // generic function calls later on. (issue 267)
-        auto *VD = dyn_cast<VarDecl>(DL);
-        Expr *Init = nullptr;
-        if (VD && VD->hasInit()) {
-          Init = VD->getInit();
-          VD->setInit(nullptr);
-        }
+        // Note: rewriteMultiDecl is currently called only by
+        // rewriteFieldOrVarDecl with VarDecls or FieldDecls, and DeclaratorDecl
+        // is a superclass of both. When we add support for typedef multi-decls,
+        // we'll need to change this code.
+        DeclaratorDecl *DD = cast<DeclaratorDecl>(DL);
+        std::string NewDeclStr = mkStringForDeclWithUnchangedType(DD, A, Info);
 
-        // Dump the declaration (without the initializer) to a string. Printing
-        // the AST node gives the full declaration including the base type which
-        // is not present in the multi-decl source code.
-        std::string DeclStr = "";
-        raw_string_ostream DeclStream(DeclStr);
-        DL->print(DeclStream);
-        assert("Original decl string empty." && !DeclStream.str().empty());
+        // If the variable has an initializer, we want this rewrite to end
+        // before the initializer to avoid interfering with any other rewrites
+        // that 3C needs to make inside the initializer expression (issue 267).
+        // VarDecl's implementation of the getSourceRange virtual method
+        // includes the initializer, but we can manually call DeclaratorDecl's
+        // implementation, which excludes the initializer.
+        SourceLocation EndLoc = DD->DeclaratorDecl::getSourceRange().getEnd();
 
         // Do the replacement. PrevEnd is setup to be the source location of the
         // comma after the previous declaration in the multi-decl. getEndLoc is
         // either the end of the declaration or just before the initializer if
         // one is present.
-        SourceRange SR(PrevEnd, DL->getEndLoc());
-        rewriteSourceRange(R, SR, DeclStream.str());
-
-        // Undo prior trickery. This need to happen so that the PSL for the decl
-        // is not changed since the PSL is used as a map key in a few places.
-        if (VD && Init)
-          VD->setInit(Init);
+        SourceRange SR(PrevEnd, DD->DeclaratorDecl::getSourceRange().getEnd());
+        rewriteSourceRange(R, SR, NewDeclStr);
       }
     }
 

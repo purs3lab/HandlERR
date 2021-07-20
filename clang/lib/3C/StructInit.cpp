@@ -11,6 +11,7 @@
 
 #include "clang/3C/StructInit.h"
 #include "clang/3C/MappingVisitor.h"
+#include "clang/3C/RewriteUtils.h"
 #include "clang/Tooling/Transformer/SourceCode.h"
 #include <sstream>
 
@@ -58,12 +59,8 @@ void StructVariableInitializer::insertVarDecl(VarDecl *VD, DeclStmt *S) {
   bool IsVarExtern = VD->getStorageClass() == StorageClass::SC_Extern;
   if (!IsVarExtern && !VD->hasInit() && hasCheckedMembers(VD)) {
     // Create replacement declaration text with an initializer.
-    const clang::Type *Ty = VD->getType().getTypePtr();
-    std::string TQ = VD->getType().getQualifiers().getAsString();
-    if (!TQ.empty())
-      TQ += " ";
-    std::string ToReplace = getStorageQualifierString(VD) + TQ + tyToStr(Ty) +
-                            " " + VD->getName().str() + " = {}";
+    std::string ToReplace =
+        mkStringForDeclWithUnchangedType(VD, *Context, I) + " = {}";
     RewriteThese.insert(
         std::make_pair(VD, new VarDeclReplacement(VD, S, ToReplace)));
   }

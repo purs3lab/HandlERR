@@ -106,6 +106,15 @@ private:
 
 typedef std::map<Decl *, DeclReplacement *> RSet;
 
+// Generate a string for the declaration that includes the name, type, and
+// storage qualifier (if any) but not a trailing semicolon. Honors names
+// assigned to unnamed structs by 3C. Used by DeclRewriter::rewriteMultiDecl for
+// variables that don't have a replacement and by StructVariableInitializer
+// (which appends an initializer).
+std::string mkStringForDeclWithUnchangedType(DeclaratorDecl *DD,
+                                             ASTContext &Context,
+                                             ProgramInfo &Info);
+
 // This class is used to figure out which global variables are part of
 // multi-variable declarations. For local variables, all variables in a single
 // multi declaration are grouped together in a DeclStmt object. This is not the

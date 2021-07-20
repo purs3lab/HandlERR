@@ -21,6 +21,33 @@
 using namespace llvm;
 using namespace clang;
 
+std::string mkStringForDeclWithUnchangedType(DeclaratorDecl *DD,
+                                             ASTContext &Context,
+                                             ProgramInfo &Info) {
+  std::string TypeWithName;
+  if (isPtrOrArrayType(DD->getType())) {
+    CVarOption CVO = Info.getVariable(DD, &Context);
+    assert(CVO.hasValue() &&
+           "Missing ConstraintVariable for unchanged variable in multi-decl");
+    TypeWithName = CVO.getValue().mkString(Info.getConstraints());
+  } else {
+    // In this case, the type should just be the base type except for top-level
+    // qualifiers. (REVIEW: Can we verify that somehow?)
+    // PointerVariableConstraint::extractBaseType doesn't include qualifiers,
+    // but since we know the type is not a pointer, it should be safe to just
+    // add any qualifiers at the beginning of the string.
+    std::string QualifierPrefix = DD->getType().getQualifiers().getAsString();
+    if (!QualifierPrefix.empty())
+      QualifierPrefix += " ";
+    TypeWithName = QualifierPrefix +
+                   PointerVariableConstraint::extractBaseType(
+                       DD, DD->getTypeSourceInfo(), DD->getType(),
+                       DD->getType().getTypePtr(), Context, Info) +
+                   " " + std::string(DD->getName());
+  }
+  return getStorageQualifierString(DD) + TypeWithName;
+}
+
 void GlobalVariableGroups::addGlobalDecl(Decl *VD, std::vector<Decl *> *VDVec) {
   if (VD && GlobVarGroups.find(VD) == GlobVarGroups.end()) {
     if (VDVec == nullptr)
