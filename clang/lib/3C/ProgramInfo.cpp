@@ -684,6 +684,11 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       unifyIfTypedef(QT, *AstContext, P);
       NewCV = P;
       NewCV->setValidDecl();
+      if (FlD->getParent()->isUnion()) {
+        // REVIEW: Should we also call NewCV->equateWithItype here? The previous
+        // code in InlineStructDetector didn't call it.
+        NewCV->constrainToWild(CS, "Union field encountered", &PLoc);
+      }
     }
   } else
     llvm_unreachable("unknown decl type");

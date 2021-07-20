@@ -43,9 +43,9 @@ void test1() {
 
   union u {
     // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
-    int *a; // expected-warning {{1 unchecked pointer: Union or external struct field encountered}}
+    int *a; // expected-warning {{1 unchecked pointer: Union field encountered}}
     // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
-    int *b; // expected-warning {{1 unchecked pointer: Union or external struct field encountered}}
+    int *b; // expected-warning {{1 unchecked pointer: Union field encountered}}
   };
 
   void (*c)(void); // unwritable-expected-warning {{0 unchecked pointers: Source code in non-writable file}}
