@@ -333,6 +333,7 @@ PointerVariableConstraint::PointerVariableConstraint(
   bool VarCreated = false;
   bool IsArr = false;
   bool IsIncompleteArr = false;
+  bool IsSizeZeroConstArr = false;
   uint32_t TypeIdx = 0;
   std::string Npre = InFunc ? ((*InFunc) + ":") : "";
   VarAtom::VarKind VK =
@@ -433,8 +434,13 @@ PointerVariableConstraint::PointerVariableConstraint(
 
       // See if there is a constant size to this array type at this position.
       if (const ConstantArrayType *CAT = dyn_cast<ConstantArrayType>(Ty)) {
+        unsigned int ArrSize = CAT->getSize().getZExtValue();
         ArrSizes[TypeIdx] = std::pair<OriginalArrType, uint64_t>(
-            O_SizedArray, CAT->getSize().getZExtValue());
+            O_SizedArray, ArrSize);
+
+        // This is used later to ensure that empty array won't become null
+        // terminated arrays.
+        IsSizeZeroConstArr = (ArrSize == 0);
 
         if (!TLoc.isNull()) {
           auto ArrTLoc = TLoc.getAs<ArrayTypeLoc>();
@@ -481,13 +487,20 @@ PointerVariableConstraint::PointerVariableConstraint(
       // int[] -> _Ptr<int> is permitted while int[1] -> _Ptr<int> is not.
       if (IsIncompleteArr)
         CS.addConstraint(CS.createGeq(VA, CS.getArr(), false));
-      else if (IsArr)
+      else if (IsArr) {
         CS.addConstraint(CS.createGeq(CS.getArr(), VA, false));
+        // A constant array declared with size 0 cannot be _Nt_checked. Checked
+        // C requires that _Nt_checked arrays are not empty since the declared
+        // size of the array includes the null terminator.
+        if (IsSizeZeroConstArr)
+          CS.addConstraint(CS.createGeq(VA, CS.getArr(), false));
+      }
     }
 
     // Prepare for next level of pointer
     VarCreated = false;
     IsArr = false;
+    IsSizeZeroConstArr = false;
     TypeIdx++;
     Npre = Npre + "*";
     VK = VarAtom::

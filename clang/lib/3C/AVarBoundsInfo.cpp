@@ -1492,8 +1492,11 @@ void AVarBoundsInfo::addConstantArrayBounds(ProgramInfo &I) {
         // Check if this array solved to NTARR. If it did, subtract one from the
         // length to account for the null terminator.
         const EnvironmentMap &Env = I.getConstraints().getVariables();
-        if (VarPCV->isNtConstantArr(Env))
+        if (VarPCV->isNtConstantArr(Env)) {
+          assert("Size zero constant array should not solve to NTARR" &&
+                 ConstantCount != 0);
           ConstantCount--;
+        }
 
         // Insert this as a declared constant count bound for the constraint
         // variable.
