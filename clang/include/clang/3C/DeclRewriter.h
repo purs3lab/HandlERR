@@ -59,6 +59,11 @@ private:
   // declaration in the containing multi-decl is visited.
   std::set<Decl *> VisitedMultiDeclMembers;
 
+  // List of RecordDecls that were split from multi-decls and should be moved
+  // out of an enclosing RecordDecl to avoid a compiler warning. Filled during
+  // multi-decl rewriting and processed by denestRecordDecls.
+  std::vector<RecordDecl *> RecordDeclsToDenest;
+
   // Visit each Decl in ToRewrite and apply the appropriate pointer type
   // to that Decl. ToRewrite is the set of all declarations to rewrite.
   void rewrite(RSet &ToRewrite);
@@ -78,6 +83,7 @@ private:
   void getDeclsOnSameLine(DeclReplacement *N, std::vector<Decl *> &Decls);
   bool isSingleDeclaration(DeclReplacement *N);
   SourceRange getNextCommaOrSemicolon(SourceLocation L);
+  void denestRecordDecls();
 };
 
 // Visits function declarations and adds entries with their new rewritten

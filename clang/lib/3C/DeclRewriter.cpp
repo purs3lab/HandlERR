@@ -238,6 +238,8 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
 
   for (auto Pair : RewriteThese)
     delete Pair.second;
+
+  DeclR.denestRecordDecls();
 }
 
 void DeclRewriter::rewrite(RSet &ToRewrite) {
@@ -263,6 +265,46 @@ void DeclRewriter::rewrite(RSet &ToRewrite) {
     } else {
       assert(false && "Unknown replacement type");
     }
+  }
+}
+
+void DeclRewriter::denestRecordDecls() {
+  // When there are multiple levels of nested RecordDecls, we need to process
+  // all the children of a RecordDecl RD before RD itself so that (1) the
+  // definitions of the children end up before the definition of RD (since the
+  // rewriter preserves order of insertions) and (2) the definitions of the
+  // children have been removed from the body of RD before we read the body of
+  // RD to move it. In effect, we want to process the RecordDecls in postorder.
+  // The easiest way to achieve this is to process them in order of their _end_
+  // locations.
+  std::sort(RecordDeclsToDenest.begin(), RecordDeclsToDenest.end(),
+            [&](RecordDecl *RD1, RecordDecl *RD2) {
+              return A.getSourceManager().isBeforeInTranslationUnit(
+                  RD1->getEndLoc(), RD2->getEndLoc());
+            });
+  for (RecordDecl *RD : RecordDeclsToDenest) {
+    // rewriteMultiDecl replaced the final "}" in the original source range with
+    // "};\n", so the new content of the source range should include the ";\n",
+    // which is what we want here. Except the rewriter has a bug where it
+    // adjusts the token range to include the final token _after_ mapping the
+    // offset to account for previous edits (it should be before). We work
+    // around the bug by adjusting the token range before calling the rewriter
+    // at all.
+    CharSourceRange CSR = Lexer::makeFileCharRange(
+        CharSourceRange::getTokenRange(RD->getSourceRange()), R.getSourceMgr(),
+        R.getLangOpts());
+    std::string DefinitionStr = R.getRewrittenText(CSR);
+    // Delete the definition from the old location.
+    rewriteSourceRange(R, CSR, "");
+    // We want to insert RD as a new child of its original semantic DeclContext,
+    // just before the existing child of that DeclContext of which RD was
+    // originally a descendant.
+    DeclContext *TopChild = RD;
+    while (TopChild->getLexicalParent() != RD->getDeclContext()) {
+      TopChild = TopChild->getLexicalParent();
+    }
+    // TODO: Use a wrapper like rewriteSourceRange.
+    R.InsertText(cast<Decl>(TopChild)->getBeginLoc(), DefinitionStr);
   }
 }
 
@@ -381,6 +423,9 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
           R.InsertTextAfterToken(DL->getBeginLoc(), " " + Iter->second);
         }
       }
+      // Make a note if the RecordDecl needs to be de-nested later.
+      if (RD->getLexicalDeclContext() != RD->getDeclContext())
+        RecordDeclsToDenest.push_back(RD);
     } else if (IsFirst) {
       // Rewriting the first declaration is easy. Nothing should change if its
       // type does not to be rewritten. When rewriting is required, it is
