@@ -95,6 +95,7 @@ public:
   // Store CVarSet with an empty set of BoundsKey into persistent contents.
   void storePersistentConstraints(clang::Expr *E, const CVarSet &Vars,
                                   ASTContext *C);
+  void removePersistentConstraints(Expr *E, ASTContext *C);
 
   // Get constraint variable for the provided Decl
   CVarOption getVariable(clang::Decl *D, clang::ASTContext *C);

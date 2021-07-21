@@ -163,6 +163,11 @@ bool TypeVarVisitor::VisitCallExpr(CallExpr *CE) {
                             &Info);
 
         TVEntry.second.setTypeParamConsVar(P);
+        // Since we've changed the constraint variable for this context, we
+        // need to remove the cache from the old one. Our new info will be
+        // used next request.
+        if (Info.hasPersistentConstraints(CE,Context))
+          Info.removePersistentConstraints(CE,Context);
       } else {
         // TODO: This might be too cautious.
         CR.constraintAllCVarsToWild(TVEntry.second.getConstraintVariables(),
