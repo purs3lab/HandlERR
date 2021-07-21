@@ -151,6 +151,23 @@ inline CSetBkeyPair pairWithEmptyBkey(const CVarSet &Vars) {
   return std::make_pair(Vars, EmptyBSet);
 }
 
+// Get the return type of the function from the TypeVars, that is, from
+// the local instantiation of a generic function. Or the regular return
+// constraint if it's not generic
+ConstraintVariable *localReturnConstraint(
+    FVConstraint *FV,
+    ProgramInfo::CallTypeParamBindingsT TypeVars,
+    Constraints &CS) {
+  int TyVarIdx = FV->getExternalReturn()->getGenericIndex();
+  // Check if local type vars are available
+  if (TypeVars.find(TyVarIdx) != TypeVars.end() &&
+      TypeVars[TyVarIdx] != nullptr) {
+    return TypeVars[TyVarIdx];
+  } else {
+    return FV->getExternalReturn();
+  }
+}
+
 // Returns a pair of set of ConstraintVariables and set of BoundsKey
 // after evaluating the expression E. Will explore E recursively, but will
 // ignore parts of it that do not contribute to the final result.
@@ -403,6 +420,10 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
       CVarSet ReturnCVs;
       BKeySet ReturnBSet = EmptyBSet;
 
+      ProgramInfo::CallTypeParamBindingsT TypeVars;
+      if (Info.hasTypeParamBindings(CE, Context))
+        TypeVars = Info.getTypeParamBindings(CE, Context);
+
       // Here, we need to look up the target of the call and return the
       // constraints for the return value of that function.
       QualType ExprType = E->getType();
@@ -418,10 +439,10 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
 
         for (ConstraintVariable *C : Tmp.first) {
           if (FVConstraint *FV = dyn_cast<FVConstraint>(C)) {
-            ReturnCVs.insert(FV->getExternalReturn());
+            ReturnCVs.insert(localReturnConstraint(FV,TypeVars,CS));
           } else if (PVConstraint *PV = dyn_cast<PVConstraint>(C)) {
             if (FVConstraint *FV = PV->getFV())
-              ReturnCVs.insert(FV->getExternalReturn());
+              ReturnCVs.insert(localReturnConstraint(FV,TypeVars,CS));
           }
         }
       } else if (DeclaratorDecl *FD = dyn_cast<DeclaratorDecl>(D)) {
@@ -465,13 +486,13 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
           assert(CV.hasValue() && "Function without constraint variable.");
           /* Direct function call */
           if (FVConstraint *FVC = dyn_cast<FVConstraint>(&CV.getValue()))
-            ReturnCVs.insert(FVC->getExternalReturn());
+            ReturnCVs.insert(localReturnConstraint(FVC,TypeVars,CS));
           /* Call via function pointer */
           else {
             PVConstraint *Tmp = dyn_cast<PVConstraint>(&CV.getValue());
             assert(Tmp != nullptr);
             if (FVConstraint *FVC = Tmp->getFV())
-              ReturnCVs.insert(FVC->getExternalReturn());
+              ReturnCVs.insert(localReturnConstraint(FVC,TypeVars,CS));
             else {
               // No FVConstraint -- make WILD.
               auto *TmpFV = new FVConstraint();
