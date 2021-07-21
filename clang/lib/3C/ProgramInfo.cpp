@@ -829,6 +829,15 @@ void ProgramInfo::storePersistentConstraints(Expr *E, const CSetBkeyPair &Vars,
   ExprLocations[Key] = PSL;
 }
 
+void ProgramInfo::removePersistentConstraints(Expr *E, ASTContext *C) {
+  assert(hasPersistentConstraints(E, C) &&
+         "Persistent constraints not present.");
+
+  IDAndTranslationUnit Key = getExprKey(E, C);
+  ExprConstraintVars.erase(Key);
+  ExprLocations.erase(Key);
+}
+
 // The Rewriter won't let us re-write things that are in macros. So, we
 // should check to see if what we just added was defined within a macro.
 // If it was, we should constrain it to top. This is sad. Hopefully,
