@@ -130,6 +130,8 @@ public:
 
   virtual ~GlobalVariableGroups();
 
+  SourceManager &getSourceManager() { return SM; }
+
 private:
   SourceManager &SM;
   std::map<Decl *, std::vector<Decl *> *> GlobVarGroups;

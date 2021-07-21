@@ -39,6 +39,9 @@ public:
                  std::string &IType, ProgramInfo &Info,
                  ArrayBoundsRewriter &ABR);
 
+  // Called from the outside by FieldFinder.
+  static void detectInlineStruct(Decl *D, SourceManager &SM);
+
 private:
   static RecordDecl *LastRecordDecl;
   static std::map<Decl *, Decl *> VDToRDMap;
@@ -75,7 +78,6 @@ private:
   void getDeclsOnSameLine(DeclReplacement *N, std::vector<Decl *> &Decls);
   bool isSingleDeclaration(DeclReplacement *N);
   SourceRange getNextCommaOrSemicolon(SourceLocation L);
-  static void detectInlineStruct(Decl *D, SourceManager &SM);
 };
 
 // Visits function declarations and adds entries with their new rewritten
@@ -126,6 +128,7 @@ public:
   FieldFinder(GlobalVariableGroups &GVG) : GVG(GVG) {}
 
   bool VisitFieldDecl(FieldDecl *FD);
+  bool VisitRecordDecl(RecordDecl *RD);
 
   static void gatherSameLineFields(GlobalVariableGroups &GVG, Decl *D);
 

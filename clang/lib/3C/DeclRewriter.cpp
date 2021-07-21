@@ -499,15 +499,15 @@ void DeclRewriter::detectInlineStruct(Decl *D, SourceManager &SM) {
       RD->getBeginLoc().isValid()) {
     LastRecordDecl = RD;
   }
-  if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
+  if (isa<VarDecl>(D) || isa<FieldDecl>(D)) {
     if (LastRecordDecl != nullptr) {
       auto LastRecordLocation = LastRecordDecl->getBeginLoc();
-      auto Begin = VD->getBeginLoc();
-      auto End = VD->getEndLoc();
+      auto Begin = D->getBeginLoc();
+      auto End = D->getEndLoc();
       bool IsInLineStruct = SM.isPointWithin(LastRecordLocation, Begin, End);
       if (IsInLineStruct) {
-        VDToRDMap[VD] = LastRecordDecl;
-        InlineVarDecls.insert(VD);
+        VDToRDMap[D] = LastRecordDecl;
+        InlineVarDecls.insert(D);
       }
     }
   }
@@ -895,7 +895,13 @@ bool FunctionDeclBuilder::inParamMultiDecl(const ParmVarDecl *PVD) {
   return false;
 }
 
+bool FieldFinder::VisitRecordDecl(RecordDecl *RD) {
+  DeclRewriter::detectInlineStruct(RD, GVG.getSourceManager());
+  return true;
+}
+
 bool FieldFinder::VisitFieldDecl(FieldDecl *FD) {
+  DeclRewriter::detectInlineStruct(FD, GVG.getSourceManager());
   GVG.addGlobalDecl(FD);
   return true;
 }
