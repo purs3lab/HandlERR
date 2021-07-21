@@ -535,7 +535,7 @@ void DeclRewriter::rewriteFunctionDecl(FunctionDeclReplacement *N) {
 /*static*/ std::set<Decl *> DeclRewriter::InlineVarDecls;
 void DeclRewriter::detectInlineStruct(Decl *D, SourceManager &SM) {
   RecordDecl *RD = dyn_cast<RecordDecl>(D);
-  if (RD != nullptr &&
+  if (RD != nullptr && RD->isCompleteDefinition() &&
       // With -fms-extensions (default on Windows), Clang injects an implicit
       // `struct _GUID` with an invalid location, which would cause an assertion
       // failure in SM.isPointWithin below.
