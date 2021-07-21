@@ -418,10 +418,8 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
         SourceLocation EndLoc = DD->DeclaratorDecl::getSourceRange().getEnd();
 
         // Do the replacement. PrevEnd is setup to be the source location of the
-        // comma after the previous declaration in the multi-decl. getEndLoc is
-        // either the end of the declaration or just before the initializer if
-        // one is present.
-        SourceRange SR(PrevEnd, DD->DeclaratorDecl::getSourceRange().getEnd());
+        // comma after the previous declaration in the multi-decl.
+        SourceRange SR(PrevEnd, EndLoc);
         rewriteSourceRange(R, SR, NewDeclStr);
       }
     }
