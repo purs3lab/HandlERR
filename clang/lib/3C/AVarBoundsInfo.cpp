@@ -1347,11 +1347,28 @@ bool AVarBoundsInfo::keepHighestPriorityBounds() {
   return HasChanged;
 }
 
+void AVarBoundsInfo::dumpBounds() {
+  llvm::errs() << "Current Array Bounds: \n";
+  for (auto BK : ArrPointerBoundsKey) {
+    ProgramVar *PV = getProgramVar(BK);
+    ABounds *B = getBounds(BK);
+    std::string Name = PV ? PV->verboseStr() : "TMP";
+    std::string Bounds = B ? B->mkString(this) : "NO_BOUNDS";
+    llvm::errs() << Name << " " << Bounds << "\n";
+  }
+  llvm::errs() << "\n";
+}
+
 void AVarBoundsInfo::dumpAVarGraph(const std::string &DFPath) {
-  std::error_code Err;
-  llvm::raw_fd_ostream DotFile(DFPath, Err);
-  llvm::WriteGraph(DotFile, ProgVarGraph);
-  DotFile.close();
+  auto DumpGraph = [DFPath](AVarGraph &G, std::string N) {
+    std::error_code Err;
+    llvm::raw_fd_ostream DotFile(N + "_" + DFPath, Err);
+    llvm::WriteGraph(DotFile, G);
+    DotFile.close();
+  };
+  DumpGraph(ProgVarGraph, "ProgVar");
+  DumpGraph(CtxSensProgVarGraph, "CtxSen");
+  DumpGraph(RevCtxSensProgVarGraph, "RevCtxSen");
 }
 
 bool AVarBoundsInfo::isFunctionReturn(BoundsKey BK) {
