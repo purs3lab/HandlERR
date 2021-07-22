@@ -161,8 +161,12 @@ ConstraintVariable *localReturnConstraint(
   int TyVarIdx = FV->getExternalReturn()->getGenericIndex();
   // Check if local type vars are available
   if (TypeVars.find(TyVarIdx) != TypeVars.end() &&
-      TypeVars[TyVarIdx] != nullptr) {
-    return TypeVars[TyVarIdx];
+      TypeVars[TyVarIdx].first != nullptr) {
+    if (TypeVars[TyVarIdx].second != nullptr) {
+      return TypeVars[TyVarIdx].second;
+    } else {
+      return TypeVars[TyVarIdx].first;
+    }
   } else {
     return FV->getExternalReturn();
   }

@@ -1841,18 +1841,11 @@ void constrainConsVarGeq(ConstraintVariable *LHS, ConstraintVariable *RHS,
 
         // Only generate constraint if LHS is not a base type.
         if (CLHS.size() != 0) {
-<<<<<<< HEAD
-          if (CLHS.size() == CRHS.size() || PCLHS->isGeneric() ||
-              PCRHS->isGeneric()) {
-            unsigned Max = std::max(CLHS.size(), CRHS.size());
-            for (unsigned N = 0; N < Max; N++) {
-=======
           if (CLHS.size() == CRHS.size() ||
-              (CLHS.size() < CRHS.size() && PCLHS->getIsGeneric()) ||
-              (CLHS.size() > CRHS.size() && PCRHS->getIsGeneric())) {
+              (CLHS.size() < CRHS.size() && PCLHS->isGeneric()) ||
+              (CLHS.size() > CRHS.size() && PCRHS->isGeneric())) {
             unsigned Min = std::min(CLHS.size(), CRHS.size());
             for (unsigned N = 0; N < Min; N++) {
->>>>>>> switch max atoms to min atoms to avoid excess
               Atom *IAtom = PCLHS->getAtom(N, CS);
               Atom *JAtom = PCRHS->getAtom(N, CS);
               if (IAtom == nullptr || JAtom == nullptr)
