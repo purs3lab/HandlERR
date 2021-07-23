@@ -101,8 +101,11 @@ public:
                                         std::string FileName) const;
 
 
-  void doRootCauseAnalysis(CVars&, CVars&, std::set<Atom *>&,
-      ConstraintsGraph&);
+  void doRootCauseAnalysis(llvm::DenseSet<ConstraintKey,
+                                          llvm::DenseMapInfo<unsigned>> &DeclVars,
+                           CVars &RelevantVars,
+                           std::set<Atom *> &DirectWild,
+                            ConstraintsGraph &CG);
 
 
   // Called when we are done adding constraints and visiting ASTs.

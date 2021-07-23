@@ -14,6 +14,7 @@
 #include "clang/3C/MappingVisitor.h"
 #include "clang/3C/Utils.h"
 #include "llvm/Support/JSON.h"
+#include <llvm/ADT/DenseSet.h>
 #include <sstream>
 
 using namespace clang;
@@ -954,12 +955,15 @@ FVConstraint *ProgramInfo::getStaticFuncConstraint(std::string FuncName,
   return nullptr;
 }
 
+typedef llvm::DenseSet<ConstraintKey, llvm::DenseMapInfo<unsigned>> ConstraintKeySet;
+
 // Factory context for root cause analysis
 // This class tracks global root cause analysis information
 class RCAFactory {
 private:
+  //TODO explain the difference in types
   // Set of vars that map to a decl
-  CVars &DeclVars;
+  ConstraintKeySet &DeclVars;
   // Set of vars in this file
   CVars &RelevantVarsKeys;
   // Set of vars that are directly wild
@@ -968,13 +972,14 @@ private:
   ConstraintsGraph &CG;
   ConstraintsInfo &CState;
 
+
   // Map a key (K) to the set of keys reachable by K
   // This functions as the memo-pad
-  std::map<ConstraintKey, std::set<ConstraintKey>> ReachableBy;
+  std::map<ConstraintKey, ConstraintKeySet> ReachableBy;
 
 
 public:
-  RCAFactory(CVars &DVs, CVars &RVs, std::set<Atom*> &DWVs,
+  RCAFactory(ConstraintKeySet &DVs, CVars &RVs, std::set<Atom*> &DWVs,
              ConstraintsGraph &CG, ConstraintsInfo &CState)
   : DeclVars(DVs), RelevantVarsKeys(RVs), DirectWildVarAtoms(DWVs),
         CG(CG), CState(CState) {}
@@ -999,7 +1004,7 @@ public:
     return ReachableBy.count(VA->getLoc()) != 0;
   }
 
-  std::set<ConstraintKey>& getReachable(VarAtom *VA) {
+  ConstraintKeySet& getReachable(VarAtom *VA) {
     assert("Should only be called on memoized values" && memoized(VA));
     return ReachableBy[VA->getLoc()];
   }
@@ -1132,7 +1137,7 @@ void RCAFactory::analyzeRootCause(VarAtom *DirectWild) {
   TotalConstrainedBy.insert(NewConstraints.begin(), NewConstraints.end());
 }
 
-void ProgramInfo::doRootCauseAnalysis(CVars &DeclVarsKey,
+void ProgramInfo::doRootCauseAnalysis(ConstraintKeySet &DeclVarsKey,
                                       CVars &RelevantVarsKey,
                                       std::set<Atom *> &DirectWildVarAtoms,
                                       ConstraintsGraph &CG) {
@@ -1185,14 +1190,15 @@ bool ProgramInfo::computeInterimConstraintState(
 
   //Map the above two sets into equivalent sets of keys
   CVars RelevantVarsKey;
-  CVars DeclVarsKey;
+  ConstraintKeySet DeclVarsKey;
 
   std::transform(RelevantVars.begin(), RelevantVars.end(),
                  std::inserter(RelevantVarsKey, RelevantVarsKey.end()), GetLocOrZero);
-  std::transform(DeclVars.begin(), DeclVars.end(),
-                 std::inserter(DeclVarsKey, DeclVarsKey.end()),
-                 GetLocOrZero);
-  DeclVarsKey.erase(0); // Remove all failed conversions
+
+  for (const auto* A : DeclVars)
+    if (const auto &VA = dyn_cast<VarAtom>(A))
+      DeclVarsKey.insert(VA->getLoc());
+
 
   CState.clear();
 
