@@ -15,6 +15,7 @@
 #include "clang/3C/Utils.h"
 #include "llvm/Support/JSON.h"
 #include <llvm/ADT/DenseSet.h>
+#include <llvm/ADT/SmallPtrSet.h>
 #include <sstream>
 
 using namespace clang;
@@ -955,6 +956,8 @@ FVConstraint *ProgramInfo::getStaticFuncConstraint(std::string FuncName,
   return nullptr;
 }
 
+
+typedef llvm::SmallPtrSet<VarAtom*, 32> VarAtomSet;
 typedef llvm::DenseSet<ConstraintKey, llvm::DenseMapInfo<unsigned>> ConstraintKeySet;
 
 // Factory context for root cause analysis
@@ -963,7 +966,6 @@ class RCAFactory {
 private:
   //TODO explain the difference in types
   // Set of vars that map to a decl
-  ConstraintKeySet &DeclVars;
   // Set of vars in this file
   CVars &RelevantVarsKeys;
   // Set of vars that are directly wild
@@ -975,13 +977,13 @@ private:
 
   // Map a key (K) to the set of keys reachable by K
   // This functions as the memo-pad
-  std::map<ConstraintKey, ConstraintKeySet> ReachableBy;
+  llvm::DenseMap<ConstraintKey, VarAtomSet, llvm::DenseMapInfo<unsigned>> ReachableBy;
 
 
 public:
-  RCAFactory(ConstraintKeySet &DVs, CVars &RVs, std::set<Atom*> &DWVs,
+  RCAFactory(CVars &RVs, std::set<Atom*> &DWVs,
              ConstraintsGraph &CG, ConstraintsInfo &CState)
-  : DeclVars(DVs), RelevantVarsKeys(RVs), DirectWildVarAtoms(DWVs),
+  : RelevantVarsKeys(RVs), DirectWildVarAtoms(DWVs),
         CG(CG), CState(CState) {}
 
 
@@ -990,10 +992,11 @@ public:
 
   // Mark ToV as being reachable from FromV
   // Check nodes reachable from ToV, and add them as well
+  // TODO there are gains to be made by optimizing this function
   void markReachable(VarAtom* FromV, VarAtom *ToV) {
     auto From = FromV->getLoc(), To = ToV->getLoc();
 
-    ReachableBy[From].insert(To);
+    ReachableBy[From].insert(ToV);
     // Check if To has reachable nodes, if so add them
     if (ReachableBy.count(To) != 0)
       ReachableBy[From].insert(ReachableBy[To].begin(), ReachableBy[To].end());
@@ -1004,18 +1007,11 @@ public:
     return ReachableBy.count(VA->getLoc()) != 0;
   }
 
-  ConstraintKeySet& getReachable(VarAtom *VA) {
+  VarAtomSet& getReachable(VarAtom *VA) {
     assert("Should only be called on memoized values" && memoized(VA));
     return ReachableBy[VA->getLoc()];
   }
 
-  bool isDeclVar(VarAtom *VA) {
-    return DeclVars.find(VA->getLoc()) != DeclVars.end();
-  }
-
-  bool isDeclVar(ConstraintKey Key) {
-    return DeclVars.find(Key) != DeclVars.end();
-  };
 
   bool isRelevantVar(VarAtom *VA) {
     return isRelevantVar(VA->getLoc());
@@ -1084,7 +1080,7 @@ public:
     if (alreadySeen(ReachableVar))
       return;
     markSeen(ReachableVar);
-    if (F->isDeclVar(ReachableVar)) {
+    if (ReachableVar->isForDecl()) {
       F->addRootCause(ReachableVar, WildAtom);
 
       if (F->isRelevantVar(ReachableVar))
@@ -1102,11 +1098,11 @@ public:
 
 private:
   void traverseMemoizedNode(VarAtom *VA) {
-    for (ConstraintKey K : F->getReachable(VA)) {
-      if (F->isDeclVar(K)) {
+    for (VarAtom *K : F->getReachable(VA)) {
+      if (K->isForDecl()) {
         F->addRootCause(K, WildAtom);
         if (F->isRelevantVar(K))
-          ConstrainedByThis.insert(K);
+          ConstrainedByThis.insert(K->getLoc());
       }
     }
   }
@@ -1137,12 +1133,11 @@ void RCAFactory::analyzeRootCause(VarAtom *DirectWild) {
   TotalConstrainedBy.insert(NewConstraints.begin(), NewConstraints.end());
 }
 
-void ProgramInfo::doRootCauseAnalysis(ConstraintKeySet &DeclVarsKey,
-                                      CVars &RelevantVarsKey,
+void ProgramInfo::doRootCauseAnalysis(CVars &RelevantVarsKey,
                                       std::set<Atom *> &DirectWildVarAtoms,
                                       ConstraintsGraph &CG) {
 
-  RCAFactory RCAF(DeclVarsKey, RelevantVarsKey, DirectWildVarAtoms, CG, CState);
+  RCAFactory RCAF(RelevantVarsKey, DirectWildVarAtoms, CG, CState);
 
   for (auto *WildAtom : DirectWildVarAtoms)
     if (auto *WildVarAtom = dyn_cast<VarAtom>(WildAtom))
@@ -1162,8 +1157,6 @@ bool ProgramInfo::computeInterimConstraintState(
     const std::set<std::string> &FilePaths) {
 
   // We need to compute two sets
-  // 1) The set of _all_ vars that refer to a Decl
-  std::set<Atom*> DeclVars;
   // 2) The set of all DeclVars vars _in_ this file, which we call _relevant_
   std::set<Atom *> RelevantVars;
 
@@ -1175,7 +1168,11 @@ bool ProgramInfo::computeInterimConstraintState(
     if (C->isForValidDecl()) {
       CAtoms Tmp;
       getVarsFromConstraint(C, Tmp, Visited);
-      DeclVars.insert(Tmp.begin(), Tmp.end());
+      // TODO setting this flag should likely being done earlier,
+      //  during construction.
+      for (auto *A : Tmp)
+        if (auto *VA = dyn_cast<VarAtom>(A))
+          VA->setForDecl();
       if (canWrite(FileName))
         RelevantVars.insert(Tmp.begin(), Tmp.end());
     }
@@ -1190,14 +1187,9 @@ bool ProgramInfo::computeInterimConstraintState(
 
   //Map the above two sets into equivalent sets of keys
   CVars RelevantVarsKey;
-  ConstraintKeySet DeclVarsKey;
 
   std::transform(RelevantVars.begin(), RelevantVars.end(),
                  std::inserter(RelevantVarsKey, RelevantVarsKey.end()), GetLocOrZero);
-
-  for (const auto* A : DeclVars)
-    if (const auto &VA = dyn_cast<VarAtom>(A))
-      DeclVarsKey.insert(VA->getLoc());
 
 
   CState.clear();
@@ -1205,7 +1197,7 @@ bool ProgramInfo::computeInterimConstraintState(
   std::set<Atom *> DirectWildVarAtoms;
   CS.getChkCG().getSuccessors(CS.getWild(), DirectWildVarAtoms);
 
-  doRootCauseAnalysis(DeclVarsKey, RelevantVarsKey, DirectWildVarAtoms, CS.getChkCG());
+  doRootCauseAnalysis(RelevantVarsKey, DirectWildVarAtoms, CS.getChkCG());
 
   // The ConstraintVariable for a variable normally appears in Variables for the
   // definition, but it may also be reused directly in ExprConstraintVars for a

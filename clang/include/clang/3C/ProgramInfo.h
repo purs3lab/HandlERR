@@ -100,12 +100,9 @@ public:
   FVConstraint *getStaticFuncConstraint(std::string FuncName,
                                         std::string FileName) const;
 
-
-  void doRootCauseAnalysis(llvm::DenseSet<ConstraintKey,
-                                          llvm::DenseMapInfo<unsigned>> &DeclVars,
-                           CVars &RelevantVars,
-                           std::set<Atom *> &DirectWild,
-                            ConstraintsGraph &CG);
+  void doRootCauseAnalysis(CVars &RelevantVarsKey,
+                           std::set<Atom *> &DirectWildVarAtoms,
+                           ConstraintsGraph &CG);
 
 
   // Called when we are done adding constraints and visiting ASTs.
