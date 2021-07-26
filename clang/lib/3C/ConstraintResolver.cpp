@@ -453,9 +453,12 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
           if (CE->getNumArgs() > 0) {
             QualType ArgTy;
             std::string FuncName = FD->getNameAsString();
-            ConstAtom *A;
-            A = analyzeAllocExpr(CE, CS, ArgTy, FuncName, Context);
-            if (A) {
+            ConstAtom *A = analyzeAllocExpr(CE, CS, ArgTy, FuncName, Context);
+            if (A && TypeVars.find(0) != TypeVars.end() &&
+                TypeVars[0] != nullptr) {
+              ReturnCVs.insert(TypeVars[0]);
+              DidInsert = true;
+            } else if (A) {
               std::string N(FD->getName());
               N = "&" + N;
               ExprType = Context->getPointerType(ArgTy);
