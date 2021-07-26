@@ -162,7 +162,10 @@ ConstraintVariable *localReturnConstraint(
   // Check if local type vars are available
   if (TypeVars.find(TyVarIdx) != TypeVars.end() &&
       TypeVars[TyVarIdx] != nullptr) {
-    return TypeVars[TyVarIdx];
+    ConstraintVariable *CV = TypeVars[TyVarIdx];
+    if (FV->getExternalReturn()->hasBoundsKey())
+      CV->setBoundsKey(FV->getExternalReturn()->getBoundsKey());
+    return CV;
   } else {
     return FV->getExternalReturn();
   }
