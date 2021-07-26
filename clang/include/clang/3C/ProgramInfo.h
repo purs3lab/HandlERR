@@ -170,6 +170,8 @@ private:
   // expected that multiple entries will map to the same source location.
   std::map<IDAndTranslationUnit, PersistentSourceLoc> ExprLocations;
 
+  std::map<ConstraintKey, PersistentSourceLoc> DeletedAtomLocations;
+
   //Performance stats
   PerformanceStats PerfS;
 
@@ -211,8 +213,7 @@ private:
   // Retrieves a FVConstraint* from a Decl (which could be static, or global)
   FVConstraint *getFuncFVConstraint(FunctionDecl *FD, ASTContext *C);
 
-  void insertIntoPtrSourceMap(const PersistentSourceLoc *PSL,
-                              ConstraintVariable *CV);
+  void insertIntoPtrSourceMap(PersistentSourceLoc PSL, ConstraintVariable *CV);
 
   void computePtrLevelStats();
 
