@@ -422,7 +422,8 @@ private:
       // Replace the original type with this new one if the type has changed.
       if (CV->anyChanges(Vars)) {
         rewriteSourceRange(Writer, Range,
-                           CV->mkString(Info.getConstraints(), false));
+                           CV->mkString(Info.getConstraints(),
+                                        MKSTRING_OPTS(EmitName = false)));
         PState.incrementNumFixedCasts();
       }
   }
@@ -462,10 +463,10 @@ public:
             PVConstraint *CheckVoid = dyn_cast<PVConstraint>(Entry.second.first);
             if (Entry.second.second != nullptr && CheckVoid->isVoidPtr()) {
               TyStr = Entry.second.second->mkString(
-                  Info.getConstraints(), false, false, true);
+                  Info.getConstraints(), MKSTRING_OPTS(EmitName = false, EmitPointee = true));
             } else {
               TyStr = Entry.second.first->mkString(
-                  Info.getConstraints(), false, false, true);
+                  Info.getConstraints(), MKSTRING_OPTS(EmitName = false, EmitPointee = true));
             }
             if (TyStr.back() == ' ')
               TyStr.pop_back();

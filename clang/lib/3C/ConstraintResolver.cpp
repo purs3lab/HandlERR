@@ -162,11 +162,15 @@ ConstraintVariable *localReturnConstraint(
   // Check if local type vars are available
   if (TypeVars.find(TyVarIdx) != TypeVars.end() &&
       TypeVars[TyVarIdx].first != nullptr) {
+    ConstraintVariable *CV = nullptr;
     if (TypeVars[TyVarIdx].second != nullptr) {
-      return TypeVars[TyVarIdx].second;
+      CV = TypeVars[TyVarIdx].second;
     } else {
-      return TypeVars[TyVarIdx].first;
+      CV = TypeVars[TyVarIdx].first;
     }
+    if (FV->getExternalReturn()->hasBoundsKey())
+      CV->setBoundsKey(FV->getExternalReturn()->getBoundsKey());
+    return CV;
   } else {
     return FV->getExternalReturn();
   }
@@ -457,9 +461,18 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
           if (CE->getNumArgs() > 0) {
             QualType ArgTy;
             std::string FuncName = FD->getNameAsString();
-            ConstAtom *A;
-            A = analyzeAllocExpr(CE, CS, ArgTy, FuncName, Context);
-            if (A) {
+            ConstAtom *A = analyzeAllocExpr(CE, CS, ArgTy, FuncName, Context);
+            if (A && TypeVars.find(0) != TypeVars.end() &&
+                TypeVars[0].first != nullptr) {
+              ConstraintVariable *CV = nullptr;
+              if (TypeVars[0].second != nullptr) {
+                CV = TypeVars[0].second;
+              } else {
+                CV = TypeVars[0].first;
+              }
+              ReturnCVs.insert(CV);
+              DidInsert = true;
+            } else if (A) {
               std::string N(FD->getName());
               N = "&" + N;
               ExprType = Context->getPointerType(ArgTy);
