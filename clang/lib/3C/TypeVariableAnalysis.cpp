@@ -131,10 +131,17 @@ bool TypeVarVisitor::VisitCallExpr(CallExpr *CE) {
 
         // Constrain this variable GEQ the function arguments using the type
         // variable so if any of them are wild, the type argument will also be
-        // an unchecked pointer.
-        constrainConsVarGeq(P, TVEntry.second.getConstraintVariables(),
+        // an unchecked pointer. Except for realloc.
+        if (FD->getNameAsString() == "realloc") {
+          constrainConsVarGeq(P, TVEntry.second.getConstraintVariables(),
+                              Info.getConstraints(), nullptr, Wild_to_Safe, false,
+                              &Info);
+
+        } else {
+          constrainConsVarGeq(P, TVEntry.second.getConstraintVariables(),
                             Info.getConstraints(), nullptr, Safe_to_Wild, false,
                             &Info);
+      }
 
         TVEntry.second.setTypeParamConsVar(P);
         // Since we've changed the constraint variable for this context, we
