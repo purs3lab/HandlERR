@@ -181,8 +181,8 @@ void AvarBoundsInference::mergeReachableProgramVars(
           BVar = TmpB;
         } else {
           // If we need to merge two constants?
-          int CVal = std::stoi(BVar->getVarName());
-          int TmpVal = std::stoi(TmpB->getVarName());
+          uint64_t CVal = BVar->getConstantVal();
+          uint64_t TmpVal = TmpB->getConstantVal();
           if (IsTarNTArr) {
             // If this is an NTarr then the values should be same.
             if (TmpVal != CVal) {
@@ -1051,9 +1051,7 @@ BoundsKey AVarBoundsInfo::getVarKey(PersistentSourceLoc &PSL) {
 BoundsKey AVarBoundsInfo::getConstKey(uint64_t Value) {
   if (ConstVarKeys.find(Value) == ConstVarKeys.end()) {
     BoundsKey NK = ++BCount;
-    std::string ConsString = std::to_string(Value);
-    ProgramVar *NPV = ProgramVar::createNewProgramVar(
-        NK, ConsString, GlobalScope::getGlobalScope(), true);
+    ProgramVar *NPV = ProgramVar::createNewConstantVar(NK, Value);
     insertProgramVar(NK, NPV);
     ConstVarKeys[Value] = NK;
   }
@@ -1430,7 +1428,7 @@ bool AVarBoundsInfo::areSameProgramVar(BoundsKey B1, BoundsKey B2) {
     ProgramVar *P1 = getProgramVar(B1);
     ProgramVar *P2 = getProgramVar(B2);
     return P1->isNumConstant() && P2->isNumConstant() &&
-           P1->getVarName() == P2->getVarName();
+           P1->getConstantVal() == P2->getConstantVal();
   }
   return B1 == B2;
 }
