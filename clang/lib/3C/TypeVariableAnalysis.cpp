@@ -132,12 +132,15 @@ bool TypeVarVisitor::VisitCallExpr(CallExpr *CE) {
           std::set<ConstraintVariable *> CVs = CR.getExprConstraintVarsSet(Uncast);
           if (auto *DRE = dyn_cast<DeclRefExpr>(Uncast)){
             CVarOption Var = Info.getVariable(DRE->getFoundDecl(),Context);
-            if (Var.hasValue()) {
-              insertBinding(CE,TyIdx,Uncast->getType(),
-                            CVs,ForcedInconsistent,&Var.getValue());
-              ++I;
-              continue;
-            }
+            if (Var.hasValue())
+              if (PVConstraint *GenVar =
+                      dyn_cast<PVConstraint>(&Var.getValue()))
+                if (GenVar->isGeneric()) {
+                  insertBinding(CE,TyIdx,Uncast->getType(),
+                                CVs,ForcedInconsistent,GenVar);
+                  ++I;
+                  continue;
+                }
           }
           insertBinding(CE, TyIdx, Uncast->getType(), CVs, ForcedInconsistent);
         }
