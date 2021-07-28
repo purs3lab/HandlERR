@@ -102,7 +102,7 @@ public:
 
   void doRootCauseAnalysis(CVars &RelevantVarsKey,
                            std::set<Atom *> &DirectWildVarAtoms,
-                           ConstraintsGraph &CG);
+                           ConstraintsGraph &CG, std::set<Atom *> RelevantVars);
 
 
   // Called when we are done adding constraints and visiting ASTs.

@@ -975,9 +975,9 @@ private:
   ConstraintsInfo &CState;
 
 
-  // Map a key (K) to the set of keys reachable by K
+  // Map a key (K) to the set of root causes reachable by K
   // This functions as the memo-pad
-  llvm::DenseMap<ConstraintKey, VarAtomSet, llvm::DenseMapInfo<unsigned>> ReachableBy;
+  llvm::DenseMap<ConstraintKey, VarAtomSet, llvm::DenseMapInfo<unsigned>> RootCauses;
 
 
 public:
@@ -988,28 +988,25 @@ public:
 
 
 
-  void analyzeRootCause(VarAtom*);
+  void analyzeRootCauses(VarAtom *VA);
 
-  // Mark ToV as being reachable from FromV
-  // Check nodes reachable from ToV, and add them as well
   // TODO there are gains to be made by optimizing this function
-  void markReachable(VarAtom* FromV, VarAtom *ToV) {
-    auto From = FromV->getLoc(), To = ToV->getLoc();
-
-    ReachableBy[From].insert(ToV);
-    // Check if To has reachable nodes, if so add them
-    if (ReachableBy.count(To) != 0)
-      ReachableBy[From].insert(ReachableBy[To].begin(), ReachableBy[To].end());
+  // Mark RootCause as being reachable from From
+  void addRootCause(VarAtom* From, VarAtom *RootCause) {
+    RootCauses[From->getLoc()].insert(RootCause);
+    if (From->isForDecl()) {
+      CState.addRootCause(From->getLoc(), RootCause->getLoc());
+      CState.getConstrainedBy(RootCause).insert(From->getLoc());
+    }
   }
 
   // Check if a given VarAtom has had reachability data logged yet
   bool memoized(VarAtom *VA) {
-    return ReachableBy.count(VA->getLoc()) != 0;
+    return RootCauses.count(VA->getLoc()) != 0;
   }
 
-  VarAtomSet& getReachable(VarAtom *VA) {
-    assert("Should only be called on memoized values" && memoized(VA));
-    return ReachableBy[VA->getLoc()];
+  VarAtomSet& getRootCauses(VarAtom *VA) {
+    return RootCauses[VA->getLoc()];
   }
 
 
@@ -1025,17 +1022,11 @@ public:
     return DirectWildVarAtoms.find(VA) != DirectWildVarAtoms.end();
   }
 
-  void addRootCause(VarAtom *Target, VarAtom *Cause) {
-    CState.addRootCause(Target->getLoc(), Cause->getLoc());
-  }
 
-  void addRootCause(ConstraintKey Target, VarAtom *Cause) {
-    CState.addRootCause(Target, Cause->getLoc());
-  }
-
+  // Gets neighbors going backwards across edges
   std::set<Atom*> getNeighbors(VarAtom *Node) {
     std::set<Atom*> Neighbors;
-    CG.getNeighbors(Node, Neighbors, true);
+    CG.getNeighbors(Node, Neighbors, false);
     return Neighbors;
   }
 
@@ -1049,11 +1040,10 @@ private:
   // Factory Context
   RCAFactory *F;
   // The target of the search
-  VarAtom *WildAtom;
-  // Set of variables constrained by the target
-  CVars ConstrainedByThis;
-  // Set of variables indirect constraints
-  CVars Indirect;
+  VarAtom *Target;
+
+  bool isIndirect = false;
+
   // Set of vars we've seen in this search (prevents cycles)
   CVars Seen;
 
@@ -1067,81 +1057,54 @@ private:
   }
 
 public:
-  RootCauseAnalysis(RCAFactory *F, VarAtom *WA) : F(F), WildAtom(WA) {
-    // Begin traversal out from the root cause of wildness
-    traverse(WA);
-  }
-
-  CVars& getConstrainedBy(void) {
-    return ConstrainedByThis;
+  RootCauseAnalysis(RCAFactory *F, VarAtom *T) : F(F), Target(T) {
+    traverse(T);
   }
 
   void traverse(VarAtom *ReachableVar) {
-    if (alreadySeen(ReachableVar))
+    if (alreadySeen(ReachableVar) || F->memoized(ReachableVar))
       return;
     markSeen(ReachableVar);
-    if (ReachableVar->isForDecl()) {
-      F->addRootCause(ReachableVar, WildAtom);
-
-      if (F->isRelevantVar(ReachableVar))
-        ConstrainedByThis.insert(ReachableVar->getLoc());
-      if (!F->isDirectlyWild(ReachableVar))
-        Indirect.insert(ReachableVar->getLoc());
+    if (F->isDirectlyWild(ReachableVar)) {
+      F->addRootCause(ReachableVar, ReachableVar);
+      return;
     }
 
-    if (F->memoized(ReachableVar))
-      traverseMemoizedNode(ReachableVar);
-    else
-      traverseNewNode(ReachableVar);
-  }
-
-
-private:
-  void traverseMemoizedNode(VarAtom *VA) {
-    for (VarAtom *K : F->getReachable(VA)) {
-      if (K->isForDecl()) {
-        F->addRootCause(K, WildAtom);
-        if (F->isRelevantVar(K))
-          ConstrainedByThis.insert(K->getLoc());
+    for (auto *N : F->getNeighbors(ReachableVar)) {
+      if (auto *VN = dyn_cast<VarAtom>(N)) {
+        traverse(VN);
+        for (auto *RC : F->getRootCauses(VN))
+          F->addRootCause(ReachableVar, RC);
       }
-    }
-  }
-
-  void traverseNewNode(VarAtom *ReachableVar) {
-    std::set<Atom*> Neighbors = F->getNeighbors(ReachableVar);
-    for (auto *Neighbor : Neighbors) {
-      auto* VarNeighbor = dyn_cast<VarAtom>(Neighbor);
-      if (VarNeighbor == nullptr)
-        continue;
-      traverse(VarNeighbor);
-      // Mark our neighbor (and all transitively reachable nodes) as reachable
-      F->markReachable(ReachableVar, VarNeighbor);
     }
   }
 
 };
 
 
-void RCAFactory::analyzeRootCause(VarAtom *DirectWild) {
-  CState.AllWildAtoms.insert(DirectWild->getLoc());
+void RCAFactory::analyzeRootCauses(VarAtom *VA) {
+  //CState.AllWildAtoms.insert(DirectWild->getLoc());
 
   // Perform root cause analysis
-  RootCauseAnalysis RCA(this, DirectWild);
-  CVars &TotalConstrainedBy = CState.getConstrainedBy(DirectWild);
-  // Add all the new constraints we found into our total set
-  CVars &NewConstraints = RCA.getConstrainedBy();
-  TotalConstrainedBy.insert(NewConstraints.begin(), NewConstraints.end());
+  RootCauseAnalysis RCA(this, VA);
 }
 
 void ProgramInfo::doRootCauseAnalysis(CVars &RelevantVarsKey,
                                       std::set<Atom *> &DirectWildVarAtoms,
-                                      ConstraintsGraph &CG) {
+                                      ConstraintsGraph &CG,
+                                      std::set<Atom *> RelevantVars) {
 
   RCAFactory RCAF(RelevantVarsKey, DirectWildVarAtoms, CG, CState);
 
+
   for (auto *WildAtom : DirectWildVarAtoms)
     if (auto *WildVarAtom = dyn_cast<VarAtom>(WildAtom))
-      RCAF.analyzeRootCause(WildVarAtom);
+      CState.AllWildAtoms.insert(WildVarAtom->getLoc());
+
+  for (auto *R : RelevantVars)
+    if (auto *V = dyn_cast<VarAtom>(R))
+      RCAF.analyzeRootCauses(V);
+
 
   findIntersection(CState.AllWildAtoms, RelevantVarsKey, CState.InSrcWildAtoms);
   findIntersection(CState.TotalNonDirectWildAtoms, RelevantVarsKey,
@@ -1157,6 +1120,7 @@ bool ProgramInfo::computeInterimConstraintState(
     const std::set<std::string> &FilePaths) {
 
   // We need to compute two sets
+  std::set<Atom*> DeclVars;
   // 2) The set of all DeclVars vars _in_ this file, which we call _relevant_
   std::set<Atom *> RelevantVars;
 
@@ -1173,6 +1137,7 @@ bool ProgramInfo::computeInterimConstraintState(
       for (auto *A : Tmp)
         if (auto *VA = dyn_cast<VarAtom>(A))
           VA->setForDecl();
+      DeclVars.insert(Tmp.begin(), Tmp.end());
       if (canWrite(FileName))
         RelevantVars.insert(Tmp.begin(), Tmp.end());
     }
@@ -1197,7 +1162,8 @@ bool ProgramInfo::computeInterimConstraintState(
   std::set<Atom *> DirectWildVarAtoms;
   CS.getChkCG().getSuccessors(CS.getWild(), DirectWildVarAtoms);
 
-  doRootCauseAnalysis(RelevantVarsKey, DirectWildVarAtoms, CS.getChkCG());
+  doRootCauseAnalysis(RelevantVarsKey, DirectWildVarAtoms, CS.getChkCG(),
+                      DeclVars);
 
   // The ConstraintVariable for a variable normally appears in Variables for the
   // definition, but it may also be reused directly in ExprConstraintVars for a
