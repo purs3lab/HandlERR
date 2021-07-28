@@ -42,6 +42,8 @@ public:
 
   virtual ~DeclReplacement() {}
 
+  std::vector<std::string> SupplementaryDecls;
+
 protected:
   explicit DeclReplacement(DeclStmt *S, std::string R, DRKind K)
       : Statement(S), Replacement(R), Kind(K) {}
@@ -133,7 +135,8 @@ public:
   ArrayBoundsRewriter(ProgramInfo &I) : Info(I) {}
   // Get the string representation of the bounds for the given variable.
   std::string getBoundsString(const PVConstraint *PV, Decl *D,
-                              bool Isitype = false);
+                              bool Isitype = false, bool UseRange = false,
+                              std::string BasePtr = "");
 
   // Check if the constraint variable has newly created bounds string.
   bool hasNewBoundsString(const PVConstraint *PV, Decl *D,

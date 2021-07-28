@@ -355,14 +355,14 @@ void AvarBoundsInference::getRelevantBounds(BoundsKey BK,
   // Try to get the bounds of all RBKeys.
   // If this pointer is used in pointer arithmetic then there
   // are no relevant bounds for this pointer.
-  if (!BI->hasPointerArithmetic(BK)) {
+  //if (!BI->hasPointerArithmetic(BK)) {
     if (CurrIterInferBounds.find(BK) != CurrIterInferBounds.end()) {
       // get the bounds inferred from the current iteration
       ResBounds = CurrIterInferBounds[BK];
     } else if (ABounds *PrevBounds = BI->getBounds(BK)) {
       ResBounds[PrevBounds->getKind()].insert(PrevBounds->getBKey());
     }
-  }
+  //}
 }
 
 bool AvarBoundsInference::areDeclaredBounds(
@@ -1052,6 +1052,10 @@ void AVarBoundsInfo::recordArithmeticOperation(clang::Expr *E,
 
 bool AVarBoundsInfo::hasPointerArithmetic(BoundsKey BK) {
   return ArrPointersWithArithmetic.find(BK) != ArrPointersWithArithmetic.end();
+}
+
+bool AVarBoundsInfo::needsRangeBound(BoundsKey BK) {
+  return hasPointerArithmetic(BK) && getBounds(BK) != nullptr;
 }
 
 ProgramVar *AVarBoundsInfo::getProgramVar(BoundsKey VK) {
