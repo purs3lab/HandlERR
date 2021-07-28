@@ -108,9 +108,9 @@ ProgramVar *ProgramVar::makeCopy(BoundsKey NK) const {
                         this->ConstantVal);
 }
 
-ProgramVar *ProgramVar::createNewConstantVar(BoundsKey VK,
+ProgramVar *ProgramVar::createNewConstantVar(BoundsKey VK, std::string VName,
                                              uint64_t Value) {
-  return new ProgramVar(VK, Value);
+  return new ProgramVar(VK, VName, Value);
 }
 
 ProgramVar *ProgramVar::createNewProgramVar(BoundsKey VK, std::string VName,

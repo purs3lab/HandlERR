@@ -428,18 +428,35 @@ PointerVariableConstraint::PointerVariableConstraint(
         ArrSizes[TypeIdx] = std::pair<OriginalArrType, uint64_t>(
             O_SizedArray, CAT->getSize().getZExtValue());
 
+        bool HasArrSizeExpr = false;
         if (!TLoc.isNull()) {
           auto ArrTLoc = TLoc.getAs<ArrayTypeLoc>();
           if (!ArrTLoc.isNull()) {
             std::string SizeStr = getSourceText(ArrTLoc.getBracketsRange(), C);
-            if (!SizeStr.empty())
+            if (!SizeStr.empty()) {
+              // HasArrSizeExpr will now be true if the SizeExpr is not null.
+              // It is possible that the size string will be non-empty, while
+              // the size expression is null. This happens when no size is
+              // provided, e.g., `int a[] = {1}`.
+              HasArrSizeExpr = ArrTLoc.getSizeExpr();
               ArrSizeStrs[TypeIdx] = SizeStr;
+            }
           }
         }
 
         // If this is the top-most pointer variable?
         if (hasBoundsKey() && IsTopMost) {
-          BoundsKey CBKey = ABInfo.getConstKey(CAT->getSize().getZExtValue());
+          std::string CountSizeStr = "";
+          if(HasArrSizeExpr) {
+            std::string ArrSizeStr = ArrSizeStrs[TypeIdx];
+            if (ArrSizeStr.length() >= 2 && ArrSizeStr[0] == '[' &&
+                ArrSizeStr[ArrSizeStr.length() - 1] == ']') {
+              CountSizeStr = ArrSizeStr.substr(1, ArrSizeStr.length() - 2);
+            }
+          }
+
+          uint64_t ArrSize = CAT->getSize().getZExtValue();
+          BoundsKey CBKey = ABInfo.getConstKey(ArrSize, CountSizeStr);
           ABounds *NB = new CountBound(CBKey);
           ABInfo.insertDeclaredBounds(D, NB);
         }

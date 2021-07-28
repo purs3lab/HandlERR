@@ -183,7 +183,13 @@ void AvarBoundsInference::mergeReachableProgramVars(
           // If we need to merge two constants?
           uint64_t CVal = BVar->getConstantVal();
           uint64_t TmpVal = TmpB->getConstantVal();
-          if (IsTarNTArr) {
+          if (CVal == TmpVal) {
+            // If the constant values are the same, but the string
+            // representations are different, then fall back to using a constant
+            // key for the integer literal representation of the size.
+            if (BVar->getVarName() != TmpB->getVarName())
+              BVar = BI->getProgramVar(BI->getConstKey(CVal));
+          } else if (IsTarNTArr) {
             // If this is an NTarr then the values should be same.
             if (TmpVal != CVal) {
               BVar = nullptr;
@@ -667,7 +673,9 @@ bool AVarBoundsInfo::tryGetVariable(clang::Expr *E, const ASTContext &C,
     E = E->IgnoreParenCasts();
     if (E->getType()->isArithmeticType() &&
         E->isIntegerConstantExpr(ConsVal, C)) {
-      Res = getVarKey(ConsVal);
+      SourceRange SR = E->getSourceRange();
+      std::string CountRepr = SR.isValid() ? getSourceText(SR, C) : "";
+      Res = getConstKey(ConsVal.getZExtValue(), CountRepr);
       Ret = true;
     } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
       auto *D = DRE->getDecl();
@@ -1048,13 +1056,26 @@ BoundsKey AVarBoundsInfo::getVarKey(PersistentSourceLoc &PSL) {
   return DeclVarMap.left().at(PSL);
 }
 
-BoundsKey AVarBoundsInfo::getConstKey(uint64_t Value) {
+BoundsKey AVarBoundsInfo::getConstKey(uint64_t Value, std::string StrRep) {
+  std::string LitStr = std::to_string(Value);
+
+  // Don't use stored constant variables if a non-empty string representation
+  // that is different from the representation of value as an integer literal is
+  // provided.
+  if (!StrRep.empty() && StrRep != LitStr) {
+    BoundsKey NK = ++BCount;
+    ProgramVar *NPV = ProgramVar::createNewConstantVar(NK, StrRep, Value);
+    insertProgramVar(NK, NPV);
+    return NK;
+  }
+
   if (ConstVarKeys.find(Value) == ConstVarKeys.end()) {
     BoundsKey NK = ++BCount;
-    ProgramVar *NPV = ProgramVar::createNewConstantVar(NK, Value);
+    ProgramVar *NPV = ProgramVar::createNewConstantVar(NK, LitStr, Value);
     insertProgramVar(NK, NPV);
     ConstVarKeys[Value] = NK;
   }
+
   return ConstVarKeys[Value];
 }
 

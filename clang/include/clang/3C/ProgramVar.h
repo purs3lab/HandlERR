@@ -410,7 +410,9 @@ public:
   static ProgramVar *createNewProgramVar(BoundsKey VK, std::string VName,
                                          const ProgramVarScope *PVS);
 
-  static ProgramVar *createNewConstantVar(BoundsKey VK, uint64_t Value);
+
+  static ProgramVar *createNewConstantVar(BoundsKey VK, std::string VName,
+                                          uint64_t Value);
 
 private:
   BoundsKey K;
@@ -440,9 +442,9 @@ private:
   ProgramVar(BoundsKey VK, std::string VName, const ProgramVarScope *PVS)
     : ProgramVar(VK, VName, PVS, false, 0) {}
 
-  ProgramVar(BoundsKey VK, uint32_t CVal)
-    : ProgramVar(VK, std::to_string(CVal), GlobalScope::getGlobalScope(), true,
-                 CVal) {}
+  ProgramVar(BoundsKey VK, std::string VName, uint32_t CVal)
+    : ProgramVar(VK, VName, GlobalScope::getGlobalScope(), true, CVal) {}
 };
+
 
 #endif // LLVM_CLANG_3C_PROGRAMVAR_H

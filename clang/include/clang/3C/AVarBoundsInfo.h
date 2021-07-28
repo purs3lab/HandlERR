@@ -222,7 +222,7 @@ public:
   BoundsKey getVariable(clang::ParmVarDecl *PVD);
   BoundsKey getVariable(clang::FieldDecl *FD);
   BoundsKey getVariable(clang::FunctionDecl *FD);
-  BoundsKey getConstKey(uint64_t Value);
+  BoundsKey getConstKey(uint64_t Value, std::string StrRep="");
 
   // Generate a random bounds key to be used for inference.
   BoundsKey getRandomBKey();
