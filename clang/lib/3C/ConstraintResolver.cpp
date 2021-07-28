@@ -453,15 +453,14 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
         if (isFunctionAllocator(std::string(FD->getName()))) {
           bool DidInsert = false;
           IsAllocator = true;
-          if (CE->getNumArgs() > 0) {
+          if (TypeVars.find(0) != TypeVars.end() && TypeVars[0] != nullptr) {
+            ReturnCVs.insert(TypeVars[0]);
+            DidInsert = true;
+          } else if (CE->getNumArgs() > 0) {
             QualType ArgTy;
             std::string FuncName = FD->getNameAsString();
             ConstAtom *A = analyzeAllocExpr(CE, CS, ArgTy, FuncName, Context);
-            if (A && TypeVars.find(0) != TypeVars.end() &&
-                TypeVars[0] != nullptr) {
-              ReturnCVs.insert(TypeVars[0]);
-              DidInsert = true;
-            } else if (A) {
+            if (A) {
               std::string N(FD->getName());
               N = "&" + N;
               ExprType = Context->getPointerType(ArgTy);
