@@ -34,7 +34,21 @@ using namespace clang;
 // to the string reference Itype.
 void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
                                   std::string &Type, std::string &IType,
-                                  ProgramInfo &Info, ArrayBoundsRewriter &ABR) {
+                                  ProgramInfo &Info, ArrayBoundsRewriter &ABR,
+                                  std::vector<std::string> &SDecls) {
+  // TODO: Is this sufficient to get the bounds key? More complex logic is used
+  //       elsewhere.
+  bool NeedsRangeBound =
+    Defn->hasBoundsKey() &&
+    Info.getABoundsInfo().needsRangeBound(Defn->getBoundsKey());
+
+  std::string DeclName = Decl ? Decl->getNameAsString() : "";
+  if (NeedsRangeBound) {
+    // TODO: Think about this assert. When is Decl null? When is the name empty?
+    assert(!DeclName.empty());
+    DeclName = "__3c_tmp_" + DeclName;
+  }
+
   const EnvironmentMap &Env = Info.getConstraints().getVariables();
   // True when the type of this variable is defined by a typedef, and the
   // constraint variable representing the typedef solved to an unchecked type.
@@ -71,7 +85,8 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
     // getOriginalTypeWithName) does not support adding these parentheses.
     Type = Defn->mkString(Info.getConstraints(),
                           MKSTRING_OPTS(UnmaskTypedef = IsCheckedTypedef,
-                                        ForItypeBase = true));
+                                        ForItypeBase = true,
+                                        UseName = DeclName));
   } else {
     // In the remaining cases, the unchecked portion of the itype is just the
     // original type of the pointer. The first branch tries to generate the type
@@ -79,17 +94,50 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
     // because it avoids changing parameter names, particularly in cases where
     // multiple functions sharing the same name are defined in different
     // translation units.
-    if (isa_and_nonnull<ParmVarDecl>(Decl) && !Decl->getName().empty())
-      Type = qtyToStr(Decl->getType(), Decl->getNameAsString());
-    else
+    if (isa_and_nonnull<ParmVarDecl>(Decl) && !DeclName.empty())
+      Type = qtyToStr(Decl->getType(), DeclName);
+    else {
+      // FIXME: This assert will probably fail. Need to handle field and global
+      //        decls and maybe returns. Also param decls without names.
+      assert(!NeedsRangeBound);
       Type = Defn->getOriginalTypeWithName();
+    }
   }
 
   IType = " : itype(";
   IType += Defn->mkString(Info.getConstraints(),
                           MKSTRING_OPTS(EmitName = false, ForItype = true,
                                         UnmaskTypedef = IsUncheckedTypedef));
-  IType += ")" + ABR.getBoundsString(Defn, Decl, true);
+  IType += ")" + ABR.getBoundsString(Defn, Decl, true, false);
+
+  // FIXME: The parameter has an itype because it's used unsafely somewhere. Now
+  //        we copy it into a local variable with a fully checked type. The
+  //        unsafe use that made the parameter an itype will now be an error.
+  //        Solutions:
+  //        - Leave it how it is. There's a compiler error that needs to be
+  //          fixed, but this is already expected. This error is not an bounds
+  //          error however, so we still want to avoid it.
+  //        - Prohibit pointer arithmetic on itypes. Loses bounds on parameter.
+  //        - Make the copy unchecked. Looses bounds on the local. Note that the
+  //          itype parameter was already treated as unchecked inside the
+  //          function, so this should be a correct rewriting. Maybe add bounds
+  //          in a comment.
+  //        - Real solution: Use the internal type of the typedef (after fixing)
+  //          #704. [ leaning towards this ]
+  if (NeedsRangeBound)
+    // FIXME: This isn't an itype base; although, it's an unchecked alias for a
+    //        itype which is conceptually kind of the same thing. ForItypeBase
+    //        needs a better name, but it can't just be `EmitUnchecked` because
+    //        it also controls function pointer parameter rewriting with extra
+    //        parens.
+    // We don't insert a bounds string because this is an unchecked pointer.
+    // TODO: If #704 is fixed, then we call mkString on the internal constraint
+    //       variable without ForItypeBase=true. Then, if the top level of the
+    //       internal constraint is checked (inner pointer levels don't matter),
+    //       we can add the bounds string.
+    SDecls.push_back(Defn->mkString(Info.getConstraints(),
+                                    MKSTRING_OPTS(ForItypeBase = true)) +
+                     " = " + DeclName + ";");
 }
 
 // This function is the public entry point for declaration rewriting.
@@ -101,6 +149,9 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
   // Collect function and record declarations that need to be rewritten in a set
   // as well as their rewriten types in a map.
   RSet RewriteThese;
+
+  //
+  std::map<Decl *, std::string> DuplicatedDecls;
 
   FunctionDeclBuilder *TRV = nullptr;
 #ifdef FIVE_C
@@ -189,6 +240,7 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
           DS = VDLToStmtMap[D];
 
         std::string NewTy = getStorageQualifierString(D);
+        std::vector<std::string> SupplementaryDecls;
         bool IsExternGlobalVar =
           isa<VarDecl>(D) &&
           cast<VarDecl>(D)->getFormalLinkage() == Linkage::ExternalLinkage;
@@ -205,19 +257,52 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
           // VarDecl and FieldDecl subclass DeclaratorDecl, so the cast will
           // always succeed.
           DeclRewriter::buildItypeDecl(PV, cast<DeclaratorDecl>(D), Type, IType,
-                                       Info, ABRewriter);
+                                       Info, ABRewriter, SupplementaryDecls);
           NewTy += Type + IType;
         } else {
-          NewTy += PV->mkString(Info.getConstraints()) +
-                   ABRewriter.getBoundsString(PV, D);
+
+          // TODO: Same question about getBoundsKey as above. Also, copy-pasted
+          //       code.
+          bool NeedsRangeBounds =
+            PV->hasBoundsKey() &&
+            Info.getABoundsInfo().needsRangeBound(PV->getBoundsKey());
+          if (NeedsRangeBounds) {
+            std::string NewName = "__3c_tmp_" + PV->getName();
+            NewTy += PV->mkString(Info.getConstraints(),
+                                  MKSTRING_OPTS(UseName = NewName)) +
+                     ABRewriter.getBoundsString(PV, D);
+            std::string SDecl = PV->mkString(Info.getConstraints()) +
+                                ABRewriter.getBoundsString(PV, D, false, true,
+                                                           NewName);
+            if (auto *VD = dyn_cast<VarDecl>(D)) {
+              if (VD->hasLocalStorage()) {
+                SDecl += " = " + NewName;
+              } else if (VD->hasInit()) {
+                SDecl += " = " + getSourceText(VD->getInit()->getSourceRange(),
+                                               Context);
+              }
+            }
+            SDecl += ";";
+            SupplementaryDecls.push_back(SDecl);
+          } else {
+            NewTy += PV->mkString(Info.getConstraints()) +
+                     ABRewriter.getBoundsString(PV, D);
+          }
         }
-        if (auto *VD = dyn_cast<VarDecl>(D))
-          RewriteThese.insert(
-              std::make_pair(VD, new VarDeclReplacement(VD, DS, NewTy)));
-        else if (auto *FD = dyn_cast<FieldDecl>(D))
-          RewriteThese.insert(
-              std::make_pair(FD, new FieldDeclReplacement(FD, DS, NewTy)));
-        else
+
+        if (auto *VD = dyn_cast<VarDecl>(D)) {
+          VarDeclReplacement *VDR = new VarDeclReplacement(VD, DS, NewTy);
+          VDR->SupplementaryDecls.insert(VDR->SupplementaryDecls.begin(),
+                                         SupplementaryDecls.begin(),
+                                         SupplementaryDecls.end());
+          RewriteThese.insert(std::make_pair(VD, VDR));
+        } else if (auto *FD = dyn_cast<FieldDecl>(D)) {
+          FieldDeclReplacement *FDR = new FieldDeclReplacement(FD, DS, NewTy);
+          FDR->SupplementaryDecls.insert(FDR->SupplementaryDecls.begin(),
+                                         SupplementaryDecls.begin(),
+                                         SupplementaryDecls.end());
+          RewriteThese.insert(std::make_pair(FD, FDR));
+        } else
           llvm_unreachable("Unrecognized declaration type.");
       }
     }
@@ -339,6 +424,8 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
   // initializers are preserved, any declarations that an initializer to
   // be valid checked-c are given one.
 
+  std::vector<std::string> AllSupplementaryDecls;
+
   bool IsFirst = true;
   SourceLocation PrevEnd;
   for (const auto &DL : SameLineDecls) {
@@ -351,6 +438,14 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
       SameLineReplacement = It->second;
       Found = true;
       VisitedMultiDeclMembers.insert(DL);
+      // TODO: This isn't a great solution. I would rather be able to interleave
+      //       the new declarations with the old, but I haven't figured this out
+      //       yet. The current implementation has known bugs when later
+      //       declarations in the multidecl reference later declarations.
+      AllSupplementaryDecls.insert(AllSupplementaryDecls.begin(),
+         SameLineReplacement->SupplementaryDecls.begin(),
+         SameLineReplacement->SupplementaryDecls.end());
+      SameLineReplacement->SupplementaryDecls.clear();
     }
 
     if (IsFirst && ContainsInlineStruct) {
@@ -427,12 +522,15 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
     // Offset by one to skip past what we've just added so it isn't overwritten.
     PrevEnd = End.getEnd().getLocWithOffset(1);
   }
+
+  emitSupplementaryDeclarations(AllSupplementaryDecls, PrevEnd);
 }
 
 // Common rewriting logic used to replace a single decl either on its own or as
 // part of a multi decl. The primary responsibility of this method (aside from
 // invoking the rewriter) is to add any required initializer expression.
-void DeclRewriter::doDeclRewrite(SourceRange &SR, DeclReplacement *N) {
+void DeclRewriter::doDeclRewrite(SourceRange SR, DeclReplacement *N) {
+  // Save original end of source range in case it changes
   std::string Replacement = N->getReplacement();
   if (isa<TypedefDecl>(N->getDecl()))
     Replacement = "typedef " + Replacement;
@@ -459,11 +557,55 @@ void DeclRewriter::doDeclRewrite(SourceRange &SR, DeclReplacement *N) {
   }
 
   rewriteSourceRange(R, SR, Replacement);
+
+  // Lexer::findNextToken can fail (why?). Rather than adding extra error
+  // handling here, pass an invalid location to emitSupplementryDeclaration so
+  // that it can emit an error.
+  // TODO: Is worth emitting a separate error here? We would be able to log the
+  //       the location passed to the failed findNextToken call. If adding an
+  //       error here, consider that it should only be emitted if rewriting
+  //       would actually need to happen. For test macro_rewrite_error.c, the
+  //       findNextToken call fails, but the invalid source location is never
+  //       used by emitSupplementaryDeclarations, so there is no error.
+  Optional<Token> NextToken = Lexer::findNextToken(
+    N->getSourceRange(A.getSourceManager()).getEnd(), A.getSourceManager(),
+    A.getLangOpts());
+  SourceLocation L = NextToken.hasValue() ? NextToken.getValue().getLocation()
+                                          : SourceLocation();
+  emitSupplementaryDeclarations(N->SupplementaryDecls, L);
 }
 
 void DeclRewriter::rewriteFunctionDecl(FunctionDeclReplacement *N) {
   rewriteSourceRange(R, N->getSourceRange(A.getSourceManager()),
                      N->getReplacement());
+  if (N->getDecl()->isThisDeclarationADefinition()) {
+    Stmt *S = N->getDecl()->getBody();
+    /*FIXME :*/ assert("N->getDecl()->getBody() can be null." && S != nullptr);
+    emitSupplementaryDeclarations(N->SupplementaryDecls,
+                                  N->getDecl()->getBody()->getBeginLoc());
+  }
+}
+
+void DeclRewriter::emitSupplementaryDeclarations(
+  const std::vector<std::string> &SDecls, SourceLocation Loc) {
+  // There are no supplementary declarations to emit. The AllDecls String
+  // will remain empty, so R.InsertTextAfterToken should no-op, but it's still
+  // and error to insert an empty string and an invalid source location,
+  // so short circuit here to be safe.
+  if (SDecls.empty())
+    return;
+
+  std::string AllDecls;
+  for (std::string D : SDecls)
+    AllDecls += "\n" + D;
+
+  bool RewriteSucess = !R.InsertTextAfterToken(Loc, AllDecls);
+  if (!RewriteSucess) {
+    // FIXME: Use rewriteSourceRange so that it handle emitting error messages.
+    llvm::errs()
+      << "Rewriting failed while emitting supplementary declaration.\n";
+    Loc.print(llvm::errs(), R.getSourceMgr());
+  }
 }
 
 // A function to detect the presence of inline struct declarations
@@ -603,6 +745,10 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
       && !FD->isGenericFunction() && !FD->isItypeGenericFunction())
     RewriteGeneric = true;
 
+  // TODO: These are only used if(FD->isThisDeclarationADefinition()), so we
+  //       don't need to populate the vector otherwise.
+  std::vector<std::string> SupplementaryDecls;
+
   // Get rewritten parameter variable declarations. Try to use
   // the source for as much as possible.
   std::vector<std::string> ParmStrs;
@@ -624,7 +770,8 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
       std::string Type, IType;
       this->buildDeclVar(CV, PVDecl, Type, IType,
                          PVDecl->getQualifiedNameAsString(), RewriteGeneric,
-                         RewriteParams, RewriteReturn, FD->isStatic());
+                         RewriteParams, RewriteReturn, FD->isStatic(),
+                         SupplementaryDecls);
       ParmStrs.push_back(Type + IType);
       ProtoHasItype |= !IType.empty();
     }
@@ -635,7 +782,8 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
       const FVComponentVariable *CV = FDConstraint->getCombineParam(I);
       std::string Type, IType;
       this->buildDeclVar(CV, PVDecl, Type, IType, "", RewriteGeneric,
-                         RewriteParams, RewriteReturn, FD->isStatic());
+                         RewriteParams, RewriteReturn, FD->isStatic(),
+                         SupplementaryDecls);
       ParmStrs.push_back(Type + IType);
       ProtoHasItype |= !IType.empty();
       // FIXME: when the above FIXME is changed this condition will always
@@ -656,8 +804,8 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
   // For now we still need to check if this needs rewriting, see FIXME below
   // if (!DeclIsTypedef)
   this->buildDeclVar(FDConstraint->getCombineReturn(), FD, ReturnVar, ItypeStr,
-                   "", RewriteGeneric, RewriteParams,
-                   RewriteReturn, FD->isStatic());
+                     "", RewriteGeneric, RewriteParams, RewriteReturn,
+                     FD->isStatic(), SupplementaryDecls);
 
   ProtoHasItype |= !ItypeStr.empty();
 
@@ -757,10 +905,12 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
 
   // Add new declarations to RewriteThese if it has changed
   if (RewriteReturn || RewriteParams) {
-    RewriteThese.insert(std::make_pair(
-        FD,
-        new FunctionDeclReplacement(FD, NewSig, RewriteReturn,
-                                    RewriteParams, RewriteGeneric)));
+    auto *FDR = new FunctionDeclReplacement(FD, NewSig, RewriteReturn,
+                                            RewriteParams, RewriteGeneric);
+    FDR->SupplementaryDecls.insert(FDR->SupplementaryDecls.begin(),
+                                   SupplementaryDecls.begin(),
+                                   SupplementaryDecls.end());
+    RewriteThese.insert(std::make_pair(FD, FDR));
   }
 
   return true;
@@ -769,23 +919,42 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
 void FunctionDeclBuilder::buildCheckedDecl(
     PVConstraint *Defn, DeclaratorDecl *Decl, std::string &Type,
     std::string &IType, std::string UseName, bool &RewriteParm,
-    bool &RewriteRet) {
+    bool &RewriteRet, std::vector<std::string> &SDecls) {
+
+  // TODO: What does it mean for a defn to not have a bounds key? Presumably it
+  //       can't have bounds, and therefore can't need range bounds.
+  bool NeedsRangeBound =
+    Defn->hasBoundsKey() &&
+    Info.getABoundsInfo().needsRangeBound(Defn->getBoundsKey());
+
+  std::string DeclName = UseName;
+  if (NeedsRangeBound)
+    DeclName = "__3c_tmp_" + DeclName;
+
   Type =
-      Defn->mkString(Info.getConstraints(), MKSTRING_OPTS(UseName = UseName));
-  //IType = getExistingIType(Defn);
+      Defn->mkString(Info.getConstraints(), MKSTRING_OPTS(UseName = DeclName));
   IType = ABRewriter.getBoundsString(Defn, Decl, !IType.empty());
   RewriteParm |= getExistingIType(Defn).empty() != IType.empty() ||
                  isa_and_nonnull<ParmVarDecl>(Decl);
   RewriteRet |= isa_and_nonnull<FunctionDecl>(Decl);
+
+  if (NeedsRangeBound) {
+    SDecls.push_back(Defn->mkString(Info.getConstraints()) +
+                     ABRewriter.getBoundsString(Defn, Decl, false, true,
+                                                DeclName) + " = " + DeclName +
+                     ";");
+  }
 }
 
 
 void FunctionDeclBuilder::buildItypeDecl(PVConstraint *Defn,
                                          DeclaratorDecl *Decl,
                                          std::string &Type, std::string &IType,
-                                         bool &RewriteParm, bool &RewriteRet) {
+                                         bool &RewriteParm, bool &RewriteRet,
+                                         std::vector<std::string> &SDecls) {
   Info.getPerfStats().incrementNumITypes();
-  DeclRewriter::buildItypeDecl(Defn, Decl, Type, IType, Info, ABRewriter);
+  DeclRewriter::buildItypeDecl(Defn, Decl, Type, IType, Info, ABRewriter,
+                               SDecls);
   RewriteParm = true;
   RewriteRet |= isa_and_nonnull<FunctionDecl>(Decl);
 }
@@ -798,19 +967,20 @@ void FunctionDeclBuilder::buildDeclVar(const FVComponentVariable *CV,
                                        DeclaratorDecl *Decl, std::string &Type,
                                        std::string &IType, std::string UseName,
                                        bool &RewriteGen, bool &RewriteParm,
-                                       bool &RewriteRet, bool StaticFunc) {
+                                       bool &RewriteRet, bool StaticFunc,
+                                       std::vector<std::string> &SDecls) {
 
   bool CheckedSolution = CV->hasCheckedSolution(Info.getConstraints());
   bool ItypeSolution = CV->hasItypeSolution(Info.getConstraints());
   if (ItypeSolution ||
       (CheckedSolution && _3COpts.ItypesForExtern && !StaticFunc)) {
     buildItypeDecl(CV->getExternal(), Decl, Type, IType, RewriteParm,
-                   RewriteRet);
+                   RewriteRet, SDecls);
     return;
   }
   if (CheckedSolution) {
     buildCheckedDecl(CV->getExternal(), Decl, Type, IType, UseName, RewriteParm,
-                     RewriteRet);
+                     RewriteRet, SDecls);
     return;
   }
 

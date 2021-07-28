@@ -52,6 +52,8 @@ public:
   virtual ~ABounds() {}
 
   virtual std::string mkString(AVarBoundsInfo *, clang::Decl *D = nullptr) = 0;
+  virtual std::string mkRangeString(AVarBoundsInfo *, clang::Decl *D,
+                                    std::string BasePtr) = 0;
   virtual bool areSame(ABounds *, AVarBoundsInfo *) = 0;
   virtual BoundsKey getBKey() = 0;
   virtual ABounds *makeCopy(BoundsKey NK) = 0;
@@ -74,6 +76,10 @@ public:
   ~CountBound() override {}
 
   std::string mkString(AVarBoundsInfo *ABI, clang::Decl *D = nullptr) override;
+
+  std::string mkRangeString(AVarBoundsInfo *, clang::Decl *D,
+                            std::string BasePtr) override;
+
   bool areSame(ABounds *O, AVarBoundsInfo *ABI) override;
   BoundsKey getBKey() override;
   ABounds *makeCopy(BoundsKey NK) override;
@@ -95,6 +101,8 @@ public:
   }
 
   std::string mkString(AVarBoundsInfo *ABI, clang::Decl *D = nullptr) override;
+  std::string mkRangeString(AVarBoundsInfo *, clang::Decl *D,
+                            std::string BasePtr) override;
   bool areSame(ABounds *O, AVarBoundsInfo *ABI) override;
 
   static bool classof(const ABounds *S) {
@@ -111,6 +119,8 @@ public:
   ~ByteBound() override {}
 
   std::string mkString(AVarBoundsInfo *ABI, clang::Decl *D = nullptr) override;
+  std::string mkRangeString(AVarBoundsInfo *, clang::Decl *D,
+                            std::string BasePtr) override;
   bool areSame(ABounds *O, AVarBoundsInfo *ABI) override;
   BoundsKey getBKey() override;
   ABounds *makeCopy(BoundsKey NK) override;
@@ -134,6 +144,8 @@ public:
   ~RangeBound() override {}
 
   std::string mkString(AVarBoundsInfo *ABI, clang::Decl *D = nullptr) override;
+  std::string mkRangeString(AVarBoundsInfo *, clang::Decl *D,
+                            std::string BasePtr) override;
   bool areSame(ABounds *O, AVarBoundsInfo *ABI) override;
 
   BoundsKey getBKey() override {

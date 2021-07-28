@@ -37,7 +37,7 @@ public:
   static void
   buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl, std::string &Type,
                  std::string &IType, ProgramInfo &Info,
-                 ArrayBoundsRewriter &ABR);
+                 ArrayBoundsRewriter &ABR, std::vector<std::string> &SDecls);
 
 private:
   static RecordDecl *LastRecordDecl;
@@ -68,9 +68,11 @@ private:
                         std::vector<Decl *> SameLineDecls,
                         bool ContainsInlineStruct);
   void rewriteSingleDecl(DeclReplacement *N, RSet &ToRewrite);
-  void doDeclRewrite(SourceRange &SR, DeclReplacement *N);
+  void doDeclRewrite(SourceRange SR, DeclReplacement *N);
   void rewriteFunctionDecl(FunctionDeclReplacement *N);
   void rewriteTypedefDecl(TypedefDeclReplacement *TDT, RSet &ToRewrite);
+  void emitSupplementaryDeclarations(const std::vector<std::string> &SDecls,
+                                     SourceLocation Loc);
   void getDeclsOnSameLine(DeclReplacement *N, std::vector<Decl *> &Decls);
   bool isSingleDeclaration(DeclReplacement *N);
   SourceRange getNextCommaOrSemicolon(SourceLocation L);
@@ -106,14 +108,15 @@ protected:
                             DeclaratorDecl *Decl, std::string &Type,
                             std::string &IType, std::string UseName,
                             bool &RewriteGen, bool &RewriteParm,
-                            bool &RewriteRet, bool StaticFunc);
+                            bool &RewriteRet, bool StaticFunc,
+                            std::vector<std::string> &SDecls);
   void buildCheckedDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
                         std::string &Type, std::string &IType,
                         std::string UseName, bool &RewriteParm,
-                        bool &RewriteRet);
+                        bool &RewriteRet, std::vector<std::string> &SDecls);
   void buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
                       std::string &Type, std::string &IType, bool &RewriteParm,
-                      bool &RewriteRet);
+                      bool &RewriteRet, std::vector<std::string> &SDecls);
 
   bool hasDeclWithTypedef(const FunctionDecl *FD);
 

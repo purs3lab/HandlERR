@@ -355,14 +355,35 @@ void AvarBoundsInference::getRelevantBounds(BoundsKey BK,
   // Try to get the bounds of all RBKeys.
   // If this pointer is used in pointer arithmetic then there
   // are no relevant bounds for this pointer.
-  if (!BI->hasPointerArithmetic(BK)) {
+  //if (!BI->hasPointerArithmetic(BK)) {
     if (CurrIterInferBounds.find(BK) != CurrIterInferBounds.end()) {
       // get the bounds inferred from the current iteration
       ResBounds = CurrIterInferBounds[BK];
     } else if (ABounds *PrevBounds = BI->getBounds(BK)) {
       ResBounds[PrevBounds->getKind()].insert(PrevBounds->getBKey());
     }
-  }
+  //}
+
+  // A pointer that is used in pointer arithmetic can have relevant bounds, but
+  // it is not permitted to be a bound for another pointer. This avoids
+  // inferring bounds such as
+  //     _Array_ptr<int> a : count(1) = 0;
+  //     _Array_ptr<int> b : bounds(a, a + 1) = a;
+  //     b++;
+  //     _Array_ptr<int> c : count(1) = b;
+  // The bounds from `a` should not propagate through `b` to `c` because the
+  // pointer arithmetic on `b` potentially invalidates the bound. For future
+  // work, all bounds "down stream" of pointer arithmetic could also use range
+  // bounds, i.e., `c` could have `bounds(a, a + 1)` as well.
+  //for (auto &E : ResBounds) {
+  //  auto Iter = E.second.begin();
+  //  while (Iter != E.second.end()) {
+  //    if (BI->hasPointerArithmetic(*Iter))
+  //      Iter = E.second.erase(Iter);
+  //    else
+  //      ++Iter;
+  //  }
+  //}
 }
 
 bool AvarBoundsInference::areDeclaredBounds(
@@ -959,12 +980,13 @@ bool AVarBoundsInfo::addAssignment(BoundsKey L, BoundsKey R) {
     // So, if we create a edge from return to itself then we create a cyclic
     // dependency and never will be able to find the bounds for the return
     // value.
-    if (L != R)
+    if (L != R && !hasPointerArithmetic(R))
       ProgVarGraph.addUniqueEdge(R, L);
   } else {
-    ProgVarGraph.addUniqueEdge(R, L);
+    if (!hasPointerArithmetic(R))
+      ProgVarGraph.addUniqueEdge(R, L);
     ProgramVar *PV = getProgramVar(R);
-    if (!(PV && PV->isNumConstant()))
+    if (!(PV && PV->isNumConstant() && !hasPointerArithmetic(L)))
       ProgVarGraph.addUniqueEdge(L, R);
   }
   return true;
@@ -1052,6 +1074,10 @@ void AVarBoundsInfo::recordArithmeticOperation(clang::Expr *E,
 
 bool AVarBoundsInfo::hasPointerArithmetic(BoundsKey BK) {
   return ArrPointersWithArithmetic.find(BK) != ArrPointersWithArithmetic.end();
+}
+
+bool AVarBoundsInfo::needsRangeBound(BoundsKey BK) {
+  return hasPointerArithmetic(BK) && getBounds(BK) != nullptr;
 }
 
 ProgramVar *AVarBoundsInfo::getProgramVar(BoundsKey VK) {

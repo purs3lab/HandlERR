@@ -255,6 +255,13 @@ public:
   // Check if the given bounds key has a pointer arithmetic done on it.
   bool hasPointerArithmetic(BoundsKey BK);
 
+  // Check if the bounds keys will need to be rewritten with range bounds. This
+  // is true for bounds keys that are subject to pointer arithmetic but
+  // otherwise have inferred bounds.
+  // TODO: disqualify pointers based on other conditions: e.g., fields probably
+  //       can't get range bound.
+  bool needsRangeBound(BoundsKey BK);
+
   // Get the ProgramVar for the provided VarKey.
   ProgramVar *getProgramVar(BoundsKey VK);
 
