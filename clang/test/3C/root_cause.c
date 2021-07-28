@@ -57,3 +57,14 @@ PA pa_test0, pa_test1;
 
 // expected-warning@+1 {{1 unchecked pointer: Internal constraint for generic function declaration, for which 3C currently does not support re-solving.}}
 _Itype_for_any(T) void remember(void *p : itype(_Ptr<T>)) {}
+
+
+int* foo(int *x) { 
+// expected-warning@+1 {{ 3 unchecked pointers: }}
+  int *y = (int*) 3;
+  x = y;
+  return x;
+}
+
+
+

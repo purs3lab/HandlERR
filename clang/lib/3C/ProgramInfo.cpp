@@ -1062,7 +1062,7 @@ public:
   }
 
   void traverse(VarAtom *ReachableVar) {
-    if (alreadySeen(ReachableVar) || F->memoized(ReachableVar))
+    if (alreadySeen(ReachableVar))
       return;
     markSeen(ReachableVar);
     if (F->isDirectlyWild(ReachableVar)) {
