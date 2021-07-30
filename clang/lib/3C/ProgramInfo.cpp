@@ -1092,7 +1092,7 @@ void RCAFactory::analyzeRootCauses(VarAtom *VA) {
 void ProgramInfo::doRootCauseAnalysis(CVars &RelevantVarsKey,
                                       std::set<Atom *> &DirectWildVarAtoms,
                                       ConstraintsGraph &CG,
-                                      std::set<Atom *> RelevantVars) {
+                                      std::set<Atom *> SearchVars) {
 
   RCAFactory RCAF(RelevantVarsKey, DirectWildVarAtoms, CG, CState);
 
@@ -1101,7 +1101,7 @@ void ProgramInfo::doRootCauseAnalysis(CVars &RelevantVarsKey,
     if (auto *WildVarAtom = dyn_cast<VarAtom>(WildAtom))
       CState.AllWildAtoms.insert(WildVarAtom->getLoc());
 
-  for (auto *R : RelevantVars)
+  for (auto *R : SearchVars)
     if (auto *V = dyn_cast<VarAtom>(R))
       RCAF.analyzeRootCauses(V);
 
@@ -1120,7 +1120,7 @@ bool ProgramInfo::computeInterimConstraintState(
     const std::set<std::string> &FilePaths) {
 
   // We need to compute two sets
-  std::set<Atom*> DeclVars;
+  std::set<Atom*> Atoms;
   // 2) The set of all DeclVars vars _in_ this file, which we call _relevant_
   std::set<Atom *> RelevantVars;
 
@@ -1129,15 +1129,15 @@ bool ProgramInfo::computeInterimConstraintState(
   for (const auto &I : Variables) {
     std::string FileName = I.first.getFileName();
     ConstraintVariable *C = I.second;
+    CAtoms Tmp;
+    getVarsFromConstraint(C, Tmp, Visited);
+    Atoms.insert(Tmp.begin(), Tmp.end());
     if (C->isForValidDecl()) {
-      CAtoms Tmp;
-      getVarsFromConstraint(C, Tmp, Visited);
       // TODO setting this flag should likely being done earlier,
       //  during construction.
       for (auto *A : Tmp)
         if (auto *VA = dyn_cast<VarAtom>(A))
           VA->setForDecl();
-      DeclVars.insert(Tmp.begin(), Tmp.end());
       if (canWrite(FileName))
         RelevantVars.insert(Tmp.begin(), Tmp.end());
     }
@@ -1163,7 +1163,7 @@ bool ProgramInfo::computeInterimConstraintState(
   CS.getChkCG().getSuccessors(CS.getWild(), DirectWildVarAtoms);
 
   doRootCauseAnalysis(RelevantVarsKey, DirectWildVarAtoms, CS.getChkCG(),
-                      DeclVars);
+                      Atoms);
 
   // The ConstraintVariable for a variable normally appears in Variables for the
   // definition, but it may also be reused directly in ExprConstraintVars for a
