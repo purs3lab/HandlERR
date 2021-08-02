@@ -1128,8 +1128,9 @@ FunctionVariableConstraint::FunctionVariableConstraint(
   }
   // Strategy: If there's one void*, turn this into a generic function.
   // Otherwise, we need to constraint the void*'s to wild
-  // Exclude external functions, function pointers, and source generics for now
-  if(hasBody() && !IsFunctionPtr && TypeParams == 0
+  // Exclude unwritables, external functions,
+  // function pointers, and source generics for now
+  if(canWrite(FileName) && hasBody() && !IsFunctionPtr && TypeParams == 0
        && Voids.size() == 1){
     int Index = Voids[0];
     if(Index == -1) {
