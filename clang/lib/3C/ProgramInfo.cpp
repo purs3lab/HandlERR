@@ -964,9 +964,7 @@ typedef llvm::DenseSet<ConstraintKey, llvm::DenseMapInfo<unsigned>> ConstraintKe
 // This class tracks global root cause analysis information
 class RCAFactory {
 private:
-  //TODO explain the difference in types
-  // Set of vars that map to a decl
-  // Set of vars in this file
+  // Set of vars that map to a decl & are in a writable file
   CVars &RelevantVarsKeys;
   // Set of vars that are directly wild
   std::set<Atom*> &DirectWildVarAtoms;
@@ -977,6 +975,7 @@ private:
 
   // Map a key (K) to the set of keys reachable by K
   // This functions as the memo-pad
+  // We use the more efficient LLVM set types here
   llvm::DenseMap<ConstraintKey, VarAtomSet, llvm::DenseMapInfo<unsigned>> ReachableBy;
 
 
@@ -1045,6 +1044,18 @@ public:
 // It searches through the Constraint Graph and finds every atom constrained
 // by the target wild atom.
 class RootCauseAnalysis {
+public:
+
+  RootCauseAnalysis(RCAFactory *F, VarAtom *WA) : F(F), WildAtom(WA) {
+    // Begin traversal out from the root cause of wildness
+    traverse(WA);
+  }
+
+  // The set of all relevant variables constrained by the target
+  CVars& getConstrainedBy(void) {
+    return ConstrainedByThis;
+  }
+
 private:
   // Factory Context
   RCAFactory *F;
@@ -1052,10 +1063,10 @@ private:
   VarAtom *WildAtom;
   // Set of variables constrained by the target
   CVars ConstrainedByThis;
-  // Set of variables indirect constraints
+  // Set of variables indirectly constrained
   CVars Indirect;
   // Set of vars we've seen in this search (prevents cycles)
-  CVars Seen;
+  ConstraintKeySet Seen;
 
 
   bool alreadySeen(VarAtom *VA) {
@@ -1066,15 +1077,6 @@ private:
     Seen.insert(VA->getLoc());
   }
 
-public:
-  RootCauseAnalysis(RCAFactory *F, VarAtom *WA) : F(F), WildAtom(WA) {
-    // Begin traversal out from the root cause of wildness
-    traverse(WA);
-  }
-
-  CVars& getConstrainedBy(void) {
-    return ConstrainedByThis;
-  }
 
   void traverse(VarAtom *ReachableVar) {
     if (alreadySeen(ReachableVar))
@@ -1110,12 +1112,11 @@ private:
   void traverseNewNode(VarAtom *ReachableVar) {
     std::set<Atom*> Neighbors = F->getNeighbors(ReachableVar);
     for (auto *Neighbor : Neighbors) {
-      auto* VarNeighbor = dyn_cast<VarAtom>(Neighbor);
-      if (VarNeighbor == nullptr)
-        continue;
-      traverse(VarNeighbor);
-      // Mark our neighbor (and all transitively reachable nodes) as reachable
-      F->markReachable(ReachableVar, VarNeighbor);
+      if (auto *VarNeighbor = dyn_cast<VarAtom>(Neighbor)) {
+        traverse(VarNeighbor);
+        // Mark our neighbor (and all transitively reachable nodes) as reachable
+        F->markReachable(ReachableVar, VarNeighbor);
+      }
     }
   }
 
@@ -1139,6 +1140,7 @@ void ProgramInfo::doRootCauseAnalysis(CVars &RelevantVarsKey,
 
   RCAFactory RCAF(RelevantVarsKey, DirectWildVarAtoms, CG, CState);
 
+  // Analyze the root causes for every directly wild atom
   for (auto *WildAtom : DirectWildVarAtoms)
     if (auto *WildVarAtom = dyn_cast<VarAtom>(WildAtom))
       RCAF.analyzeRootCause(WildVarAtom);
@@ -1156,11 +1158,12 @@ void ProgramInfo::doRootCauseAnalysis(CVars &RelevantVarsKey,
 bool ProgramInfo::computeInterimConstraintState(
     const std::set<std::string> &FilePaths) {
 
-  // We need to compute two sets
-  // 2) The set of all DeclVars vars _in_ this file, which we call _relevant_
+  // The set of all DeclVars vars in a writable file, which we call _relevant_
   std::set<Atom *> RelevantVars;
 
   // Compute the above two sets
+
+
   CVarSet Visited;
   for (const auto &I : Variables) {
     std::string FileName = I.first.getFileName();
@@ -1185,13 +1188,10 @@ bool ProgramInfo::computeInterimConstraintState(
     return (ConstraintKey)0;
   };
 
-  //Map the above two sets into equivalent sets of keys
+  //Map the above set into equivalent set of keys
   CVars RelevantVarsKey;
-
   std::transform(RelevantVars.begin(), RelevantVars.end(),
                  std::inserter(RelevantVarsKey, RelevantVarsKey.end()), GetLocOrZero);
-
-
   CState.clear();
 
   std::set<Atom *> DirectWildVarAtoms;
