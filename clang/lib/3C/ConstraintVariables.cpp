@@ -78,9 +78,10 @@ PointerVariableConstraint::derefPVConstraint(PointerVariableConstraint *PVC) {
   assert(!PVC->Vars.empty() && !SrcVars.empty());
   Vars.erase(Vars.begin());
   SrcVars.erase(SrcVars.begin());
-  return new PointerVariableConstraint(Vars, SrcVars, PVC->getTy(),
-                                       PVC->getName(), PVC->getFV(),
-                                       PVC->getItype());
+  return new PointerVariableConstraint(
+      Vars, SrcVars, PVC->BaseType, PVC->Name, PVC->FV, PVC->ItypeStr,
+      PVC->GenericIndex, PVC->IsTypedef, PVC->TDT, PVC->TypedefString,
+      PVC->TypedefLevelInfo);
 }
 
 PointerVariableConstraint *PointerVariableConstraint::addAtomPVConstraint(
@@ -100,8 +101,10 @@ PointerVariableConstraint *PointerVariableConstraint::addAtomPVConstraint(
 
   Vars.insert(Vars.begin(), NewA);
   SrcVars.insert(SrcVars.begin(), PtrTyp);
-  return new PointerVariableConstraint(Vars, SrcVars, PVC->BaseType, PVC->Name,
-                                       PVC->FV, PVC->ItypeStr);
+  return new PointerVariableConstraint(
+      Vars, SrcVars, PVC->BaseType, PVC->Name, PVC->FV, PVC->ItypeStr,
+      PVC->GenericIndex, PVC->IsTypedef, PVC->TDT, PVC->TypedefString,
+      PVC->TypedefLevelInfo);
 }
 
 PointerVariableConstraint::PointerVariableConstraint(

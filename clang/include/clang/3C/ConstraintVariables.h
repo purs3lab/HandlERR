@@ -351,11 +351,15 @@ private:
   PointerVariableConstraint(CAtoms V, std::vector<ConstAtom *> SV,
                             std::string T, std::string Name,
                             FunctionVariableConstraint *F, std::string Is,
-                            int Generic = -1)
-      : ConstraintVariable(PointerVariable, "" /*not used*/, Name), BaseType(T),
+                            int Generic=-1, bool IsTypeddef=false, TypedefNameDecl *TDT=nullptr,
+                            std::string TypedefString="",
+                            struct InternalTypedefInfo TypedefLevelInfo={}) :
+    ConstraintVariable(PointerVariable, "" /*not used*/, Name), BaseType(T),
         Vars(V), SrcVars(SV), FV(F), SrcHasItype(!Is.empty()), ItypeStr(Is),
         PartOfFuncPrototype(false), Parent(nullptr), BoundsAnnotationStr(""),
-        GenericIndex(Generic), IsZeroWidthArray(false), IsVoidPtr(false) {}
+        GenericIndex(Generic), IsZeroWidthArray(false), IsTypedef(IsTypeddef),
+        TDT(TDT), TypedefString(TypedefString),
+        TypedefLevelInfo(TypedefLevelInfo), IsVoidPtr(false) {}
 
 public:
   std::string getTy() const { return BaseType; }
