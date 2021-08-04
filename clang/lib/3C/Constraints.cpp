@@ -121,7 +121,9 @@ bool Constraints::addConstraint(Constraint *C) {
     } else
       llvm_unreachable("unsupported constraint");
     return true;
-  } else if (C->isUnwritable()) {
+  }
+
+  if (C->isUnwritable()) {
     auto *StoredConstraint = *Search;
     StoredConstraint->setReason(C->getReason());
   }

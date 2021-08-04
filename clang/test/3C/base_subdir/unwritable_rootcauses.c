@@ -6,5 +6,10 @@
 int foo(void) { 
   int *a = ptr;
   int *z = a;
-  return *z;
+  int* q = f1();
+  int *w = arr + 2;
+
+  f2(q); // expected-warning {{1 unchecked pointer: Default void* type}}
+  
+  return *z + *q + *w;
 }
