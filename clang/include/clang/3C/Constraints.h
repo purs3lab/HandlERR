@@ -277,9 +277,12 @@ public:
   virtual bool operator==(const Constraint &Other) const = 0;
   virtual bool operator!=(const Constraint &Other) const = 0;
   virtual bool operator<(const Constraint &Other) const = 0;
-  virtual std::string getReason() { return REASON; }
+  virtual std::string getReason() const { return REASON; }
   virtual void setReason(const std::string &Rsn) { REASON = Rsn; }
-  virtual bool isUnwritable(void) = 0;
+
+  bool isUnwritable(void) const {
+    return getReason() == "Declaration in non-writable file";
+  }
 
   const PersistentSourceLoc &getLocation() const { return PL; }
 };
@@ -350,6 +353,7 @@ public:
     if (const Geq *E = llvm::dyn_cast<Geq>(&Other))
       return *Lhs == *E->Lhs && *Rhs == *E->Rhs &&
              IsCheckedConstraint == E->IsCheckedConstraint;
+
     return false;
   }
 
@@ -374,10 +378,6 @@ public:
   }
 
   bool isSoft(void) { return IsSoft; }
-
-  bool isUnwritable(void) {
-    return getReason() == "Declaration in non-writable file";
-  }
 
 private:
   Atom *Lhs;

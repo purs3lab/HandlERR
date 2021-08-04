@@ -96,8 +96,10 @@ void Constraints::editConstraintHook(Constraint *C) {
 bool Constraints::addConstraint(Constraint *C) {
   editConstraintHook(C);
 
+  auto Search = TheConstraints.find(C);
+
   // Check if C is already in the set of constraints.
-  if (TheConstraints.find(C) == TheConstraints.end()) {
+  if (Search == TheConstraints.end()) {
     TheConstraints.insert(C);
 
     if (Geq *G = dyn_cast<Geq>(C)) {
@@ -119,6 +121,9 @@ bool Constraints::addConstraint(Constraint *C) {
     } else
       llvm_unreachable("unsupported constraint");
     return true;
+  } else if (C->isUnwritable()) {
+    auto *StoredConstraint = *Search;
+    StoredConstraint->setReason(C->getReason());
   }
 
   return false;

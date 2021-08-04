@@ -5,5 +5,6 @@
 
 int foo(void) { 
   int *a = ptr;
-  return *a;
+  int *z = a;
+  return *z;
 }
