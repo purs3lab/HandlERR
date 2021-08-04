@@ -123,6 +123,12 @@ bool Constraints::addConstraint(Constraint *C) {
     return true;
   }
 
+  // If the constraint being added is due to unwritability,
+  // propagate this reason to the existing constraint.
+  // This way we always prioritize the unwritability as the reason
+  // for wildness.
+  // This is needed as 3C will currently only report one cause of wildness
+  // (See Issue #268)
   if (C->isUnwritable()) {
     auto *StoredConstraint = *Search;
     StoredConstraint->setReason(C->getReason());
