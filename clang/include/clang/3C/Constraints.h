@@ -279,6 +279,7 @@ public:
   virtual bool operator<(const Constraint &Other) const = 0;
   virtual std::string getReason() { return REASON; }
   virtual void setReason(const std::string &Rsn) { REASON = Rsn; }
+  virtual bool isUnwritable(void) = 0;
 
   const PersistentSourceLoc &getLocation() const { return PL; }
 };
@@ -300,7 +301,8 @@ public:
   Geq(Atom *Lhs, Atom *Rhs, const std::string &Rsn, PersistentSourceLoc *PL,
       bool IsCC = true, bool Soft = false)
       : Constraint(C_Geq, Rsn, PL), Lhs(Lhs), Rhs(Rhs),
-        IsCheckedConstraint(IsCC), IsSoft(Soft) {}
+        IsCheckedConstraint(IsCC), IsSoft(Soft) {
+  }
 
   static bool classof(const Constraint *C) { return C->getKind() == C_Geq; }
 
@@ -372,6 +374,10 @@ public:
   }
 
   bool isSoft(void) { return IsSoft; }
+
+  bool isUnwritable(void) {
+    return getReason() == "Declaration in non-writable file";
+  }
 
 private:
   Atom *Lhs;
