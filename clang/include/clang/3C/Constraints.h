@@ -281,7 +281,8 @@ public:
   virtual void setReason(const std::string &Rsn) { REASON = Rsn; }
 
   bool isUnwritable(void) const {
-    return getReason() == "Declaration in non-writable file";
+    return getReason() == "Declaration in non-writable file" ||
+            getReason() == "Expression in non-writable file";
   }
 
   const PersistentSourceLoc &getLocation() const { return PL; }
