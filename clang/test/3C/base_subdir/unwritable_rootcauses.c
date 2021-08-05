@@ -1,7 +1,8 @@
 // RUN: cd %S
-// RUN: 3c -alltypes -addcr -output-dir=%t.checked/base_subdir -warn-all-root-cause %s -- -Xclang -verify
+// RUN: 3c -alltypes -addcr -output-dir=%t.checked/base_subdir -warn-root-cause %s -- -Xclang -verify=unwritable-expected
 
 #include "../unwritable_rootcauses.h"
+#include "../root_cause.c"
 
 int foo(void) { 
   int *a = ptr;
@@ -9,7 +10,7 @@ int foo(void) {
   int* q = f1();
   int *w = arr + 2;
 
-  f2(q); // expected-warning {{1 unchecked pointer: Default void* type}}
+  f2(q); // unwritable-expected-warning {{1 unchecked pointer: Default void* type}}
   
   return *z + *q + *w;
 }
