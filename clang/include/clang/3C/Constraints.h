@@ -304,8 +304,7 @@ public:
   Geq(Atom *Lhs, Atom *Rhs, const std::string &Rsn, PersistentSourceLoc *PL,
       bool IsCC = true, bool Soft = false)
       : Constraint(C_Geq, Rsn, PL), Lhs(Lhs), Rhs(Rhs),
-        IsCheckedConstraint(IsCC), IsSoft(Soft) {
-  }
+        IsCheckedConstraint(IsCC), IsSoft(Soft) {}
 
   static bool classof(const Constraint *C) { return C->getKind() == C_Geq; }
 
