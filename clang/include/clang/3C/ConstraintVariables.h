@@ -191,6 +191,7 @@ public:
                                const std::string &ReasonUnchangeable,
                                PersistentSourceLoc *PSL) = 0;
 
+  // Copy this variable and replace all VarAtoms with fresh VarAtoms.
   virtual ConstraintVariable *getCopy(Constraints &CS) = 0;
 
   virtual ~ConstraintVariable(){};
@@ -320,7 +321,8 @@ private:
   // Get solution for the atom of a pointer.
   const ConstAtom *getSolution(const Atom *A, const EnvironmentMap &E) const;
 
-  PointerVariableConstraint(PointerVariableConstraint *Ot, Constraints &CS);
+  // Construct a copy of this variable, reusing all VarAtoms.
+  PointerVariableConstraint(PointerVariableConstraint *Ot);
   PointerVariableConstraint *Parent;
   // String representing declared bounds expression.
   std::string BoundsAnnotationStr;
@@ -347,19 +349,12 @@ private:
   // Is this a pointer to void? Possibly with multiple levels of indirection.
   bool IsVoidPtr;
 
-  // Constructor for when we know a CVars and a type string.
-  PointerVariableConstraint(CAtoms V, std::vector<ConstAtom *> SV,
-                            std::string T, std::string Name,
-                            FunctionVariableConstraint *F, std::string Is,
-                            int Generic=-1, bool IsTypeddef=false, TypedefNameDecl *TDT=nullptr,
-                            std::string TypedefString="",
-                            struct InternalTypedefInfo TypedefLevelInfo={}) :
-    ConstraintVariable(PointerVariable, "" /*not used*/, Name), BaseType(T),
-        Vars(V), SrcVars(SV), FV(F), SrcHasItype(!Is.empty()), ItypeStr(Is),
-        PartOfFuncPrototype(false), Parent(nullptr), BoundsAnnotationStr(""),
-        GenericIndex(Generic), IsZeroWidthArray(false), IsTypedef(IsTypeddef),
-        TDT(TDT), TypedefString(TypedefString),
-        TypedefLevelInfo(TypedefLevelInfo), IsVoidPtr(false) {}
+
+  PointerVariableConstraint(std::string Name) :
+    ConstraintVariable(PointerVariable, "", Name), FV(nullptr),
+    SrcHasItype(false), PartOfFuncPrototype(false), Parent(nullptr),
+    GenericIndex(-1), IsZeroWidthArray(false), IsTypedef(false), TDT(nullptr),
+    TypedefLevelInfo({}), IsVoidPtr(false) {}
 
 public:
   std::string getTy() const { return BaseType; }
@@ -558,7 +553,7 @@ public:
 // when a re-write of a function pointer is needed.
 class FunctionVariableConstraint : public ConstraintVariable {
 private:
-  FunctionVariableConstraint(FunctionVariableConstraint *Ot, Constraints &CS);
+  FunctionVariableConstraint(FunctionVariableConstraint *Ot);
 
   // N constraints on the return value of the function.
   FVComponentVariable ReturnVar;
@@ -581,11 +576,6 @@ private:
   void equateFVConstraintVars(ConstraintVariable *CV, ProgramInfo &Info) const;
 
 public:
-  FunctionVariableConstraint()
-      : ConstraintVariable(FunctionVariable, "", ""), FileName(""),
-        Hasproto(false), Hasbody(false), IsStatic(false), Parent(nullptr),
-        IsFunctionPtr(false) {}
-
   FunctionVariableConstraint(clang::DeclaratorDecl *D, ProgramInfo &I,
                              const clang::ASTContext &C);
   FunctionVariableConstraint(clang::TypedefDecl *D, ProgramInfo &I,
