@@ -14,9 +14,9 @@ _Itype_for_any(T) void vsf_sysutil_memclr(void *p_dest
                                                 byte_count(size),
                                             unsigned int size)
 // CHECK_ALL: _Itype_for_any(T) void vsf_sysutil_memclr(void *p_dest
-// CHECK-NEXT: : itype(_Array_ptr<T>)
-// CHECK-NEXT: byte_count(size),
-// CHECK-NEXT: unsigned int size)
+// CHECK_ALL-NEXT: : itype(_Array_ptr<T>)
+// CHECK_ALL-NEXT: byte_count(size),
+// CHECK_ALL-NEXT: unsigned int size)
 {
   /* Safety */
   if (size == 0) {
