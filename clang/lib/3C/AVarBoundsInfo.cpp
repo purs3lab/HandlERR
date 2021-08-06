@@ -667,15 +667,15 @@ bool AVarBoundsInfo::tryGetVariable(clang::Decl *D, BoundsKey &R) {
 
 bool AVarBoundsInfo::tryGetVariable(clang::Expr *E, const ASTContext &C,
                                     BoundsKey &Res) {
-  llvm::APSInt ConsVal;
+  Optional<llvm::APSInt> OptConsVal;
   bool Ret = false;
   if (E != nullptr) {
     E = E->IgnoreParenCasts();
     if (E->getType()->isArithmeticType() &&
-        E->isIntegerConstantExpr(ConsVal, C)) {
+        (OptConsVal = E->getIntegerConstantExpr(C))) {
       SourceRange SR = E->getSourceRange();
       std::string CountRepr = SR.isValid() ? getSourceText(SR, C) : "";
-      Res = getConstKey(ConsVal.getZExtValue(), CountRepr);
+      Res = getConstKey((*OptConsVal).getZExtValue(), CountRepr);
       Ret = true;
     } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
       auto *D = DRE->getDecl();
