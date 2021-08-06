@@ -48,7 +48,7 @@ typedef int *intptr;
 
 // expected-warning@+1 {{Declaration in non-writable file}}
 void unwritable_cast(void((*g)(int *q)) : itype(_Ptr<void(_Ptr<int>)>)) {
-  // expected-warning@+1 {{Declaration in non-writable file}}
+  // expected-warning@+1 {{Expression in non-writable file}}
   int *p = 0;
   // Now 3C thinks it needs to insert _Assume_bounds_cast<_Ptr<int>> around `p`
   // because it forgets that it is allowed to use the original type of `g`.
