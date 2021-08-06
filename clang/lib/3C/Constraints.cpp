@@ -128,7 +128,7 @@ bool Constraints::addConstraint(Constraint *C) {
   // This way we always prioritize the unwritability as the reason
   // for wildness.
   // This is needed as 3C will currently only report one cause of wildness
-  // (See Issue #268)
+  // (See https://github.com/correctcomputation/checkedc-clang/issues/664)
   if (C->isUnwritable()) {
     auto *StoredConstraint = *Search;
     StoredConstraint->setReason(C->getReason());
