@@ -9,8 +9,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-_Itype_for_any(T) void vsf_sysutil_memclr(void *p_dest : itype(_Array_ptr<T>) byte_count(size), unsigned int size)
-// CHECK_ALL: _Itype_for_any(T) void vsf_sysutil_memclr(void *p_dest : itype(_Array_ptr<T>) byte_count(size), unsigned int size)
+_Itype_for_any(T) void vsf_sysutil_memclr(void *p_dest
+                                          : itype(_Array_ptr<T>)
+                                                byte_count(size),
+                                            unsigned int size)
+// CHECK_ALL: _Itype_for_any(T) void vsf_sysutil_memclr(void *p_dest
+// CHECK-NEXT: : itype(_Array_ptr<T>)
+// CHECK-NEXT: byte_count(size),
+// CHECK-NEXT: unsigned int size)
 {
   /* Safety */
   if (size == 0) {
