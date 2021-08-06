@@ -157,13 +157,15 @@ inline CSetBkeyPair pairWithEmptyBkey(const CVarSet &Vars) {
 ConstraintVariable *localReturnConstraint(
     FVConstraint *FV,
     ProgramInfo::CallTypeParamBindingsT TypeVars,
-    Constraints &CS) {
+    Constraints &CS,
+    ProgramInfo &Info) {
   int TyVarIdx = FV->getExternalReturn()->getGenericIndex();
   // Check if local type vars are available
   if (TypeVars.find(TyVarIdx) != TypeVars.end() &&
       TypeVars[TyVarIdx].first != nullptr) {
     ConstraintVariable *CV = nullptr;
-    if (TypeVars[TyVarIdx].second != nullptr) {
+    if (TypeVars[TyVarIdx].second != nullptr &&
+        TypeVars[TyVarIdx].first->isSolutionChecked(Info.getConstraints().getVariables())) {
       CV = TypeVars[TyVarIdx].second;
     } else {
       CV = TypeVars[TyVarIdx].first;
@@ -447,10 +449,10 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
 
         for (ConstraintVariable *C : Tmp.first) {
           if (FVConstraint *FV = dyn_cast<FVConstraint>(C)) {
-            ReturnCVs.insert(localReturnConstraint(FV,TypeVars,CS));
+            ReturnCVs.insert(localReturnConstraint(FV,TypeVars,CS,Info));
           } else if (PVConstraint *PV = dyn_cast<PVConstraint>(C)) {
             if (FVConstraint *FV = PV->getFV())
-              ReturnCVs.insert(localReturnConstraint(FV,TypeVars,CS));
+              ReturnCVs.insert(localReturnConstraint(FV,TypeVars,CS,Info));
           }
         }
       } else if (DeclaratorDecl *FD = dyn_cast<DeclaratorDecl>(D)) {
@@ -503,13 +505,13 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
           assert(CV.hasValue() && "Function without constraint variable.");
           /* Direct function call */
           if (FVConstraint *FVC = dyn_cast<FVConstraint>(&CV.getValue()))
-            ReturnCVs.insert(localReturnConstraint(FVC,TypeVars,CS));
+            ReturnCVs.insert(localReturnConstraint(FVC,TypeVars,CS,Info));
           /* Call via function pointer */
           else {
             PVConstraint *Tmp = dyn_cast<PVConstraint>(&CV.getValue());
             assert(Tmp != nullptr);
             if (FVConstraint *FVC = Tmp->getFV())
-              ReturnCVs.insert(localReturnConstraint(FVC,TypeVars,CS));
+              ReturnCVs.insert(localReturnConstraint(FVC,TypeVars,CS,Info));
             else {
               // No FVConstraint -- make WILD.
               auto *TmpFV = new FVConstraint();

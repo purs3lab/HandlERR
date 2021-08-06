@@ -460,8 +460,8 @@ public:
           if (Entry.second.first != nullptr) {
             AllInconsistent = false;
             std::string TyStr;
-            PVConstraint *CheckVoid = dyn_cast<PVConstraint>(Entry.second.first);
-            if (Entry.second.second != nullptr && CheckVoid->isVoidPtr()) {
+            if (Entry.second.second != nullptr &&
+                Entry.second.first->isSolutionChecked(Info.getConstraints().getVariables())) {
               TyStr = Entry.second.second->mkString(
                   Info.getConstraints(), MKSTRING_OPTS(EmitName = false, EmitPointee = true));
             } else {
