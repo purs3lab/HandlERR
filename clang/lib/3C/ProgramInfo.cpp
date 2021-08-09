@@ -1181,12 +1181,12 @@ void ProgramInfo::addTypedef(PersistentSourceLoc PSL, bool CanRewriteDef,
   else
     V = new PointerVariableConstraint(TD, *this, C);
 
-  auto *const Rsn = !CanRewriteDef
-                        ? "Unable to rewrite a typedef with multiple names"
-                        : "Declaration in non-writable file";
-  if (!(CanRewriteDef && canWrite(PSL.getFileName()))) {
-    V->constrainToWild(this->getConstraints(), Rsn, &PSL);
-  }
+  if (!CanRewriteDef)
+    V->constrainToWild(this->getConstraints(), "Unable to rewrite a typedef with multiple names", &PSL);
+
+  if (!canWrite(PSL.getFileName()))
+    V->constrainToWild(this->getConstraints(), "Declaration in non-writable file", &PSL);
+
   constrainWildIfMacro(V, TD->getLocation(), &PSL);
   this->TypedefVars[PSL] = {*V};
 }
