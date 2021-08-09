@@ -32,6 +32,7 @@ class ConstraintsGraph;
 
 #define DEFAULT_REASON "UNKNOWN_REASON"
 #define POINTER_IS_ARRAY_REASON "Pointer is array but alltypes is disabled."
+#define UNWRITABLE_REASON "Source code in non-writable file."
 
 template <typename T> struct PComp {
   bool operator()(const T Lhs, const T Rhs) const { return *Lhs < *Rhs; }
@@ -281,8 +282,7 @@ public:
   virtual void setReason(const std::string &Rsn) { REASON = Rsn; }
 
   bool isUnwritable(void) const {
-    return getReason() == "Declaration in non-writable file" ||
-            getReason() == "Expression in non-writable file";
+    return getReason() == UNWRITABLE_REASON;
   }
 
   const PersistentSourceLoc &getLocation() const { return PL; }
