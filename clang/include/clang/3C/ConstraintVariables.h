@@ -247,7 +247,6 @@ public:
   static PointerVariableConstraint *
   getWildPVConstraint(Constraints &CS, const std::string &Rsn,
                       PersistentSourceLoc *PSL = nullptr);
-  static PointerVariableConstraint *getPtrPVConstraint(Constraints &CS);
   static PointerVariableConstraint *getNonPtrPVConstraint(Constraints &CS);
   static PointerVariableConstraint *getNamedNonPtrPVConstraint(StringRef Name,
                                                                Constraints &CS);
