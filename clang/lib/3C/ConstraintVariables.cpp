@@ -61,7 +61,7 @@ PointerVariableConstraint *
 PointerVariableConstraint::getNonPtrPVConstraint(Constraints &CS) {
   static PointerVariableConstraint *GlobalNonPtrPV = nullptr;
   if (GlobalNonPtrPV == nullptr)
-    return new PointerVariableConstraint("basevar");
+    GlobalNonPtrPV = new PointerVariableConstraint("basevar");
   return GlobalNonPtrPV;
 }
 
