@@ -191,7 +191,9 @@ public:
                                const std::string &ReasonUnchangeable,
                                PersistentSourceLoc *PSL) = 0;
 
-  // Copy this variable and replace all VarAtoms with fresh VarAtoms.
+  // Copy this variable and replace all VarAtoms with fresh VarAtoms. Using
+  // fresh atoms allows the new variable to solve to different types than the
+  // original.
   virtual ConstraintVariable *getCopy(Constraints &CS) = 0;
 
   virtual ~ConstraintVariable(){};
@@ -244,17 +246,35 @@ public:
     RestrictQualification
   };
 
+  // Get a constraint variable representing a pointer which has been constrained
+  // to WILD for the specified reason.
+  // TODO: This method always returns a constraint variable containing one atom.
+  //       This causes problems if the variable is later used as a deeper
+  //       pointer type. See correctcomputation/checkedc-clang#673.
   static PointerVariableConstraint *
   getWildPVConstraint(Constraints &CS, const std::string &Rsn,
                       PersistentSourceLoc *PSL = nullptr);
+
+  // Get constraint variables representing values that are not pointers. If a
+  // meaningful name can be assigned to the value, the second method should be
+  // used to get higher quality root-cause and debugging output.
   static PointerVariableConstraint *getNonPtrPVConstraint(Constraints &CS);
   static PointerVariableConstraint *getNamedNonPtrPVConstraint(StringRef Name,
                                                                Constraints &CS);
 
+  // Given a constraint variable, return a new constraint variable with the same
+  // atoms as the original, but with one fresh atoms added to the front of the
+  // Vars vector. This effectively takes the address of the pointer represented
+  // by the original constraint variable.
   static PointerVariableConstraint *
   addAtomPVConstraint(PointerVariableConstraint *PVC, ConstAtom *PtrTyp,
                       Constraints &CS);
 
+  // Return a new constraint variable representing the result of dereferencing
+  // the input constraint variable. This is accomplished by first copying the
+  // parameter, and then removing the first element of the Vars vector in the
+  // copy. The remaining VarAtoms in the copy are the same as those in the
+  // original.
   static PointerVariableConstraint *
   derefPVConstraint(PointerVariableConstraint *PVC);
 
@@ -320,7 +340,10 @@ private:
   // Get solution for the atom of a pointer.
   const ConstAtom *getSolution(const Atom *A, const EnvironmentMap &E) const;
 
-  // Construct a copy of this variable, reusing all VarAtoms.
+  // Construct a copy of this variable, reusing all VarAtoms. To instead obtains
+  // a copy of the constraint variable which contains fresh VarAtoms (allowing
+  // the new variable to solve to different type than the original), instead use
+  // the method getCopy.
   PointerVariableConstraint(PointerVariableConstraint *Ot);
   PointerVariableConstraint *Parent;
   // String representing declared bounds expression.
@@ -349,7 +372,9 @@ private:
   // Is this a pointer to void? Possibly with multiple levels of indirection.
   bool IsVoidPtr;
 
-
+  // Construct and empty PointerVariableConstraint with only the name set. All
+  // other fields are initialized to default values. This is used to construct
+  // variables for non-pointer expressions.
   PointerVariableConstraint(std::string Name) :
     ConstraintVariable(PointerVariable, "", Name), FV(nullptr),
     SrcHasItype(false), PartOfFuncPrototype(false), Parent(nullptr),
