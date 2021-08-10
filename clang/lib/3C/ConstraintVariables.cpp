@@ -54,7 +54,7 @@ PointerVariableConstraint *PointerVariableConstraint::getWildPVConstraint(
   WildPVC->Vars.push_back(VA);
   WildPVC->SrcVars.push_back(CS.getWild());
 
-  // Mark this constraint variable is generic. This is done because we do not
+  // Mark this constraint variable as generic. This is done because we do not
   // know the type of the constraint, and therefore we also don't know the
   // number of atoms it needs to have. Fortunately, it's already WILD, so any
   // constraint made with it will force the other constraint to WILD, safely
