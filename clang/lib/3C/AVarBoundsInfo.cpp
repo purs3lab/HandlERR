@@ -320,9 +320,11 @@ bool AvarBoundsInference::getReachableBoundKeys(const ProgramVarScope *DstScope,
   } else {
     PotK.insert(TV.getVisibleKeys().begin(), TV.getVisibleKeys().end());
 
-    // This condition seems to be necessary for array bounds using global
-    // variables, but it's not clear why exactly it's required, and why it's
-    // only added to VisibleKeys and never InScopeKeys.
+    // This condition is necessary for array bounds using global variables.
+    // The bounds keys for global variable do not appear in the BKGraph array
+    // bounds graph, so breadth first search finds visits an empty set of nodes,
+    // not even visiting the initial bounds key. This ensures the global
+    // variable is added to the set of potential keys.
     if (DstScope->isInInnerScope(*BI->getProgramVar(FromVarK)->getScope()))
       PotK.insert(FromVarK);
   }
@@ -1138,11 +1140,9 @@ void AVarBoundsInfo::computeArrPointers(const ProgramInfo *PI) {
     if (hasOnlyNtArray(CV, PI->getConstraints())) {
       NtArrPointerBoundsKey.insert(BK);
       // If the return value is an nt array pointer and there are no declared
-      // bounds? Then, we cannot find bounds for this pointer.
-      // FIXME: This feels wrong. Why does it only apply to NTARR? Why does it
-      //        only apply to the return value? As I understand it, an
-      //        _Nt_array_ptr without bounds actually has bounds `count(0)`,
-      //        so it should be treated as a count bound for inference.
+      // bounds? Then, we cannot find bounds for this pointer. This avoids
+      // placing incorrect bounds on null terminated arrays as discussed in
+      // https://github.com/correctcomputation/checkedc-clang/issues/553
       if (CV->getName() == RETVAR && getBounds(BK) == nullptr)
         PointersWithImpossibleBounds.insert(BK);
     }
