@@ -96,11 +96,6 @@ void Constraints::editConstraintHook(Constraint *C) {
 bool Constraints::addConstraint(Constraint *C) {
   editConstraintHook(C);
 
-  // TODO:
-  //   currently the multiple names constraint reason
-  //   isn't replaced by the non-writable reason
-  //   I think it's something in the overloaded == operator
-
   auto Search = TheConstraints.find(C);
 
   // Check if C is already in the set of constraints.

@@ -363,7 +363,6 @@ public:
     if (const Geq *E = llvm::dyn_cast<Geq>(&Other))
       return *Lhs == *E->Lhs && *Rhs == *E->Rhs &&
              IsCheckedConstraint == E->IsCheckedConstraint;
-
     return false;
   }
 

@@ -5,9 +5,10 @@
 #include "../root_cause.c"
 
 int foo(void) { 
+  // Create some pointers to get actual numbers in the root cause output
   int *a = ptr;
   int *z = a;
-  int* q = f1();
+  int *q = f1();
   int *w = arr + 2;
 
   f2(q); // unwritable-expected-warning {{1 unchecked pointer: Default void* type}}
