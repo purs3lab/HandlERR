@@ -17,6 +17,8 @@
 #include <llvm/ADT/DenseSet.h>
 #include <llvm/ADT/SmallPtrSet.h>
 #include <sstream>
+#include <thread>
+#include <functional>
 
 using namespace clang;
 
@@ -972,6 +974,68 @@ FVConstraint *ProgramInfo::getStaticFuncConstraint(std::string FuncName,
 typedef llvm::SmallPtrSet<VarAtom*, 32> VarAtomSet;
 typedef llvm::DenseSet<ConstraintKey, llvm::DenseMapInfo<unsigned>> ConstraintKeySet;
 
+template <typename T>
+class ConcurrentQueue {
+private:
+  std::mutex Lock;
+  std::queue<T> Q;
+
+public:
+  ConcurrentQueue(std::vector<T> Init) {
+    for (auto V : Init)
+      Q.push(V);
+  }
+
+  ConcurrentQueue(std::set<T> Init) {
+    for (auto V : Init)
+      Q.push(V);
+  }
+
+  llvm::Optional<T> pop(void) {
+    Lock.lock();
+    if (Q.size() == 0) {
+      Lock.unlock();
+      return llvm::Optional<T>();
+    }
+
+    auto R = llvm::Optional<T>(Q.front());
+    Q.pop();
+    Lock.unlock();
+    return R;
+  }
+};
+
+class LockedSet {
+private:
+  std::shared_ptr<std::mutex> Lock;
+  std::shared_ptr<VarAtomSet> Data;
+
+public:
+
+  LockedSet() : Lock(std::make_shared<std::mutex>()),
+                Data(std::make_shared<VarAtomSet>()) {
+  }
+
+  LockedSet(const LockedSet &RHS) : Lock(RHS.Lock), Data(RHS.Data) {
+
+  }
+
+
+   VarAtomSet query(std::function<VarAtomSet(VarAtomSet&)> F) {
+    Lock->lock();
+    auto Ans = F(*Data);
+    Lock->unlock();
+    return Ans;
+  }
+
+  void apply(std::function<void(VarAtomSet&)> F) {
+    Lock->lock();
+    F(*Data);
+    Lock->unlock();
+  }
+
+};
+
 // Factory context for root cause analysis
 // This class tracks global root cause analysis information
 class RCAFactory {
@@ -979,7 +1043,7 @@ private:
   // Set of vars that map to a decl & are in a writable file
   CVars &RelevantVarsKeys;
   // Set of vars that are directly wild
-  std::set<Atom*> &DirectWildVarAtoms;
+  std::set<VarAtom*> &DirectWildVarAtoms;
 
   ConstraintsGraph &CG;
   ConstraintsInfo &CState;
@@ -988,14 +1052,19 @@ private:
   // Map a key (K) to the set of keys reachable by K
   // This functions as the memo-pad
   // We use the more efficient LLVM set types here
-  llvm::DenseMap<ConstraintKey, VarAtomSet, llvm::DenseMapInfo<unsigned>> ReachableBy;
+  llvm::DenseMap<ConstraintKey, LockedSet, llvm::DenseMapInfo<unsigned>> ReachableBy;
+  ConcurrentQueue<VarAtom*> Jobs;
+  std::vector<std::thread> Workers;
 
 
 public:
-  RCAFactory(CVars &RVs, std::set<Atom*> &DWVs,
+  RCAFactory(CVars &RVs, std::set<VarAtom*> &DWVs,
              ConstraintsGraph &CG, ConstraintsInfo &CState)
   : RelevantVarsKeys(RVs), DirectWildVarAtoms(DWVs),
-        CG(CG), CState(CState) {}
+        CG(CG), CState(CState), Jobs(DWVs) {
+    for (auto *DirectWild : DWVs)
+      CState.AllWildAtoms.insert(DirectWild->getLoc());
+  }
 
 
 
@@ -1007,10 +1076,28 @@ public:
   void markReachable(VarAtom* FromV, VarAtom *ToV) {
     auto From = FromV->getLoc(), To = ToV->getLoc();
 
-    ReachableBy[From].insert(ToV);
+    auto Updater = [&](VarAtomSet &Reachable) {
+      Reachable.insert(ToV);
+    };
+
+
+    ReachableBy[From].apply(Updater);
     // Check if To has reachable nodes, if so add them
-    if (ReachableBy.count(To) != 0)
-      ReachableBy[From].insert(ReachableBy[To].begin(), ReachableBy[To].end());
+    if (ReachableBy.count(To) != 0) {
+      auto Getter = [&](VarAtomSet &Reachable) {
+        VarAtomSet S;
+        S.insert(Reachable.begin(), Reachable.end());
+        return S;
+      };
+
+      auto S1 = ReachableBy[To].query(Getter);
+
+      auto Setter = [&](VarAtomSet &Reachable) {
+        Reachable.insert(S1.begin(), S1.end());
+      };
+
+      ReachableBy[From].apply(Setter);
+    }
   }
 
   // Check if a given VarAtom has had reachability data logged yet
@@ -1018,7 +1105,7 @@ public:
     return ReachableBy.count(VA->getLoc()) != 0;
   }
 
-  VarAtomSet& getReachable(VarAtom *VA) {
+  LockedSet& getReachable(VarAtom *VA) {
     assert("Should only be called on memoized values" && memoized(VA));
     return ReachableBy[VA->getLoc()];
   }
@@ -1059,8 +1146,7 @@ class RootCauseAnalysis {
 public:
 
   RootCauseAnalysis(RCAFactory *F, VarAtom *WA) : F(F), WildAtom(WA) {
-    // Begin traversal out from the root cause of wildness
-    traverse(WA);
+    traverse(WildAtom);
   }
 
   // The set of all relevant variables constrained by the target
@@ -1071,7 +1157,7 @@ public:
 private:
   // Factory Context
   RCAFactory *F;
-  // The target of the search
+  // The target of the current search
   VarAtom *WildAtom;
   // Set of variables constrained by the target
   CVars ConstrainedByThis;
@@ -1112,13 +1198,16 @@ private:
 
 private:
   void traverseMemoizedNode(VarAtom *VA) {
-    for (VarAtom *K : F->getReachable(VA)) {
-      if (K->isForDecl()) {
-        F->addRootCause(K, WildAtom);
-        if (F->isRelevantVar(K))
-          ConstrainedByThis.insert(K->getLoc());
+    auto SetF = [&](VarAtomSet Reachable) {
+      for (VarAtom *K : Reachable) {
+        if (K->isForDecl()) {
+          F->addRootCause(K, WildAtom);
+          if (F->isRelevantVar(K))
+            ConstrainedByThis.insert(K->getLoc());
+        }
       }
-    }
+    };
+    F->getReachable(VA).apply(SetF);
   }
 
   void traverseNewNode(VarAtom *ReachableVar) {
@@ -1134,12 +1223,41 @@ private:
 
 };
 
+class RootCauseAnalysisExecutor {
+
+  RootCauseAnalysisExecutor(RCAFactory *F,
+                            ConcurrentQueue<VarAtom*> &Jobs)
+  : F(F), Jobs(Jobs) {}
+
+  // Thread entrypoint
+  void operator()(void) {
+    while(true) {
+      auto Next = Jobs.pop();
+      if (Next.hasValue()) {
+        auto *NextVarAtom = Next.getValue();
+        RootCauseAnalysis(F, NextVarAtom);
+        // TODO perform end of analysis tasks
+      } else {
+        break;
+      }
+    }
+  }
+
+
+private:
+  // Factory Context
+  RCAFactory *F;
+
+  ConcurrentQueue<VarAtom*> &Jobs;
+};
+
 
 void RCAFactory::analyzeRootCause(VarAtom *DirectWild) {
   CState.AllWildAtoms.insert(DirectWild->getLoc());
 
   // Perform root cause analysis
   RootCauseAnalysis RCA(this, DirectWild);
+  RCA();
   CVars &TotalConstrainedBy = CState.getConstrainedBy(DirectWild);
   // Add all the new constraints we found into our total set
   CVars &NewConstraints = RCA.getConstrainedBy();
@@ -1147,21 +1265,27 @@ void RCAFactory::analyzeRootCause(VarAtom *DirectWild) {
 }
 
 void ProgramInfo::doRootCauseAnalysis(CVars &RelevantVarsKey,
-                                      std::set<Atom *> &DirectWildVarAtoms,
+                                      std::set<Atom *> &DirectWildAtoms,
                                       ConstraintsGraph &CG) {
 
+  std::set<VarAtom*> DirectWildVarAtoms;
+  for (auto *A : DirectWildAtoms)
+    if (auto *VA = dyn_cast<VarAtom>(A))
+      DirectWildVarAtoms.insert(VA);
   RCAFactory RCAF(RelevantVarsKey, DirectWildVarAtoms, CG, CState);
 
   // Analyze the root causes for every directly wild atom
-  for (auto *WildAtom : DirectWildVarAtoms)
-    if (auto *WildVarAtom = dyn_cast<VarAtom>(WildAtom))
-      RCAF.analyzeRootCause(WildVarAtom);
+  for (auto *VA : DirectWildVarAtoms)
+    RCAF.analyzeRootCause(VA);
 
   findIntersection(CState.AllWildAtoms, RelevantVarsKey, CState.InSrcWildAtoms);
   findIntersection(CState.TotalNonDirectWildAtoms, RelevantVarsKey,
                    CState.InSrcNonDirectWildAtoms);
 
 }
+
+
+
 
 // From the given constraint graph, this method computes the interim constraint
 // state that contains constraint vars which are directly assigned WILD and
