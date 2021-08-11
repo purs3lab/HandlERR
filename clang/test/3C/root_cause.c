@@ -56,6 +56,8 @@ void test1() {
   // unwritable-expected-warning@+2 {{0 unchecked pointers: Source code in non-writable file}}
   // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
   int *d = malloc(1); // expected-warning {{1 unchecked pointer: Unsafe call to allocator function}}
+  // unwritable-expected-warning@+2 {{0 unchecked pointers: Source code in non-writable file}}
+  // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
   int **e = malloc(1); // expected-warning {{1 unchecked pointer: Unsafe call to allocator function}}
 }
 
