@@ -18,13 +18,11 @@ void test0() {
   int *a;
   // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
   char *b;
-  // unwritable-expected-warning@+2 {{0 unchecked pointers: Source code in non-writable file}}
-  // unwritable-expected-warning@+1 {{incompatible pointer types assigning to 'int *' from 'char *'}}
+  // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
   a = b; // expected-warning {{2 unchecked pointers: Cast from char * to int *}}
 
   // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
   int *c;
-  // unwritable-expected-warning@+1 {{expression result unused}}
   (char *)c; // expected-warning {{1 unchecked pointer: Cast from int * to char *}}
 
   // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
