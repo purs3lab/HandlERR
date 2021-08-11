@@ -3,7 +3,7 @@
 // This test is unusual in that it checks for the errors in the code
 
 // We define a prototype for malloc here instead of including <stdlib.h> 
-// as including stdlib will create numerous root-cause warnings we don't with to deal with
+// as including stdlib will create numerous root-cause warnings we don't want to deal with
 
 // unwritable-expected-warning@+2 {{0 unchecked pointers: Source code in non-writable file}}
 // expected-warning@+1 {{Unchecked pointer in parameter or return of external function my_malloc}}
