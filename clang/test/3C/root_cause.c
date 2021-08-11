@@ -1,4 +1,4 @@
-// RUN: 3c -base-dir=%S -alltypes -warn-all-root-cause %s -- -Xclang -verify -Wno-everything
+// RUN: 3c -use-malloc=my_malloc -base-dir=%S -alltypes -warn-all-root-cause %s -- -Xclang -verify -Wno-everything
 
 // This test is unusual in that it checks for the errors in the code
 
@@ -6,8 +6,8 @@
 // as including stdlib will create numerous root-cause warnings we don't with to deal with
 
 // unwritable-expected-warning@+2 {{0 unchecked pointers: Source code in non-writable file}}
-// expected-warning@+1 {{Unchecked pointer in parameter or return of external function malloc}}
-_Itype_for_any(T) void *malloc(unsigned long size) : itype(_Array_ptr<T>) byte_count(size);
+// expected-warning@+1 {{Unchecked pointer in parameter or return of external function my_malloc}}
+_Itype_for_any(T) void *my_malloc(unsigned long size) : itype(_Array_ptr<T>) byte_count(size);
 
 
 // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
@@ -40,7 +40,7 @@ void test1() {
   // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
   int *b; 
   // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
-  b = malloc(sizeof(int)); // expected-warning {{1 unchecked pointer: Bad pointer type solution}}
+  b = my_malloc(sizeof(int)); // expected-warning {{1 unchecked pointer: Bad pointer type solution}}
   b[0] = 1;
 
   union u {
@@ -55,10 +55,10 @@ void test1() {
 
   // unwritable-expected-warning@+2 {{0 unchecked pointers: Source code in non-writable file}}
   // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
-  int *d = malloc(1); // expected-warning {{1 unchecked pointer: Unsafe call to allocator function}}
+  int *d = my_malloc(1); // expected-warning {{1 unchecked pointer: Unsafe call to allocator function}}
   // unwritable-expected-warning@+2 {{0 unchecked pointers: Source code in non-writable file}}
   // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
-  int **e = malloc(1); // expected-warning {{1 unchecked pointer: Unsafe call to allocator function}}
+  int **e = my_malloc(1); // expected-warning {{1 unchecked pointer: Unsafe call to allocator function}}
 }
 
 // unwritable-expected-warning@+2 {{0 unchecked pointers: Source code in non-writable file}}

@@ -1,5 +1,5 @@
 // RUN: cd %S
-// RUN: 3c -alltypes -addcr -output-dir=%t.checked/base_subdir -warn-all-root-cause %s -- -Xclang -verify=unwritable-expected
+// RUN: 3c -use-malloc=my_malloc -alltypes -addcr -output-dir=%t.checked/base_subdir -warn-all-root-cause %s -- -Xclang -verify=unwritable-expected
 
 #include "../unwritable_rootcauses.h"
 #include "../root_cause.c"
