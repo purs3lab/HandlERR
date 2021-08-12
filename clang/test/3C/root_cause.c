@@ -67,15 +67,15 @@ extern int *glob;
 // expected-warning@+1 {{1 unchecked pointer: Unchecked pointer in parameter or return of external function glob_f}}
 int *glob_f(void);
 
-    // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
+// unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
 void (*void_star_fptr)(void *); // expected-warning {{1 unchecked pointer: Default void* type}}
-    // unwritable-expected-warning@+1 {{ 0 unchecked pointers: Source code in non-writable file}}
+// unwritable-expected-warning@+1 {{ 0 unchecked pointers: Source code in non-writable file}}
 void void_star_fn(void *p); // expected-warning {{1 unchecked pointer: Default void* type}}
 
 typedef struct {
   int x;
   float f;
-    // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
+// unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
 } A, *PA;
 // expected-warning@-1 {{2 unchecked pointers: Unable to rewrite a typedef with multiple names}}
 // Two pointers affected by the above root cause. Do not count the typedef
