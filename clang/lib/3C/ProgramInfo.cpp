@@ -993,6 +993,7 @@ public:
 
   llvm::Optional<T> pop(void) {
     Lock.lock();
+    llvm::errs() << "Concurrent queue accessed: Size: " << Q.size() << "\n";
     if (Q.size() == 0) {
       Lock.unlock();
       return llvm::Optional<T>();
@@ -1049,10 +1050,7 @@ private:
   ConstraintsInfo &CState;
 
 
-  // Map a key (K) to the set of keys reachable by K
-  // This functions as the memo-pad
-  // We use the more efficient LLVM set types here
-  llvm::DenseMap<ConstraintKey, LockedSet, llvm::DenseMapInfo<unsigned>> ReachableBy;
+ // We use the more efficient LLVM set types here
   ConcurrentQueue<VarAtom*> Jobs;
   std::vector<std::thread> Workers;
 
@@ -1066,49 +1064,12 @@ public:
       CState.AllWildAtoms.insert(DirectWild->getLoc());
   }
 
-
-
-  void analyzeRootCause(VarAtom*);
-
-  // Mark ToV as being reachable from FromV
-  // Check nodes reachable from ToV, and add them as well
-  // TODO there are gains to be made by optimizing this function
-  void markReachable(VarAtom* FromV, VarAtom *ToV) {
-    auto From = FromV->getLoc(), To = ToV->getLoc();
-
-    auto Updater = [&](VarAtomSet &Reachable) {
-      Reachable.insert(ToV);
-    };
-
-
-    ReachableBy[From].apply(Updater);
-    // Check if To has reachable nodes, if so add them
-    if (ReachableBy.count(To) != 0) {
-      auto Getter = [&](VarAtomSet &Reachable) {
-        VarAtomSet S;
-        S.insert(Reachable.begin(), Reachable.end());
-        return S;
-      };
-
-      auto S1 = ReachableBy[To].query(Getter);
-
-      auto Setter = [&](VarAtomSet &Reachable) {
-        Reachable.insert(S1.begin(), S1.end());
-      };
-
-      ReachableBy[From].apply(Setter);
-    }
+  ConstraintsInfo& getCState(void) {
+    return CState;
   }
 
-  // Check if a given VarAtom has had reachability data logged yet
-  bool memoized(VarAtom *VA) {
-    return ReachableBy.count(VA->getLoc()) != 0;
-  }
+  void analyzeRootCause();
 
-  LockedSet& getReachable(VarAtom *VA) {
-    assert("Should only be called on memoized values" && memoized(VA));
-    return ReachableBy[VA->getLoc()];
-  }
 
 
   bool isRelevantVar(VarAtom *VA) {
@@ -1147,6 +1108,10 @@ public:
 
   RootCauseAnalysis(RCAFactory *F, VarAtom *WA) : F(F), WildAtom(WA) {
     traverse(WildAtom);
+    CVars &TotalConstrainedBy = F->getCState().getConstrainedBy(WildAtom);
+    // Add all the new constraints we found into our total set
+    CVars &NewConstraints = getConstrainedBy();
+    TotalConstrainedBy.insert(NewConstraints.begin(), NewConstraints.end());
   }
 
   // The set of all relevant variables constrained by the target
@@ -1189,34 +1154,16 @@ private:
         Indirect.insert(ReachableVar->getLoc());
     }
 
-    if (F->memoized(ReachableVar))
-      traverseMemoizedNode(ReachableVar);
-    else
-      traverseNewNode(ReachableVar);
+    traverseNewNode(ReachableVar);
   }
 
 
 private:
-  void traverseMemoizedNode(VarAtom *VA) {
-    auto SetF = [&](VarAtomSet Reachable) {
-      for (VarAtom *K : Reachable) {
-        if (K->isForDecl()) {
-          F->addRootCause(K, WildAtom);
-          if (F->isRelevantVar(K))
-            ConstrainedByThis.insert(K->getLoc());
-        }
-      }
-    };
-    F->getReachable(VA).apply(SetF);
-  }
-
   void traverseNewNode(VarAtom *ReachableVar) {
     std::set<Atom*> Neighbors = F->getNeighbors(ReachableVar);
     for (auto *Neighbor : Neighbors) {
       if (auto *VarNeighbor = dyn_cast<VarAtom>(Neighbor)) {
         traverse(VarNeighbor);
-        // Mark our neighbor (and all transitively reachable nodes) as reachable
-        F->markReachable(ReachableVar, VarNeighbor);
       }
     }
   }
@@ -1224,23 +1171,24 @@ private:
 };
 
 class RootCauseAnalysisExecutor {
-
+public:
   RootCauseAnalysisExecutor(RCAFactory *F,
                             ConcurrentQueue<VarAtom*> &Jobs)
   : F(F), Jobs(Jobs) {}
 
   // Thread entrypoint
   void operator()(void) {
+
     while(true) {
       auto Next = Jobs.pop();
       if (Next.hasValue()) {
         auto *NextVarAtom = Next.getValue();
         RootCauseAnalysis(F, NextVarAtom);
-        // TODO perform end of analysis tasks
       } else {
         break;
       }
     }
+    llvm::errs() << "Thread dying, got none from queue\n";
   }
 
 
@@ -1251,17 +1199,19 @@ private:
   ConcurrentQueue<VarAtom*> &Jobs;
 };
 
-
-void RCAFactory::analyzeRootCause(VarAtom *DirectWild) {
-  CState.AllWildAtoms.insert(DirectWild->getLoc());
-
-  // Perform root cause analysis
-  RootCauseAnalysis RCA(this, DirectWild);
-  RCA();
-  CVars &TotalConstrainedBy = CState.getConstrainedBy(DirectWild);
-  // Add all the new constraints we found into our total set
-  CVars &NewConstraints = RCA.getConstrainedBy();
-  TotalConstrainedBy.insert(NewConstraints.begin(), NewConstraints.end());
+void RCAFactory::analyzeRootCause() {
+  unsigned NumThreads = 1;
+  Workers.clear();
+  llvm::errs() << "Size of workers: (pre creation) " << Workers.size() << "\n";
+  for (unsigned I = 0; I < NumThreads; I++) {
+    llvm::errs() << "Creating a Thread\n";
+    Workers.push_back(std::thread(RootCauseAnalysisExecutor(this, Jobs)));
+  }
+  llvm::errs() << "Size of workers: (post creation) " << Workers.size() << "\n";
+  for (auto &Thread : Workers) {
+    llvm::errs() << "joining a thread\n";
+    Thread.join();
+  }
 }
 
 void ProgramInfo::doRootCauseAnalysis(CVars &RelevantVarsKey,
@@ -1276,7 +1226,7 @@ void ProgramInfo::doRootCauseAnalysis(CVars &RelevantVarsKey,
 
   // Analyze the root causes for every directly wild atom
   for (auto *VA : DirectWildVarAtoms)
-    RCAF.analyzeRootCause(VA);
+    RCAF.analyzeRootCause();
 
   findIntersection(CState.AllWildAtoms, RelevantVarsKey, CState.InSrcWildAtoms);
   findIntersection(CState.TotalNonDirectWildAtoms, RelevantVarsKey,
@@ -1294,6 +1244,7 @@ void ProgramInfo::doRootCauseAnalysis(CVars &RelevantVarsKey,
 bool ProgramInfo::computeInterimConstraintState(
     const std::set<std::string> &FilePaths) {
 
+  llvm::errs() << "Computing interim constraint stats\n";
   // The set of all DeclVars vars in a writable file, which we call _relevant_
   std::set<Atom *> RelevantVars;
 
