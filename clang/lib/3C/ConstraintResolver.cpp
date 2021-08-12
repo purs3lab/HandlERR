@@ -165,7 +165,8 @@ ConstraintVariable *localReturnConstraint(
       TypeVars[TyVarIdx].first != nullptr) {
     ConstraintVariable *CV = nullptr;
     if (TypeVars[TyVarIdx].second != nullptr &&
-        TypeVars[TyVarIdx].first->isSolutionChecked(Info.getConstraints().getVariables())) {
+        TypeVars[TyVarIdx].second->isSolutionChecked(
+            Info.getConstraints().getVariables())) {
       CV = TypeVars[TyVarIdx].second;
     } else {
       CV = TypeVars[TyVarIdx].first;
@@ -463,7 +464,9 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
           if (TypeVars.find(0) != TypeVars.end() &&
               TypeVars[0].first != nullptr) {
             ConstraintVariable *CV = nullptr;
-            if (TypeVars[0].second != nullptr) {
+            if (TypeVars[0].second != nullptr
+                && TypeVars[0].second->isSolutionChecked(
+                       Info.getConstraints().getVariables())) {
               CV = TypeVars[0].second;
             } else {
               CV = TypeVars[0].first;

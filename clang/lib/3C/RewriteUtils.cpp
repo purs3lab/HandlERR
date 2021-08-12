@@ -461,7 +461,7 @@ public:
             AllInconsistent = false;
             std::string TyStr;
             if (Entry.second.second != nullptr &&
-                Entry.second.first->isSolutionChecked(Info.getConstraints().getVariables())) {
+                Entry.second.second->isSolutionChecked(Info.getConstraints().getVariables())) {
               TyStr = Entry.second.second->mkString(
                   Info.getConstraints(), MKSTRING_OPTS(EmitName = false, EmitPointee = true));
             } else {

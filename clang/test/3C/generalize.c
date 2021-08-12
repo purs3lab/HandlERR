@@ -41,6 +41,16 @@ void call_from_gen_fn(void *i) {
 }
 
 
+// Code reduced from parsons
+_Itype_for_any(T) void sys_free(void *free_ptr : itype(_Ptr<T>));
+void extern_fp((*free_fun)(void*));
+static void wrap_free(void *wrap_ptr) {
+  sys_free(wrap_ptr);
+  // CHECK: sys_free<void>(wrap_ptr);
+}
+void make_wild(void) {
+  extern_fp(wrap_free);
+}
 
 // Code from vsftpd
 #include <stdlib.h>
