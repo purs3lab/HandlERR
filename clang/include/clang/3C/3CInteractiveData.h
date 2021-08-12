@@ -56,6 +56,11 @@ public:
     RootCauses[Var].insert(RootCause);
   }
 
+  void addRootCauses(std::vector<ConstraintKey> Vars, ConstraintKey Cause) {
+    for (auto V : Vars)
+      RootCauses[V].insert(Cause);
+  }
+
   CVars& getConstrainedBy(VarAtom *Var) {
     return getConstrainedBy(Var->getLoc());
   }

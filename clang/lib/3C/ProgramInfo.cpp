@@ -993,7 +993,6 @@ public:
 
   llvm::Optional<T> pop(void) {
     Lock.lock();
-    llvm::errs() << "Concurrent queue accessed: Size: " << Q.size() << "\n";
     if (Q.size() == 0) {
       Lock.unlock();
       return llvm::Optional<T>();
@@ -1006,36 +1005,9 @@ public:
   }
 };
 
-class LockedSet {
-private:
-  std::shared_ptr<std::mutex> Lock;
-  std::shared_ptr<VarAtomSet> Data;
+typedef llvm::DenseMap<ConstraintKey, std::vector<ConstraintKey>,
+    llvm::DenseMapInfo<uint32_t>> RootCauseInfo ;
 
-public:
-
-  LockedSet() : Lock(std::make_shared<std::mutex>()),
-                Data(std::make_shared<VarAtomSet>()) {
-  }
-
-  LockedSet(const LockedSet &RHS) : Lock(RHS.Lock), Data(RHS.Data) {
-
-  }
-
-
-   VarAtomSet query(std::function<VarAtomSet(VarAtomSet&)> F) {
-    Lock->lock();
-    auto Ans = F(*Data);
-    Lock->unlock();
-    return Ans;
-  }
-
-  void apply(std::function<void(VarAtomSet&)> F) {
-    Lock->lock();
-    F(*Data);
-    Lock->unlock();
-  }
-
-};
 
 // Factory context for root cause analysis
 // This class tracks global root cause analysis information
@@ -1048,6 +1020,7 @@ private:
 
   ConstraintsGraph &CG;
   ConstraintsInfo &CState;
+  std::mutex CStateLock;
 
 
  // We use the more efficient LLVM set types here
@@ -1064,35 +1037,40 @@ public:
       CState.AllWildAtoms.insert(DirectWild->getLoc());
   }
 
-  ConstraintsInfo& getCState(void) {
-    return CState;
+
+  ConcurrentQueue<VarAtom*>& getJobQueue(void) {
+    return Jobs;
   }
 
   void analyzeRootCause();
 
+  void updateGlobalContext(RootCauseInfo &Info) {
+    CStateLock.lock();
+    for (auto P : Info) {
+      auto Cause = P.getFirst();
+      auto Affects = P.getSecond();
+      CState.addRootCauses(Affects, Cause);
+      CVars &TotalConstrainedBy = CState.getConstrainedBy(Cause);
+      // Add all the new constraints we found into our total set
+      TotalConstrainedBy.insert(Affects.begin(), Affects.end());
+    }
+    CStateLock.unlock();
+  }
 
 
-  bool isRelevantVar(VarAtom *VA) {
+  bool isRelevantVar(VarAtom *VA) const {
     return isRelevantVar(VA->getLoc());
   }
 
-  bool isRelevantVar(ConstraintKey Key) {
+  bool isRelevantVar(ConstraintKey Key) const {
     return RelevantVarsKeys.find(Key) != RelevantVarsKeys.end();
   }
 
-  bool isDirectlyWild(VarAtom *VA) {
+  bool isDirectlyWild(VarAtom *VA) const {
     return DirectWildVarAtoms.find(VA) != DirectWildVarAtoms.end();
   }
 
-  void addRootCause(VarAtom *Target, VarAtom *Cause) {
-    CState.addRootCause(Target->getLoc(), Cause->getLoc());
-  }
-
-  void addRootCause(ConstraintKey Target, VarAtom *Cause) {
-    CState.addRootCause(Target, Cause->getLoc());
-  }
-
-  std::set<Atom*> getNeighbors(VarAtom *Node) {
+  std::set<Atom*> getNeighbors(VarAtom *Node) const {
     std::set<Atom*> Neighbors;
     CG.getNeighbors(Node, Neighbors, true);
     return Neighbors;
@@ -1100,18 +1078,17 @@ public:
 
 };
 
+class RootCauseAnalysisExecutor;
+
 // This class performs the root cause analysis on a single wild atom
 // It searches through the Constraint Graph and finds every atom constrained
 // by the target wild atom.
 class RootCauseAnalysis {
 public:
 
-  RootCauseAnalysis(RCAFactory *F, VarAtom *WA) : F(F), WildAtom(WA) {
+  RootCauseAnalysis(const RCAFactory &F, RootCauseAnalysisExecutor &TC,
+                    VarAtom *WA) : F(F), ThreadContext(TC), WildAtom(WA) {
     traverse(WildAtom);
-    CVars &TotalConstrainedBy = F->getCState().getConstrainedBy(WildAtom);
-    // Add all the new constraints we found into our total set
-    CVars &NewConstraints = getConstrainedBy();
-    TotalConstrainedBy.insert(NewConstraints.begin(), NewConstraints.end());
   }
 
   // The set of all relevant variables constrained by the target
@@ -1121,7 +1098,9 @@ public:
 
 private:
   // Factory Context
-  RCAFactory *F;
+  const RCAFactory &F;
+  // Thread Local Context
+  RootCauseAnalysisExecutor &ThreadContext;
   // The target of the current search
   VarAtom *WildAtom;
   // Set of variables constrained by the target
@@ -1141,26 +1120,12 @@ private:
   }
 
 
-  void traverse(VarAtom *ReachableVar) {
-    if (alreadySeen(ReachableVar))
-      return;
-    markSeen(ReachableVar);
-    if (ReachableVar->isForDecl()) {
-      F->addRootCause(ReachableVar, WildAtom);
-
-      if (F->isRelevantVar(ReachableVar))
-        ConstrainedByThis.insert(ReachableVar->getLoc());
-      if (!F->isDirectlyWild(ReachableVar))
-        Indirect.insert(ReachableVar->getLoc());
-    }
-
-    traverseNewNode(ReachableVar);
-  }
+  void traverse(VarAtom *ReachableVar);
 
 
 private:
   void traverseNewNode(VarAtom *ReachableVar) {
-    std::set<Atom*> Neighbors = F->getNeighbors(ReachableVar);
+    std::set<Atom*> Neighbors = F.getNeighbors(ReachableVar);
     for (auto *Neighbor : Neighbors) {
       if (auto *VarNeighbor = dyn_cast<VarAtom>(Neighbor)) {
         traverse(VarNeighbor);
@@ -1172,44 +1137,65 @@ private:
 
 class RootCauseAnalysisExecutor {
 public:
-  RootCauseAnalysisExecutor(RCAFactory *F,
-                            ConcurrentQueue<VarAtom*> &Jobs)
-  : F(F), Jobs(Jobs) {}
+  RootCauseAnalysisExecutor(RCAFactory &F) : F(F) {}
 
   // Thread entrypoint
   void operator()(void) {
 
     while(true) {
-      auto Next = Jobs.pop();
+      auto Next = F.getJobQueue().pop();
       if (Next.hasValue()) {
         auto *NextVarAtom = Next.getValue();
-        RootCauseAnalysis(F, NextVarAtom);
+        RootCauseAnalysis(F, *this, NextVarAtom);
       } else {
         break;
       }
     }
-    llvm::errs() << "Thread dying, got none from queue\n";
+    updateGlobalContext();
+  }
+
+  void addConstraint(VarAtom *RootCause, VarAtom* Affected) {
+    RootCauses[RootCause->getLoc()].push_back(Affected->getLoc());
   }
 
 
 private:
-  // Factory Context
-  RCAFactory *F;
 
-  ConcurrentQueue<VarAtom*> &Jobs;
+  void updateGlobalContext(void) {
+    F.updateGlobalContext(RootCauses);
+  }
+
+
+  // Factory Context
+  RCAFactory &F;
+  RootCauseInfo RootCauses;
+
 };
 
-void RCAFactory::analyzeRootCause() {
-  unsigned NumThreads = 1;
-  Workers.clear();
-  llvm::errs() << "Size of workers: (pre creation) " << Workers.size() << "\n";
-  for (unsigned I = 0; I < NumThreads; I++) {
-    llvm::errs() << "Creating a Thread\n";
-    Workers.push_back(std::thread(RootCauseAnalysisExecutor(this, Jobs)));
+
+void RootCauseAnalysis::traverse(VarAtom *ReachableVar) {
+  if (alreadySeen(ReachableVar))
+    return;
+  markSeen(ReachableVar);
+  if (ReachableVar->isForDecl()) {
+    ThreadContext.addConstraint(WildAtom, ReachableVar);
+
+    if (F.isRelevantVar(ReachableVar))
+      ConstrainedByThis.insert(ReachableVar->getLoc());
+    if (!F.isDirectlyWild(ReachableVar))
+      Indirect.insert(ReachableVar->getLoc());
   }
-  llvm::errs() << "Size of workers: (post creation) " << Workers.size() << "\n";
+
+  traverseNewNode(ReachableVar);
+}
+
+void RCAFactory::analyzeRootCause() {
+  unsigned NumThreads = std::thread::hardware_concurrency();
+  Workers.clear();
+  for (unsigned I = 0; I < NumThreads; I++) {
+    Workers.push_back(std::thread(RootCauseAnalysisExecutor(*this)));
+  }
   for (auto &Thread : Workers) {
-    llvm::errs() << "joining a thread\n";
     Thread.join();
   }
 }
@@ -1244,7 +1230,6 @@ void ProgramInfo::doRootCauseAnalysis(CVars &RelevantVarsKey,
 bool ProgramInfo::computeInterimConstraintState(
     const std::set<std::string> &FilePaths) {
 
-  llvm::errs() << "Computing interim constraint stats\n";
   // The set of all DeclVars vars in a writable file, which we call _relevant_
   std::set<Atom *> RelevantVars;
 
