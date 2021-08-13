@@ -1117,12 +1117,14 @@ FunctionVariableConstraint::FunctionVariableConstraint(
   // Locate the void* params for potential generic use, or to mark wild
   std::vector<int> Voids;
   if(ReturnVar.ExternalConstraint->isVoidPtr() &&
-     !ReturnVar.ExternalConstraint->isGeneric()) {
+      !ReturnVar.ExternalConstraint->isGeneric() &&
+      ReturnVar.ExternalConstraint->getCvars().size() == 1) {
     Voids.push_back(-1);
   }
   for(unsigned i=0; i < ParamVars.size();i++) {
     if(ParamVars[i].ExternalConstraint->isVoidPtr() &&
-       !ParamVars[i].ExternalConstraint->isGeneric()) {
+        !ParamVars[i].ExternalConstraint->isGeneric() &&
+        ParamVars[i].ExternalConstraint->getCvars().size() == 1) {
       Voids.push_back(i);
     }
   }
