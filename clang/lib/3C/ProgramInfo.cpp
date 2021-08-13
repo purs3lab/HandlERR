@@ -1155,7 +1155,8 @@ public:
   }
 
   void addConstraint(VarAtom *RootCause, VarAtom* Affected) {
-    RootCauses[RootCause->getLoc()].push_back(Affected->getLoc());
+    if (F.isRelevantVar(Affected))
+      RootCauses[RootCause->getLoc()].push_back(Affected->getLoc());
   }
 
 
