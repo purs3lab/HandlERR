@@ -249,8 +249,7 @@ public:
               const int TyIdx =
                   TargetFV->getExternalParam(I)->getGenericIndex();
               if (ConsistentTypeParams.find(TyIdx) !=
-                  ConsistentTypeParams.end()
-                  && ConsistentTypeParams[TyIdx].first != nullptr)
+                  ConsistentTypeParams.end())
                 ArgumentConstraints =
                     CB.getExprConstraintVars(A->IgnoreImpCasts());
               else
