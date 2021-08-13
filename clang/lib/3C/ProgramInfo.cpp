@@ -19,6 +19,7 @@
 #include <sstream>
 #include <thread>
 #include <functional>
+#include <atomic>
 
 using namespace clang;
 
@@ -977,31 +978,25 @@ typedef llvm::DenseSet<ConstraintKey, llvm::DenseMapInfo<unsigned>> ConstraintKe
 template <typename T>
 class ConcurrentQueue {
 private:
-  std::mutex Lock;
-  std::queue<T> Q;
+  std::vector<T> Q;
+  std::atomic_uint32_t Ptr;
+
 
 public:
-  ConcurrentQueue(std::vector<T> Init) {
-    for (auto V : Init)
-      Q.push(V);
-  }
+  ConcurrentQueue(std::vector<T> Init) : Q(Init), Ptr(0) {}
 
-  ConcurrentQueue(std::set<T> Init) {
+  ConcurrentQueue(std::set<T> Init) : Ptr(0) {
     for (auto V : Init)
-      Q.push(V);
+      Q.push_back(V);
   }
 
   llvm::Optional<T> pop(void) {
-    Lock.lock();
-    if (Q.size() == 0) {
-      Lock.unlock();
+    auto Idx = Ptr.fetch_add(1);
+    if (Idx < Q.size()) {
+      return llvm::Optional<T>(Q[Idx]);
+    } else {
       return llvm::Optional<T>();
     }
-
-    auto R = llvm::Optional<T>(Q.front());
-    Q.pop();
-    Lock.unlock();
-    return R;
   }
 };
 
