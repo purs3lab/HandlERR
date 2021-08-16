@@ -40,6 +40,17 @@ void call_from_gen_fn(void *i) {
   // CHECK: viewer<T>(i);
 }
 
+// nameless decls use a different code path for rewriting,
+// second param forces rewrite
+// check to see that we don't rewrite unsafe vals. ie T*
+void nameless(void *, char *);
+void nameless(void *a, char *b)
+{
+  a = 1; // make it unsafe
+}
+// CHECK: void nameless(void * a, _Ptr<char> b);
+// CHECK: void nameless(void *a, _Ptr<char> b)
+
 
 // Code reduced from parsons
 _Itype_for_any(T) void sys_free(void *free_ptr : itype(_Ptr<T>));

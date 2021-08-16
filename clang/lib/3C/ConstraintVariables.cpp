@@ -776,7 +776,8 @@ PointerVariableConstraint::mkString(Constraints &CS,
   // a generic function so give it the default generic type name.
   // Add more type names below if we expect to use a lot.
   std::string BaseTypeName = BaseType;
-  if (InferredGenericIndex > -1 && isVoidPtr()) {
+  if (InferredGenericIndex > -1 && isVoidPtr() &&
+      isSolutionChecked(CS.getVariables())) {
     assert(InferredGenericIndex < 3
            && "Trying to use an unexpected type variable name");
     BaseTypeName = std::begin({"T","U","V"})[InferredGenericIndex];
