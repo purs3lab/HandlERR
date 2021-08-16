@@ -707,9 +707,13 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
     RewriteParams = true;
 
   // If we're making this into a generic function, the return must be rewritten
-  // because it's between the generic indicator and parameters, and we're
-  // definitely rewriting one of them.
-  if (RewriteGeneric) RewriteReturn = true;
+  // because it's between the generic indicator and parameters, and we'll also
+  // rewrite parameters in case there's an itype in there that won't trigger
+  // a normal rewrite.
+  if (RewriteGeneric) {
+    RewriteReturn = true;
+    RewriteParams = true;
+  }
 
   // If the function is declared using a typedef for the function type, then we
   // need to rewrite parameters and the return if either would have been
