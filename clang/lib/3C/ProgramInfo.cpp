@@ -640,8 +640,10 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
     NewCV = F;
 
     auto RetTy = FD->getReturnType();
-    unifyIfTypedef(RetTy.getTypePtr(), *AstContext, FD, F->getExternalReturn());
-    unifyIfTypedef(RetTy.getTypePtr(), *AstContext, FD, F->getInternalReturn());
+    unifyIfTypedef(RetTy.getTypePtr(), *AstContext, F->getExternalReturn(),
+                   Wild_to_Safe);
+    unifyIfTypedef(RetTy.getTypePtr(), *AstContext, F->getInternalReturn(),
+                   Safe_to_Wild);
     ensureNtCorrect(RetTy, *AstContext, F->getExternalReturn());
     ensureNtCorrect(RetTy, *AstContext, F->getInternalReturn());
 
@@ -652,8 +654,8 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       const Type *Ty = PVD->getType().getTypePtr();
       PVConstraint *PVInternal = F->getInternalParam(I);
       PVConstraint *PVExternal = F->getExternalParam(I);
-      unifyIfTypedef(Ty, *AstContext, PVD, PVInternal);
-      unifyIfTypedef(Ty, *AstContext, PVD, PVExternal);
+      unifyIfTypedef(Ty, *AstContext, PVExternal, Wild_to_Safe);
+      unifyIfTypedef(Ty, *AstContext, PVInternal, Safe_to_Wild);
       ensureNtCorrect(PVD->getType(), *AstContext, PVInternal);
       ensureNtCorrect(PVD->getType(), *AstContext, PVExternal);
       PVInternal->setValidDecl();
@@ -681,7 +683,7 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       P->setValidDecl();
       NewCV = P;
       std::string VarName(VD->getName());
-      unifyIfTypedef(Ty, *AstContext, VD, P);
+      unifyIfTypedef(Ty, *AstContext, P);
       ensureNtCorrect(VD->getType(), *AstContext, P);
       if (VD->hasGlobalStorage()) {
         // If we see a definition for this global variable, indicate so in
@@ -702,7 +704,7 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
     const Type *Ty = FlD->getTypeSourceInfo()->getTypeLoc().getTypePtr();
     if (Ty->isPointerType() || Ty->isArrayType()) {
       PVConstraint *P = new PVConstraint(D, *this, *AstContext);
-      unifyIfTypedef(Ty, *AstContext, FlD, P);
+      unifyIfTypedef(Ty, *AstContext, P);
       NewCV = P;
       NewCV->setValidDecl();
     }
@@ -726,15 +728,15 @@ void ProgramInfo::ensureNtCorrect(const QualType &QT, const ASTContext &C,
 }
 
 void ProgramInfo::unifyIfTypedef(const Type *Ty, ASTContext &Context,
-                                 DeclaratorDecl *Decl, PVConstraint *P) {
+                                 PVConstraint *P, ConsAction CA) {
   if (const auto *TDT = dyn_cast<TypedefType>(Ty)) {
     auto *TDecl = TDT->getDecl();
     auto PSL = PersistentSourceLoc::mkPSL(TDecl, Context);
     auto O = lookupTypedef(PSL);
     if (O.hasValue()) {
       auto *Bounds = &O.getValue();
-      P->setTypedef(TDecl, TDecl->getNameAsString());
-      constrainConsVarGeq(P, Bounds, CS, &PSL, Same_to_Same, true, this);
+      P->setTypedef(Bounds, TDecl->getNameAsString());
+      constrainConsVarGeq(P, Bounds, CS, &PSL, CA, false, this);
     }
   }
 }

@@ -163,7 +163,7 @@ public:
                        PointerVariableConstraint *PV);
 
   void unifyIfTypedef(const clang::Type *, clang::ASTContext &,
-                      clang::DeclaratorDecl *, PVConstraint *);
+                      PVConstraint *, ConsAction CA = Same_to_Same);
 
   CVarOption lookupTypedef(PersistentSourceLoc PSL);
 

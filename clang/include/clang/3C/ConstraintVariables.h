@@ -365,8 +365,9 @@ private:
   bool IsZeroWidthArray;
 
   bool IsTypedef = false;
-  TypedefNameDecl *TDT;
   std::string TypedefString;
+  ConstraintVariable *TypedefVar;
+
   // Does the type internally contain a typedef, and if so: at what level and
   // what is it's name?
   struct InternalTypedefInfo TypedefLevelInfo;
@@ -381,7 +382,7 @@ private:
     ConstraintVariable(PointerVariable, "", Name), FV(nullptr),
     SrcHasItype(false), PartOfFuncPrototype(false), Parent(nullptr),
     SourceGenericIndex(-1), InferredGenericIndex(-1),
-    IsZeroWidthArray(false), IsTypedef(false), TDT(nullptr),
+    IsZeroWidthArray(false), IsTypedef(false),
     TypedefLevelInfo({}), IsVoidPtr(false) {}
 
 public:
@@ -392,8 +393,9 @@ public:
   // Check if any of the pointers is either a sized or unsized arr.
   bool hasSomeSizedArr() const;
 
-  bool isTypedef(void);
-  void setTypedef(TypedefNameDecl *T, std::string S);
+  bool isTypedef(void) const;
+  const  ConstraintVariable *getTypedefVar() const;
+  void setTypedef(ConstraintVariable *TypedefVar, std::string S);
 
   // Return true if this constraint had an itype in the original source code.
   bool srcHasItype() const override { return SrcHasItype; }
