@@ -22,8 +22,6 @@
 #include "clang/Tooling/CommonOptionsParser.h"
 #include <mutex>
 
-
-
 // The main interface exposed by the 3C to interact with the tool.
 //
 // See clang/docs/checkedc/3C/clang-tidy.md#_3c-name-prefix

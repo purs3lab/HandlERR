@@ -120,7 +120,8 @@ static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
   if (_3CGlobalOptions.Verbose)
     errs() << "Writing files out\n";
 
-  bool StdoutMode = (_3CGlobalOptions.OutputPostfix == "-" && _3CGlobalOptions.OutputDir.empty());
+  bool StdoutMode = (_3CGlobalOptions.OutputPostfix == "-" &&
+                     _3CGlobalOptions.OutputDir.empty());
   SourceManager &SM = C.getSourceManager();
   // Iterate over each modified rewrite buffer.
   for (auto Buffer = R.buffer_begin(); Buffer != R.buffer_end(); ++Buffer) {
@@ -133,7 +134,7 @@ static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
       DiagnosticsEngine &DE = C.getDiagnostics();
       DiagnosticsEngine::Level UnwritableChangeDiagnosticLevel =
           _3CGlobalOptions.AllowUnwritableChanges ? DiagnosticsEngine::Warning
-                                 : DiagnosticsEngine::Error;
+                                                  : DiagnosticsEngine::Error;
       auto PrintExtraUnwritableChangeInfo = [&]() {
         // With -dump-unwritable-changes and not -allow-unwritable-changes, we
         // want the -allow-unwritable-changes note before the dump.
@@ -262,7 +263,8 @@ static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
         // OK because tryGetCanonicalFilePath should ensure that neither BaseDir
         // nor OutputDir has a trailing separator.
         SmallString<255> Tmp(FeAbsS);
-        llvm::sys::path::replace_path_prefix(Tmp, _3CGlobalOptions.BaseDir, _3CGlobalOptions.OutputDir);
+        llvm::sys::path::replace_path_prefix(Tmp, _3CGlobalOptions.BaseDir,
+                                             _3CGlobalOptions.OutputDir);
         NFile = std::string(Tmp.str());
         EC = llvm::sys::fs::create_directories(sys::path::parent_path(NFile));
         if (EC) {
@@ -594,7 +596,8 @@ void RewriteConsumer::emitRootCauseDiagnostics(ASTContext &Context) {
         // or are in the main file of the TU. Alternatively, don't filter causes
         // if -warn-all-root-cause is passed.
         int PtrCount = I.getNumPtrsAffected(WReason.first);
-        if (_3CGlobalOptions.WarnAllRootCause || SM.isInMainFile(SL) || PtrCount > 1) {
+        if (_3CGlobalOptions.WarnAllRootCause || SM.isInMainFile(SL) ||
+            PtrCount > 1) {
           // SL is invalid when the File is not in the current translation unit.
           if (SL.isValid()) {
             EmittedDiagnostics.insert(PSL);
@@ -621,7 +624,8 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   // Take care of some other rewriting tasks
   std::set<llvm::FoldingSetNodeID> Seen;
   std::map<llvm::FoldingSetNodeID, AnnotationNeeded> NodeMap;
-  CheckedRegionFinder CRF(&Context, R, Info, Seen, NodeMap, _3CGlobalOptions.WarnRootCause);
+  CheckedRegionFinder CRF(&Context, R, Info, Seen, NodeMap,
+                          _3CGlobalOptions.WarnRootCause);
   CheckedRegionAdder CRA(&Context, R, NodeMap, Info);
   CastLocatorVisitor CLV(&Context);
   CastPlacementVisitor ECPV(&Context, Info, R, CLV.getExprsWithCast());

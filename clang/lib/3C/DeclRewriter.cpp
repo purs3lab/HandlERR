@@ -195,7 +195,8 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
         bool IsExternGlobalVar =
           isa<VarDecl>(D) &&
           cast<VarDecl>(D)->getFormalLinkage() == Linkage::ExternalLinkage;
-        if (_3CGlobalOptions.ItypesForExtern && (isa<FieldDecl>(D) || IsExternGlobalVar)) {
+        if (_3CGlobalOptions.ItypesForExtern &&
+            (isa<FieldDecl>(D) || IsExternGlobalVar)) {
           // Give record fields and global variables itypes when using
           // -itypes-for-extern. Note that we haven't properly implemented
           // itypes for structures and globals. This just rewrites to an itype
@@ -798,7 +799,8 @@ void FunctionDeclBuilder::buildDeclVar(const FVComponentVariable *CV,
 
   bool CheckedSolution = CV->hasCheckedSolution(Info.getConstraints());
   bool ItypeSolution = CV->hasItypeSolution(Info.getConstraints());
-  if (ItypeSolution || (CheckedSolution && _3CGlobalOptions.ItypesForExtern && !StaticFunc)) {
+  if (ItypeSolution ||
+      (CheckedSolution && _3CGlobalOptions.ItypesForExtern && !StaticFunc)) {
     buildItypeDecl(CV->getExternal(), Decl, Type, IType, RewriteParm,
                    RewriteRet);
     return;

@@ -269,7 +269,8 @@ public:
               constrainConsVarGeq(ParameterDC, ArgumentConstraints.first, CS,
                                   &PL, CA, false, &Info, false);
 
-              if (_3CGlobalOptions.AllTypes && TFD != nullptr && I < TFD->getNumParams()) {
+              if (_3CGlobalOptions.AllTypes && TFD != nullptr &&
+                  I < TFD->getNumParams()) {
                 auto *PVD = TFD->getParamDecl(I);
                 auto &CSBI = Info.getABoundsInfo().getCtxSensBoundsHandler();
                 // Here, we need to handle context-sensitive assignment.

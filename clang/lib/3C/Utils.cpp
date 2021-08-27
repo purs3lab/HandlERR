@@ -182,7 +182,8 @@ bool functionHasVarArgs(clang::FunctionDecl *FD) {
 }
 
 bool isFunctionAllocator(std::string FuncName) {
-  return std::find(_3CGlobalOptions.AllocatorFunctions.begin(), _3CGlobalOptions.AllocatorFunctions.end(),
+  return std::find(_3CGlobalOptions.AllocatorFunctions.begin(),
+                   _3CGlobalOptions.AllocatorFunctions.end(),
                    FuncName) != _3CGlobalOptions.AllocatorFunctions.end() ||
          llvm::StringSwitch<bool>(FuncName)
              .Cases("malloc", "calloc", "realloc", true)

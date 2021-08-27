@@ -169,7 +169,8 @@ void ProgramInfo::printAggregateStats(const std::set<std::string> &F,
   for (auto &I : Variables) {
     ConstraintVariable *C = I.second;
     std::string FileName = I.first.getFileName();
-    if (F.count(FileName) || FileName.find(_3CGlobalOptions.BaseDir) != std::string::npos) {
+    if (F.count(FileName) ||
+        FileName.find(_3CGlobalOptions.BaseDir) != std::string::npos) {
       if (C->isForValidDecl()) {
         FoundVars.clear();
         getVarsFromConstraint(C, FoundVars, Visited);
@@ -236,8 +237,10 @@ void ProgramInfo::printAggregateStats(const std::set<std::string> &F,
 void ProgramInfo::printStats(const std::set<std::string> &F, raw_ostream &O,
                              bool OnlySummary, bool JsonFormat) {
   if (!OnlySummary && !JsonFormat) {
-    O << "Enable itype propagation:" << _3CGlobalOptions.EnablePropThruIType << "\n";
-    O << "Sound handling of var args functions:" << _3CGlobalOptions.HandleVARARGS << "\n";
+    O << "Enable itype propagation:" << _3CGlobalOptions.EnablePropThruIType
+      << "\n";
+    O << "Sound handling of var args functions:"
+      << _3CGlobalOptions.HandleVARARGS << "\n";
   }
   std::map<std::string, std::tuple<int, int, int, int, int>> FilesToVars;
   CVarSet InSrcCVars, Visited;
@@ -247,7 +250,8 @@ void ProgramInfo::printStats(const std::set<std::string> &F, raw_ostream &O,
   // First, build the map and perform the aggregation.
   for (auto &I : Variables) {
     std::string FileName = I.first.getFileName();
-    if (F.count(FileName) || FileName.find(_3CGlobalOptions.BaseDir) != std::string::npos) {
+    if (F.count(FileName) ||
+        FileName.find(_3CGlobalOptions.BaseDir) != std::string::npos) {
       int VarC = 0;
       int PC = 0;
       int NtaC = 0;
@@ -662,7 +666,8 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       // constrain to WILD even if we don't end up storing this in the map.
       constrainWildIfMacro(PVExternal, PVD->getLocation());
       // If this is "main", constrain its argv parameter to a nested arr
-      if (_3CGlobalOptions.AllTypes && FuncName == "main" && FD->isGlobal() && I == 1) {
+      if (_3CGlobalOptions.AllTypes && FuncName == "main" && FD->isGlobal() &&
+          I == 1) {
         PVInternal->constrainOuterTo(CS, CS.getArr());
         PVInternal->constrainIdxTo(CS, CS.getNTArr(), 1);
       }
