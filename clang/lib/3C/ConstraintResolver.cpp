@@ -106,8 +106,8 @@ static ConstAtom *analyzeAllocExpr(CallExpr *CE, Constraints &CS,
 
   ConstAtom *Ret = CS.getPtr();
   Expr *E;
-  if (std::find(AllocatorFunctions.begin(), AllocatorFunctions.end(),
-                FuncName) != AllocatorFunctions.end() ||
+  if (std::find(_3CGlobalOptions.AllocatorFunctions.begin(), _3CGlobalOptions.AllocatorFunctions.end(),
+                FuncName) != _3CGlobalOptions.AllocatorFunctions.end() ||
       FuncName.compare("malloc") == 0)
     E = CE->getArg(0);
   else {
@@ -646,7 +646,7 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
       P->constrainToWild(Info.getConstraints(), Rsn, &PL);
       Ret = pairWithEmptyBkey({P});
     } else {
-      if (Verbose) {
+      if (_3CGlobalOptions.Verbose) {
         llvm::errs() << "WARNING! Initialization expression ignored: ";
         E->dump(llvm::errs(), *Context);
         llvm::errs() << "\n";
@@ -693,7 +693,7 @@ void ConstraintResolver::constrainLocalAssign(Stmt *TSt, Expr *LHS, Expr *RHS,
 
   // Only if all types are enabled and these are not pointers, then track
   // the assignment.
-  if (AllTypes) {
+  if (_3CGlobalOptions.AllTypes) {
     if ((!containsValidCons(L.first) && !containsValidCons(R.first)) ||
         !HandleBoundsKey) {
       ABI.handleAssignment(LHS, L.first, L.second, RHS, R.first, R.second,
@@ -718,7 +718,7 @@ void ConstraintResolver::constrainLocalAssign(Stmt *TSt, DeclaratorDecl *D,
   if (V.hasValue())
     constrainConsVarGeq(&V.getValue(), RHSCons.first, Info.getConstraints(),
                         PLPtr, CAction, false, &Info, HandleBoundsKey);
-  if (AllTypes && !IgnoreBnds) {
+  if (_3CGlobalOptions.AllTypes && !IgnoreBnds) {
     if (!HandleBoundsKey || (!(V.hasValue() && isValidCons(&V.getValue())) &&
                              !containsValidCons(RHSCons.first))) {
       auto &ABI = Info.getABoundsInfo();

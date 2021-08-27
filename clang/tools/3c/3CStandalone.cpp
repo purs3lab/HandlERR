@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/3C/3C.h"
+#include "clang/3C/3CGlobalOptions.h"
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
@@ -291,11 +292,11 @@ int main(int argc, const char **argv) {
   CcOptions.ConstraintOutputJson = OptConstraintOutputJson.getValue();
   CcOptions.StatsOutputJson = OptStatsOutputJson.getValue();
   CcOptions.WildPtrInfoJson = OptWildPtrInfoJson.getValue();
-  CcOptions.PerPtrInfoJson = OptPerPtrWILDInfoJson.getValue();
+  CcOptions.PerWildPtrInfoJson = OptPerPtrWILDInfoJson.getValue();
   CcOptions.AddCheckedRegions = OptAddCheckedRegions;
-  CcOptions.EnableAllTypes = OptAllTypes;
+  CcOptions.AllTypes = OptAllTypes;
   CcOptions.EnableCCTypeChecker = OptEnableCCTypeChecker;
-  CcOptions.WarnRootCause = OptWarnRootCause;
+  CcOptions.WarnRootCause = OptWarnRootCause || OptWarnAllRootCause;
   CcOptions.WarnAllRootCause = OptWarnAllRootCause;
   CcOptions.DumpUnwritableChanges = OptDumpUnwritableChanges;
   CcOptions.AllowUnwritableChanges = OptAllowUnwritableChanges;

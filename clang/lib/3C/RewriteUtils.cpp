@@ -96,7 +96,7 @@ void rewriteSourceRange(Rewriter &R, const CharSourceRange &Range,
   // crashing with an assert fail.
   if (!RewriteSuccess) {
     clang::DiagnosticsEngine &DE = R.getSourceMgr().getDiagnostics();
-    bool ReportError = ErrFail && !AllowRewriteFailures;
+    bool ReportError = ErrFail && !_3CGlobalOptions.AllowRewriteFailures;
     reportCustomDiagnostic(
         DE,
         ReportError ? DiagnosticsEngine::Error : DiagnosticsEngine::Warning,
@@ -117,10 +117,10 @@ void rewriteSourceRange(Rewriter &R, const CharSourceRange &Range,
 }
 
 static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
-  if (Verbose)
+  if (_3CGlobalOptions.Verbose)
     errs() << "Writing files out\n";
 
-  bool StdoutMode = (OutputPostfix == "-" && OutputDir.empty());
+  bool StdoutMode = (_3CGlobalOptions.OutputPostfix == "-" && _3CGlobalOptions.OutputDir.empty());
   SourceManager &SM = C.getSourceManager();
   // Iterate over each modified rewrite buffer.
   for (auto Buffer = R.buffer_begin(); Buffer != R.buffer_end(); ++Buffer) {
@@ -132,26 +132,26 @@ static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
 
       DiagnosticsEngine &DE = C.getDiagnostics();
       DiagnosticsEngine::Level UnwritableChangeDiagnosticLevel =
-          AllowUnwritableChanges ? DiagnosticsEngine::Warning
+          _3CGlobalOptions.AllowUnwritableChanges ? DiagnosticsEngine::Warning
                                  : DiagnosticsEngine::Error;
       auto PrintExtraUnwritableChangeInfo = [&]() {
         // With -dump-unwritable-changes and not -allow-unwritable-changes, we
         // want the -allow-unwritable-changes note before the dump.
-        if (!DumpUnwritableChanges) {
+        if (!_3CGlobalOptions.DumpUnwritableChanges) {
           reportCustomDiagnostic(
               DE, DiagnosticsEngine::Note,
               "use the -dump-unwritable-changes option to see the new version "
               "of the file",
               SourceLocation());
         }
-        if (!AllowUnwritableChanges) {
+        if (!_3CGlobalOptions.AllowUnwritableChanges) {
           reportCustomDiagnostic(
               DE, DiagnosticsEngine::Note,
               "you can use the -allow-unwritable-changes option to temporarily "
               "downgrade this error to a warning",
               SourceLocation());
         }
-        if (DumpUnwritableChanges) {
+        if (_3CGlobalOptions.DumpUnwritableChanges) {
           errs() << "=== Beginning of new version of " << FE->getName()
                  << " ===\n";
           Buffer->second.write(errs());
@@ -240,7 +240,7 @@ static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
       // because stdout mode is handled above. OutputPostfix defaults to "-"
       // when it's not provided, so any other value means that we should use
       // OutputPostfix. Otherwise, we must be in OutputDir mode.
-      if (OutputPostfix != "-") {
+      if (_3CGlobalOptions.OutputPostfix != "-") {
         // That path should be the same as the old one, with a
         // suffix added between the file name and the extension.
         // For example \foo\bar\a.c should become \foo\bar\a.checked.c
@@ -250,19 +250,19 @@ static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
         std::string FileName = sys::path::remove_leading_dotslash(PfName).str();
         std::string Ext = sys::path::extension(FileName).str();
         std::string Stem = sys::path::stem(FileName).str();
-        NFile = Stem + "." + OutputPostfix + Ext;
+        NFile = Stem + "." + _3CGlobalOptions.OutputPostfix + Ext;
         if (!DirName.empty())
           NFile = DirName + sys::path::get_separator().str() + NFile;
       } else {
-        assert(!OutputDir.empty());
+        assert(!_3CGlobalOptions.OutputDir.empty());
         // If this does not hold when OutputDir is set, it should have been a
         // fatal error in the _3CInterface constructor.
-        assert(filePathStartsWith(FeAbsS, BaseDir));
+        assert(filePathStartsWith(FeAbsS, _3CGlobalOptions.BaseDir));
         // replace_path_prefix is not smart about separators, but this should be
         // OK because tryGetCanonicalFilePath should ensure that neither BaseDir
         // nor OutputDir has a trailing separator.
         SmallString<255> Tmp(FeAbsS);
-        llvm::sys::path::replace_path_prefix(Tmp, BaseDir, OutputDir);
+        llvm::sys::path::replace_path_prefix(Tmp, _3CGlobalOptions.BaseDir, _3CGlobalOptions.OutputDir);
         NFile = std::string(Tmp.str());
         EC = llvm::sys::fs::create_directories(sys::path::parent_path(NFile));
         if (EC) {
@@ -278,7 +278,7 @@ static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
       raw_fd_ostream Out(NFile, EC, sys::fs::F_None);
 
       if (!EC) {
-        if (Verbose)
+        if (_3CGlobalOptions.Verbose)
           errs() << "writing out " << NFile << "\n";
         Buffer->second.write(Out);
       } else {
@@ -594,7 +594,7 @@ void RewriteConsumer::emitRootCauseDiagnostics(ASTContext &Context) {
         // or are in the main file of the TU. Alternatively, don't filter causes
         // if -warn-all-root-cause is passed.
         int PtrCount = I.getNumPtrsAffected(WReason.first);
-        if (WarnAllRootCause || SM.isInMainFile(SL) || PtrCount > 1) {
+        if (_3CGlobalOptions.WarnAllRootCause || SM.isInMainFile(SL) || PtrCount > 1) {
           // SL is invalid when the File is not in the current translation unit.
           if (SL.isValid()) {
             EmittedDiagnostics.insert(PSL);
@@ -611,7 +611,7 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
 
   Info.getPerfStats().startRewritingTime();
 
-  if (WarnRootCause)
+  if (_3CGlobalOptions.WarnRootCause)
     emitRootCauseDiagnostics(Context);
 
   // Rewrite Variable declarations
@@ -621,7 +621,7 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   // Take care of some other rewriting tasks
   std::set<llvm::FoldingSetNodeID> Seen;
   std::map<llvm::FoldingSetNodeID, AnnotationNeeded> NodeMap;
-  CheckedRegionFinder CRF(&Context, R, Info, Seen, NodeMap, WarnRootCause);
+  CheckedRegionFinder CRF(&Context, R, Info, Seen, NodeMap, _3CGlobalOptions.WarnRootCause);
   CheckedRegionAdder CRA(&Context, R, NodeMap, Info);
   CastLocatorVisitor CLV(&Context);
   CastPlacementVisitor ECPV(&Context, Info, R, CLV.getExprsWithCast());
@@ -629,7 +629,7 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   TypeArgumentAdder TPA(&Context, Info, R);
   TranslationUnitDecl *TUD = Context.getTranslationUnitDecl();
   for (const auto &D : TUD->decls()) {
-    if (AddCheckedRegions) {
+    if (_3CGlobalOptions.AddCheckedRegions) {
       // Adding checked regions enabled?
       // TODO: Should checked region finding happen somewhere else? This is
       //       supposed to be rewriting.
