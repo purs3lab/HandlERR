@@ -43,6 +43,39 @@ void test7(int * : count(10));
 //CHECK: int *test6(void) : count(10);
 //CHECK: void test7(int * : count(10));
 
+void checked_caller() {
+//CHECK_NOALL: void checked_caller() {
+//CHECK_ALL: void checked_caller() _Checked {
+  int *a;
+  //CHECK: _Ptr<int> a = ((void *)0);
+  test2(a);
+
+  int *b = test3();
+  //CHECK: _Ptr<int> b = test3();
+
+  int *c;
+  //CHECK: _Ptr<int> c = ((void *)0);
+  test4(c);
+
+  int *d = test5();
+  //CHECK: _Ptr<int> d = test5();
+
+  int *e = test6();
+  //CHECK_NOALL: int *e = test6();
+  //CHECK_ALL: _Array_ptr<int> e : count(10) = test6();
+
+  int *f;
+  //CHECK_NOALL: int *f;
+  //CHECK_ALL: _Array_ptr<int> f : count(10) = ((void *)0);
+  test7(f);
+
+  // Get 3C to infer the correct length for f and e.
+  for(int i = 0; i < 10; i++) {
+    f[i];
+    e[i];
+  }
+}
+
 // Void pointers should still be fully unchecked unless there is an existing
 // checked type/itype.
 void test_void0(void *);
