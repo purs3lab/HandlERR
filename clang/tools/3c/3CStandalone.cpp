@@ -296,7 +296,7 @@ int main(int argc, const char **argv) {
   CcOptions.AddCheckedRegions = OptAddCheckedRegions;
   CcOptions.AllTypes = OptAllTypes;
   CcOptions.EnableCCTypeChecker = OptEnableCCTypeChecker;
-  CcOptions.WarnRootCause = OptWarnRootCause || OptWarnAllRootCause;
+  CcOptions.WarnRootCause = OptWarnRootCause;
   CcOptions.WarnAllRootCause = OptWarnAllRootCause;
   CcOptions.DumpUnwritableChanges = OptDumpUnwritableChanges;
   CcOptions.AllowUnwritableChanges = OptAllowUnwritableChanges;

@@ -310,6 +310,7 @@ _3CInterface::_3CInterface(const struct _3COptions &CCopt,
                            CompilationDatabase *CompDB) {
 
   _3COpts = CCopt;
+  _3COpts.WarnRootCause |= _3COpts.WarnAllRootCause;
 
   llvm::InitializeAllTargets();
   llvm::InitializeAllTargetMCs();
