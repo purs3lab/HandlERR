@@ -120,8 +120,7 @@ static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
   if (_3COpts.Verbose)
     errs() << "Writing files out\n";
 
-  bool StdoutMode = (_3COpts.OutputPostfix == "-" &&
-                     _3COpts.OutputDir.empty());
+  bool StdoutMode = (_3COpts.OutputPostfix == "-" && _3COpts.OutputDir.empty());
   SourceManager &SM = C.getSourceManager();
   // Iterate over each modified rewrite buffer.
   for (auto Buffer = R.buffer_begin(); Buffer != R.buffer_end(); ++Buffer) {
@@ -596,8 +595,7 @@ void RewriteConsumer::emitRootCauseDiagnostics(ASTContext &Context) {
         // or are in the main file of the TU. Alternatively, don't filter causes
         // if -warn-all-root-cause is passed.
         int PtrCount = I.getNumPtrsAffected(WReason.first);
-        if (_3COpts.WarnAllRootCause || SM.isInMainFile(SL) ||
-            PtrCount > 1) {
+        if (_3COpts.WarnAllRootCause || SM.isInMainFile(SL) || PtrCount > 1) {
           // SL is invalid when the File is not in the current translation unit.
           if (SL.isValid()) {
             EmittedDiagnostics.insert(PSL);

@@ -237,10 +237,9 @@ void ProgramInfo::printAggregateStats(const std::set<std::string> &F,
 void ProgramInfo::printStats(const std::set<std::string> &F, raw_ostream &O,
                              bool OnlySummary, bool JsonFormat) {
   if (!OnlySummary && !JsonFormat) {
-    O << "Enable itype propagation:" << _3COpts.EnablePropThruIType
+    O << "Enable itype propagation:" << _3COpts.EnablePropThruIType << "\n";
+    O << "Sound handling of var args functions:" << _3COpts.HandleVARARGS
       << "\n";
-    O << "Sound handling of var args functions:"
-      << _3COpts.HandleVARARGS << "\n";
   }
   std::map<std::string, std::tuple<int, int, int, int, int>> FilesToVars;
   CVarSet InSrcCVars, Visited;
@@ -666,8 +665,7 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       // constrain to WILD even if we don't end up storing this in the map.
       constrainWildIfMacro(PVExternal, PVD->getLocation());
       // If this is "main", constrain its argv parameter to a nested arr
-      if (_3COpts.AllTypes && FuncName == "main" && FD->isGlobal() &&
-          I == 1) {
+      if (_3COpts.AllTypes && FuncName == "main" && FD->isGlobal() && I == 1) {
         PVInternal->constrainOuterTo(CS, CS.getArr());
         PVInternal->constrainIdxTo(CS, CS.getNTArr(), 1);
       }

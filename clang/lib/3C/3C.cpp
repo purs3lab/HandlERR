@@ -259,8 +259,7 @@ public:
 void dumpConstraintOutputJson(const std::string &PostfixStr,
                               ProgramInfo &Info) {
   if (_3COpts.DumpIntermediate) {
-    std::string FilePath =
-      _3COpts.ConstraintOutputJson + PostfixStr + ".json";
+    std::string FilePath = _3COpts.ConstraintOutputJson + PostfixStr + ".json";
     errs() << "Writing json output to:" << FilePath << "\n";
     std::error_code Ec;
     llvm::raw_fd_ostream OutputJson(FilePath, Ec);
@@ -319,15 +318,14 @@ _3CInterface::_3CInterface(const struct _3COptions &CCopt,
 
   ConstraintsBuilt = false;
 
-  if (_3COpts.OutputPostfix != "-" &&
-      !_3COpts.OutputDir.empty()) {
+  if (_3COpts.OutputPostfix != "-" && !_3COpts.OutputDir.empty()) {
     errs() << "3C initialization error: Cannot use both -output-postfix and "
               "-output-dir\n";
     ConstructionFailed = true;
     return;
   }
-  if (_3COpts.OutputPostfix == "-" &&
-      _3COpts.OutputDir.empty() && SourceFileList.size() > 1) {
+  if (_3COpts.OutputPostfix == "-" && _3COpts.OutputDir.empty() &&
+      SourceFileList.size() > 1) {
     errs() << "3C initialization error: Cannot specify more than one input "
               "file when output is to stdout\n";
     ConstructionFailed = true;
@@ -346,8 +344,7 @@ _3CInterface::_3CInterface(const struct _3COptions &CCopt,
   EC = tryGetCanonicalFilePath(_3COpts.BaseDir, TmpPath);
   if (EC) {
     errs() << "3C initialization error: Failed to canonicalize base directory "
-           << "\"" << _3COpts.BaseDir << "\": " << EC.message()
-           << "\n";
+           << "\"" << _3COpts.BaseDir << "\": " << EC.message() << "\n";
     ConstructionFailed = true;
     return;
   }
@@ -367,8 +364,8 @@ _3CInterface::_3CInterface(const struct _3COptions &CCopt,
     EC = tryGetCanonicalFilePath(_3COpts.OutputDir, TmpPath);
     if (EC) {
       errs() << "3C initialization error: Failed to canonicalize output "
-             << "directory \"" << _3COpts.OutputDir
-             << "\": " << EC.message() << "\n";
+             << "directory \"" << _3COpts.OutputDir << "\": " << EC.message()
+             << "\n";
       ConstructionFailed = true;
       return;
     }
@@ -391,8 +388,7 @@ _3CInterface::_3CInterface(const struct _3COptions &CCopt,
     if (!filePathStartsWith(AbsPath, _3COpts.BaseDir)) {
       errs()
           << "3C initialization "
-          << (_3COpts.OutputDir != "" ||
-              !_3COpts.AllowSourcesOutsideBaseDir
+          << (_3COpts.OutputDir != "" || !_3COpts.AllowSourcesOutsideBaseDir
                   ? "error"
                   : "warning")
           << ": File \"" << AbsPath
@@ -631,8 +627,7 @@ bool _3CInterface::dumpStats() {
       GlobalProgramInfo.printStats(FilePaths, OutputJson, false, true);
       OutputJson.close();
     }
-    std::string AggregateStats =
-      _3COpts.StatsOutputJson + ".aggregate.json";
+    std::string AggregateStats = _3COpts.StatsOutputJson + ".aggregate.json";
     llvm::raw_fd_ostream AggrJson(AggregateStats, Ec);
     if (!AggrJson.has_error()) {
       GlobalProgramInfo.printAggregateStats(FilePaths, AggrJson);
@@ -645,8 +640,7 @@ bool _3CInterface::dumpStats() {
       WildPtrInfo.close();
     }
 
-    llvm::raw_fd_ostream PerWildPtrInfo(_3COpts.PerWildPtrInfoJson,
-                                        Ec);
+    llvm::raw_fd_ostream PerWildPtrInfo(_3COpts.PerWildPtrInfoJson, Ec);
     if (!PerWildPtrInfo.has_error()) {
       GlobalProgramInfo.getInterimConstraintState().printRootCauseStats(
           PerWildPtrInfo, GlobalProgramInfo.getConstraints());
