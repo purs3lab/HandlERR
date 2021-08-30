@@ -70,6 +70,6 @@ struct _3COptions {
 };
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-extern struct _3COptions _3CGlobalOptions;
+extern struct _3COptions _3COpts;
 
 #endif // LLVM_CLANG_3C_3CGLOBALOPTIONS_H
