@@ -663,8 +663,10 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       constrainWildIfMacro(PVExternal, PVD->getLocation());
       // If this is "main", constrain its argv parameter to a nested arr
       if (AllTypes && FuncName == "main" && FD->isGlobal() && I == 1) {
-        PVInternal->constrainOuterTo(CS, CS.getArr());
-        PVInternal->constrainIdxTo(CS, CS.getNTArr(), 1);
+        PVInternal->constrainOuterTo(CS, CS.getArr(),
+                                     std::string(SPECIAL_REASON) +"main");
+        PVInternal->constrainIdxTo(CS, CS.getNTArr(), 1,
+                                   std::string(SPECIAL_REASON) +"main");
       }
       // It is possible to have a param decl in a macro when the function is
       // not.
@@ -721,7 +723,7 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
 void ProgramInfo::ensureNtCorrect(const QualType &QT, const ASTContext &C,
                                   PointerVariableConstraint *PV) {
   if (AllTypes && !canBeNtArray(QT)) {
-    PV->constrainOuterTo(CS, CS.getArr(), true, true);
+    PV->constrainOuterTo(CS, CS.getArr(), ARRAY_REASON, true, true);
   }
 }
 
@@ -977,7 +979,11 @@ bool ProgramInfo::computeInterimConstraintState(
 
   CState.clear();
   std::set<Atom *> DirectWildVarAtoms;
-  CS.getChkCG().getSuccessors(CS.getWild(), DirectWildVarAtoms);
+  std::vector<ConstraintsGraph::AtomCons> DWVA;
+  CS.getChkCG().getSuccessors(CS.getWild(), DWVA);
+  for (auto A : DWVA) {
+    DirectWildVarAtoms.insert(A.atom);
+  }
 
   CVars TmpCGrp;
   CVars OnlyIndirect;

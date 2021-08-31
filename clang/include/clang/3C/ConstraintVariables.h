@@ -498,9 +498,10 @@ public:
   void constrainToWild(Constraints &CS, const std::string &Rsn) const override;
   void constrainToWild(Constraints &CS, const std::string &Rsn,
                        PersistentSourceLoc *PL) const override;
-  void constrainOuterTo(Constraints &CS, ConstAtom *C, bool DoLB = false,
-                        bool Soft = false);
+  void constrainOuterTo(Constraints &CS, ConstAtom *C, const std::string &Rsn,
+                        bool DoLB = false, bool Soft = false);
   void constrainIdxTo(Constraints &CS, ConstAtom *C, unsigned int Idx,
+                      const std::string &Rsn,
                       bool DoLB = false, bool Soft = false);
   bool anyChanges(const EnvironmentMap &E) const override;
   bool anyArgumentIsWild(const EnvironmentMap &E);

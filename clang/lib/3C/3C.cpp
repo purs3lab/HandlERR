@@ -715,7 +715,7 @@ bool _3CInterface::makeSinglePtrNonWild(ConstraintKey TargetPtr) {
 
   // Delete the constraint that make the provided targetPtr WILD.
   VarAtom *VA = CS.getOrCreateVar(TargetPtr, "q", VarAtom::V_Other);
-  Geq NewE(VA, CS.getWild());
+  Geq NewE(VA, CS.getWild(), INTERNAL_USE_REASON);
   Constraint *OriginalConstraint = *CS.getConstraints().find(&NewE);
   CS.removeConstraint(OriginalConstraint);
   VA->getAllConstraints().erase(OriginalConstraint);
@@ -776,7 +776,9 @@ bool _3CInterface::invalidateWildReasonGlobally(ConstraintKey PtrKey) {
 
   // Delete ALL the constraints that have the same given reason.
   VarAtom *VA = CS.getOrCreateVar(PtrKey, "q", VarAtom::V_Other);
-  Geq NewE(VA, CS.getWild());
+  // TODO: there was previously no reason here. This code may have relied on
+  // lack of reasons elsewhere.
+  Geq NewE(VA, CS.getWild(), DEFAULT_REASON);
   Constraint *OriginalConstraint = *CS.getConstraints().find(&NewE);
   invalidateAllConstraintsWithReason(OriginalConstraint);
 

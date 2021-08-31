@@ -178,7 +178,7 @@ bool Constraints::removeReasonBasedConstraint(Constraint *C) {
 static bool
 doSolve(ConstraintsGraph &CG,
         ConstraintsEnv &Env, Constraints *CS, bool DoLeastSolution,
-        std::set<VarAtom *> *InitVs, std::set<VarAtom *> &Conflicts) {
+        std::set<VarAtom *> *InitVs, std::vector<ConstraintsGraph::AtomCons> &Conflicts) {
 
   std::vector<Atom *> WorkList;
 
@@ -197,11 +197,11 @@ doSolve(ConstraintsGraph &CG,
     ConstAtom *CurrSol = Env.getAssignment(Curr);
 
     // get its neighbors.
-    std::set<Atom *> Neighbors;
+    std::vector<ConstraintsGraph::AtomCons> Neighbors;
     CG.getNeighbors(Curr, Neighbors, DoLeastSolution);
     // update each successor's solution.
-    for (auto *NeighborA : Neighbors) {
-      if (VarAtom *Neighbor = dyn_cast<VarAtom>(NeighborA)) {
+    for (auto N : Neighbors) {
+      if (VarAtom *Neighbor = dyn_cast<VarAtom>(N.atom)) {
         ConstAtom *NghSol = Env.getAssignment(Neighbor);
         // update solution if doing so would change it
         // checked? --- if sol(Neighbor) <> (sol(Neighbor) JOIN Cur)
@@ -218,12 +218,12 @@ doSolve(ConstraintsGraph &CG,
   }
 
   // Check Upper/lower bounds hold; collect failures in conflicts set.
-  std::set<Atom *> Neighbors;
+  std::vector<ConstraintsGraph::AtomCons> Neighbors;
   bool Ok = true;
   for (ConstAtom *Cbound : CG.getAllConstAtoms()) {
     if (CG.getNeighbors(Cbound, Neighbors, !DoLeastSolution)) {
-      for (Atom *A : Neighbors) {
-        VarAtom *VA = dyn_cast<VarAtom>(A);
+      for (auto N : Neighbors) {
+        VarAtom *VA = dyn_cast<VarAtom>(N.atom);
         if (VA == nullptr)
           continue;
         ConstAtom *Csol = Env.getAssignment(VA);
@@ -234,7 +234,7 @@ doSolve(ConstraintsGraph &CG,
           // wild after pointer type solving is finished. Checked types will
           // be resolved with this new constraint, transitively propagating the
           // new WILD-ness.
-          Conflicts.insert(VA);
+          Conflicts.push_back(N);
           // Failure case.
           if (Verbose) {
             errs() << "Unsolvable constraints: ";
@@ -308,10 +308,10 @@ static std::set<VarAtom *> findBounded(ConstraintsGraph &CG,
     auto *Curr = *(Open.begin());
     Open.erase(Open.begin());
 
-    std::set<Atom *> Neighbors;
+    std::vector<ConstraintsGraph::AtomCons> Neighbors;
     CG.getNeighbors(Curr, Neighbors, Succs, false, true);
-    for (Atom *A : Neighbors) {
-      VarAtom *VA = dyn_cast<VarAtom>(A);
+    for (auto A : Neighbors) {
+      VarAtom *VA = dyn_cast<VarAtom>(A.atom);
       if (VA && Bounded.find(VA) == Bounded.end()) {
         Open.insert(VA);
         Bounded.insert(VA);
@@ -323,7 +323,7 @@ static std::set<VarAtom *> findBounded(ConstraintsGraph &CG,
 }
 
 bool Constraints::graphBasedSolve() {
-  std::set<VarAtom *> Conflicts;
+  std::vector<ConstraintsGraph::AtomCons> Conflicts;
   ConstraintsGraph SolChkCG;
   ConstraintsGraph SolPtrTypCG;
   ConstraintsEnv &Env = Environment;
@@ -438,13 +438,13 @@ bool Constraints::graphBasedSolve() {
     if (!Res) {
       std::set<VarAtom *> Rest;
       Env.doCheckedSolve(true);
-      for (VarAtom *VA : Conflicts) {
-        assert(VA != nullptr);
-        std::string Rsn = "Bad pointer type solution";
-        Geq *ConflictConstraint = createGeq(VA, getWild(), Rsn);
+      for (auto Conflict : Conflicts) {
+        assert(Conflict.atom != nullptr);
+        std::string Rsn = Conflict.cons->getReason();
+        Geq *ConflictConstraint = createGeq(Conflict.atom, getWild(), Rsn);
         addConstraint(ConflictConstraint);
         SolChkCG.addConstraint(ConflictConstraint, *this);
-        Rest.insert(VA);
+        Rest.insert(cast<VarAtom>(Conflict.atom));
       }
       Conflicts.clear();
       /* FIXME: Should we propagate the old res? */
@@ -565,14 +565,9 @@ ConstraintsGraph &Constraints::getPtrTypCG() {
   return *PtrTypCG;
 }
 
-Geq *Constraints::createGeq(Atom *Lhs, Atom *Rhs, bool IsCheckedConstraint,
-                            bool Soft) {
-  return new Geq(Lhs, Rhs, IsCheckedConstraint, Soft);
-}
-
 Geq *Constraints::createGeq(Atom *Lhs, Atom *Rhs, const std::string &Rsn,
-                            bool IsCheckedConstraint) {
-  return new Geq(Lhs, Rhs, Rsn, IsCheckedConstraint);
+                            bool IsCheckedConstraint, bool Soft) {
+  return new Geq(Lhs, Rhs, Rsn, IsCheckedConstraint, Soft);
 }
 
 Geq *Constraints::createGeq(Atom *Lhs, Atom *Rhs, const std::string &Rsn,

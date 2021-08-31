@@ -102,15 +102,15 @@ PointerVariableConstraint *PointerVariableConstraint::addAtomPVConstraint(
   std::vector<ConstAtom *> &SrcVars = Copy->SrcVars;
 
   VarAtom *NewA = CS.getFreshVar("&" + Copy->Name, VarAtom::V_Other);
-  CS.addConstraint(CS.createGeq(NewA, PtrTyp, false));
+  CS.addConstraint(CS.createGeq(NewA, PtrTyp, INNER_POINTER_REASON, false));
 
   // Add a constraint between the new atom and any existing atom for this
   // pointer. This is the same constraint that is added between atoms of a
   // pointer in the PointerVariableConstraint constructor. It forces all inner
-  // atoms to be wild if an outer atom in wild.
+  // atoms to be wild if an outer atom is wild.
   if (!Vars.empty())
     if (auto *VA = dyn_cast<VarAtom>(*Vars.begin()))
-      CS.addConstraint(new Geq(VA, NewA));
+      CS.addConstraint(new Geq(VA, NewA, INNER_POINTER_REASON));
 
   Vars.insert(Vars.begin(), NewA);
   SrcVars.insert(SrcVars.begin(), PtrTyp);
@@ -473,9 +473,9 @@ PointerVariableConstraint::PointerVariableConstraint(
       // Incomplete arrays are lower bounded to ARR because the transformation
       // int[] -> _Ptr<int> is permitted while int[1] -> _Ptr<int> is not.
       if (IsIncompleteArr)
-        CS.addConstraint(CS.createGeq(VA, CS.getArr(), false));
+        CS.addConstraint(CS.createGeq(VA, CS.getArr(), ARRAY_REASON, false));
       else if (IsArr)
-        CS.addConstraint(CS.createGeq(CS.getArr(), VA, false));
+        CS.addConstraint(CS.createGeq(CS.getArr(), VA, ARRAY_REASON, false));
     }
 
     // Prepare for next level of pointer
@@ -537,7 +537,7 @@ PointerVariableConstraint::PointerVariableConstraint(
       VarAtom *VI = dyn_cast<VarAtom>(Vars[VarIdx]);
       VarAtom *VJ = dyn_cast<VarAtom>(Vars[VarIdx + 1]);
       if (VI && VJ)
-        CS.addConstraint(new Geq(VJ, VI));
+        CS.addConstraint(new Geq(VJ, VI, INNER_POINTER_REASON));
     }
   }
 }
@@ -1284,17 +1284,18 @@ void PointerVariableConstraint::constrainToWild(Constraints &CS,
 }
 
 void PointerVariableConstraint::constrainIdxTo(Constraints &CS, ConstAtom *C,
-                                               unsigned int Idx, bool DoLB,
-                                               bool Soft) {
+                                               unsigned int Idx,
+                                               const std::string &Rsn,
+                                               bool DoLB, bool Soft) {
   assert(C == CS.getPtr() || C == CS.getArr() || C == CS.getNTArr());
 
   if (Vars.size() > Idx) {
     Atom *A = Vars[Idx];
     if (VarAtom *VA = dyn_cast<VarAtom>(A)) {
       if (DoLB)
-        CS.addConstraint(CS.createGeq(VA, C, false, Soft));
+        CS.addConstraint(CS.createGeq(VA, C, Rsn, false, Soft));
       else
-        CS.addConstraint(CS.createGeq(C, VA, false, Soft));
+        CS.addConstraint(CS.createGeq(C, VA, Rsn, false, Soft));
     } else if (ConstAtom *CA = dyn_cast<ConstAtom>(A)) {
       if (DoLB) {
         if (*CA < *C) {
@@ -1312,8 +1313,9 @@ void PointerVariableConstraint::constrainIdxTo(Constraints &CS, ConstAtom *C,
 }
 
 void PointerVariableConstraint::constrainOuterTo(Constraints &CS, ConstAtom *C,
+                                                 const std::string &Rsn,
                                                  bool DoLB, bool Soft) {
-  constrainIdxTo(CS, C, 0, DoLB, Soft);
+  constrainIdxTo(CS, C, 0, Rsn, DoLB, Soft);
 }
 
 bool PointerVariableConstraint::anyArgumentIsWild(const EnvironmentMap &E) {
@@ -1374,7 +1376,7 @@ PVConstraint *PointerVariableConstraint::getCopy(Constraints &CS) {
       VarAtom *FreshVA = CS.getFreshVar(VA->getName(), VA->getVarKind());
       FreshVars.push_back(FreshVA);
       if (!isa<WildAtom>(*CAIt))
-        CS.addConstraint(CS.createGeq(*CAIt, FreshVA, false));
+        CS.addConstraint(CS.createGeq(*CAIt, FreshVA, COPY_REASON, false));
     }
     ++VAIt;
     ++CAIt;
@@ -2252,8 +2254,8 @@ void FVComponentVariable::linkInternalExternal(ProgramInfo &I,
     if (isa<VarAtom>(InternalA) || isa<VarAtom>(ExternalA)) {
       // Equate pointer types for internal and external parameter constraint
       // variables.
-      CS.addConstraint(CS.createGeq(InternalA, ExternalA, false));
-      CS.addConstraint(CS.createGeq(ExternalA, InternalA, false));
+      CS.addConstraint(CS.createGeq(InternalA, ExternalA, LINK_REASON, false));
+      CS.addConstraint(CS.createGeq(ExternalA, InternalA, LINK_REASON, false));
 
       if (!isa<ConstAtom>(ExternalA)) {
         // Constrain Internal >= External. If external solves to wild, then so
@@ -2261,7 +2263,8 @@ void FVComponentVariable::linkInternalExternal(ProgramInfo &I,
         // use causes the internal variable to be wild because the external
         // variable solves to WILD only when there is an unsafe use that
         // cannot be resolved by inserting casts.
-        CS.addConstraint(CS.createGeq(InternalA, ExternalA, true));
+        CS.addConstraint(CS.createGeq(InternalA, ExternalA,
+                                      LINK_REASON, true));
 
         // Atoms of return constraint variables are unified after the first
         // level. This is because CheckedC does not allow assignment from e.g.
@@ -2269,7 +2272,8 @@ void FVComponentVariable::linkInternalExternal(ProgramInfo &I,
         // variable with type `int **`.
         if (DisableFunctionEdges || DisableRDs || EquateChecked ||
             (ExternalConstraint->getName() == RETVAR && J > 0))
-          CS.addConstraint(CS.createGeq(ExternalA, InternalA, true));
+          CS.addConstraint(CS.createGeq(ExternalA, InternalA,
+                                        LINK_REASON, true));
       }
     }
   }

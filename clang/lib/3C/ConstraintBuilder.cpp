@@ -290,7 +290,7 @@ public:
                   // In `printf("... %s ...", ...)`, the argument corresponding
                   // to the `%s` should be an _Nt_array_ptr
                   // (https://github.com/correctcomputation/checkedc-clang/issues/549).
-                  constrainVarsTo(ArgumentConstraints.first, CS.getNTArr());
+                  constrainVarsTo(ArgumentConstraints.first, CS.getNTArr(), ARRAY_REASON);
                 }
                 if (Verbose) {
                   std::string FuncName = TargetFV->getName();
@@ -310,7 +310,7 @@ public:
   // e1[e2]
   bool VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
     Constraints &CS = Info.getConstraints();
-    constraintInBodyVariable(E->getBase(), CS.getArr());
+    constraintInBodyVariable(E->getBase(), CS.getArr(), ARRAY_REASON);
     return true;
   }
 
@@ -374,18 +374,18 @@ public:
 private:
   // Constraint all the provided vars to be
   // equal to the provided type i.e., (V >= type).
-  void constrainVarsTo(CVarSet &Vars, ConstAtom *CAtom) {
+  void constrainVarsTo(CVarSet &Vars, ConstAtom *CAtom, const std::string &Rsn) {
     Constraints &CS = Info.getConstraints();
     for (const auto &I : Vars)
       if (PVConstraint *PVC = dyn_cast<PVConstraint>(I)) {
-        PVC->constrainOuterTo(CS, CAtom);
+        PVC->constrainOuterTo(CS, CAtom, Rsn);
       }
   }
 
   // Constraint helpers.
-  void constraintInBodyVariable(Expr *E, ConstAtom *CAtom) {
+  void constraintInBodyVariable(Expr *E, ConstAtom *CAtom, const std::string &Rsn) {
     CVarSet Var = CB.getExprConstraintVarsSet(E);
-    constrainVarsTo(Var, CAtom);
+    constrainVarsTo(Var, CAtom, Rsn);
   }
 
   // Constraint all the argument of the provided
@@ -424,7 +424,8 @@ private:
     } else {
       if (ModifyingExpr)
         Info.getABoundsInfo().recordArithmeticOperation(E, &CB);
-      constraintInBodyVariable(E, Info.getConstraints().getArr());
+      constraintInBodyVariable(E, Info.getConstraints().getArr(),
+                               ARRAY_REASON);
     }
   }
 

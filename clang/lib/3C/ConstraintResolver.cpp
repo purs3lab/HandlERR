@@ -382,7 +382,7 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
               // On the other hand, CheckedC does let you take the address of
               // constant sized arrays.
               if (!PCV->getArrPresent())
-                PCV->constrainOuterTo(CS, CS.getPtr(), true);
+                PCV->constrainOuterTo(CS, CS.getPtr(), REFERENCE_REASON, true);
           // Add a VarAtom to UOExpr's PVConstraint, for &.
           Ret = std::make_pair(addAtomAll(T.first, CS.getPtr(), CS), T.second);
         }
@@ -471,7 +471,7 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
               ExprType = Context->getPointerType(ArgTy);
               PVConstraint *PVC = new PVConstraint(ExprType, nullptr, N, Info,
                                                    *Context, nullptr, 0);
-              PVC->constrainOuterTo(CS, A, true);
+              PVC->constrainOuterTo(CS, A, INNER_POINTER_REASON, true);
               ReturnCVs.insert(PVC);
               DidInsert = true;
               if (FuncName.compare("realloc") == 0) {
@@ -615,7 +615,8 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
       // We create a new constraint variable and constraint it to an Nt_array.
 
       PVConstraint *P = new PVConstraint(Str, Info, *Context);
-      P->constrainOuterTo(CS, CS.getNTArr()); // NB: ARR already there.
+      P->constrainOuterTo(CS, CS.getNTArr(),
+                          std::string(SPECIAL_REASON) + "string literal"); // NB: ARR already there.
 
       BoundsKey TmpKey = ABI.getRandomBKey();
       P->setBoundsKey(TmpKey);

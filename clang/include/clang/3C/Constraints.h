@@ -30,10 +30,18 @@ class Constraints;
 class PersistentSourceLoc;
 class ConstraintsGraph;
 
+#define INTERNAL_USE_REASON "This reason should never be displayed"
 #define DEFAULT_REASON "UNKNOWN_REASON"
 #define POINTER_IS_ARRAY_REASON "Pointer is array but alltypes is disabled."
 #define VOID_TYPE_REASON "Default void* type"
 #define UNWRITABLE_REASON "Source code in non-writable file."
+#define INNER_POINTER_REASON "Pointer is within an outer pointer"
+#define ARRAY_REASON "Lowerbounded to an array type"
+// std::string(SPECIAL_REASON) + name
+#define SPECIAL_REASON "Special case for "
+#define COPY_REASON "Identical Copy"
+#define LINK_REASON "Function Internal/External Link"
+#define REFERENCE_REASON "Target of & operator"
 
 template <typename T> struct PComp {
   bool operator()(const T Lhs, const T Rhs) const { return *Lhs < *Rhs; }
@@ -304,10 +312,6 @@ class Geq : public Constraint {
   friend class VarAtom;
 
 public:
-  Geq(Atom *Lhs, Atom *Rhs, bool IsCC = true, bool Soft = false)
-      : Constraint(C_Geq), Lhs(Lhs), Rhs(Rhs), IsCheckedConstraint(IsCC),
-        IsSoft(Soft) {}
-
   Geq(Atom *Lhs, Atom *Rhs, const std::string &Rsn, bool IsCC = true,
       bool Soft = false)
       : Constraint(C_Geq, Rsn), Lhs(Lhs), Rhs(Rhs), IsCheckedConstraint(IsCC),
@@ -468,10 +472,8 @@ public:
   void print(llvm::raw_ostream &) const;
   void dumpJson(llvm::raw_ostream &) const;
 
-  Geq *createGeq(Atom *Lhs, Atom *Rhs, bool IsCheckedConstraint = true,
-                 bool Soft = false);
   Geq *createGeq(Atom *Lhs, Atom *Rhs, const std::string &Rsn,
-                 bool IsCheckedConstraint = true);
+                 bool IsCheckedConstraint = true, bool Soft = false);
   Geq *createGeq(Atom *Lhs, Atom *Rhs, const std::string &Rsn,
                  PersistentSourceLoc *PL, bool IsCheckedConstraint = true);
 

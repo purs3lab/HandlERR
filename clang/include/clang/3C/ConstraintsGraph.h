@@ -36,11 +36,12 @@ public:
 
   DataType getData() const { return Data; }
 
-  void connectTo(NodeType &Other, bool SoftEdge = false) {
-    auto *BLR = new EdgeType(Other);
+  void connectTo(NodeType &Other, bool SoftEdge = false,
+                 Constraint *C = nullptr) {
+    auto *BLR = new EdgeType(Other, C);
     BLR->IsSoft = SoftEdge;
     this->addEdge(*BLR);
-    auto *BRL = new EdgeType(*this);
+    auto *BRL = new EdgeType(*this, C);
     Other.addPredecessor(*BRL);
   }
 
@@ -93,9 +94,12 @@ struct GraphTraits<DataNode<Data, EdgeType> *> {
 template <class DataType>
 struct DataEdge : public llvm::DGEdge<DataNode<DataType>, DataEdge<DataType>> {
   typedef llvm::DGEdge<DataNode<DataType>, DataEdge<DataType>> SuperType;
-  explicit DataEdge(DataNode<DataType> &Node) : SuperType(Node) {}
-  DataEdge(const DataEdge &E) : SuperType(E) {}
+  explicit DataEdge(DataNode<DataType> &Node, Constraint *C = nullptr)
+      : SuperType(Node), EdgeConstraint(C) {}
+  DataEdge(const DataEdge &E, Constraint *C = nullptr)
+      : SuperType(E), EdgeConstraint(C) {}
   bool IsSoft = false;
+  Constraint *EdgeConstraint;
 };
 
 class GraphVizOutputGraph;
@@ -135,10 +139,10 @@ public:
     invalidateBFSCache();
   }
 
-  void addEdge(Data L, Data R, bool SoftEdge = false) {
+  void addEdge(Data L, Data R, bool SoftEdge = false, Constraint *C = nullptr) {
     NodeType *BL = this->findOrCreateNode(L);
     NodeType *BR = this->findOrCreateNode(R);
-    BL->connectTo(*BR, SoftEdge);
+    BL->connectTo(*BR, SoftEdge, C);
     invalidateBFSCache();
   }
 
@@ -234,6 +238,37 @@ public:
   // Const atoms are the starting points for the solving algorithm so, we need
   // be able to retrieve them from the graph.
   std::set<ConstAtom *> &getAllConstAtoms();
+
+  // Pair an `Atom*` with a `Constraint*`, to deconstruct a graph edge
+  struct AtomCons {
+    Atom *atom;
+    Constraint *cons;
+    AtomCons(Atom *A, Constraint *C) : atom(A), cons(C) {}
+  };
+
+  bool getNeighbors(Atom *A, std::vector<AtomCons> &DataSet, bool Succ,
+                    bool Append = false, bool IgnoreSoftEdges = false) {
+    NodeType *N = this->findNode(A);
+    if (N == nullptr)
+      return false;
+    if (!Append)
+      DataSet.clear();
+    auto Edges = Succ ? N->getEdges() : N->getPredecessors();
+    for (auto *E : Edges)
+      if (!E->IsSoft || !IgnoreSoftEdges)
+        DataSet.push_back(AtomCons(E->getTargetNode().getData(),E->EdgeConstraint));
+    return !DataSet.empty();
+  }
+
+  bool getSuccessors(Atom *A, std::vector<AtomCons> &DataSet,
+                     bool Append = false) {
+    return getNeighbors(A, DataSet, true, Append);
+  }
+
+  bool getPredecessors(Atom *A, std::vector<AtomCons> &DataSet,
+                       bool Append = false) {
+    return getNeighbors(A, DataSet, false, Append);
+  }
 
 protected:
   // Add vertex is overridden to save const atoms as they are added to the graph
