@@ -239,14 +239,9 @@ public:
   // be able to retrieve them from the graph.
   std::set<ConstAtom *> &getAllConstAtoms();
 
-  // Pair an `Atom*` with a `Constraint*`, to deconstruct a graph edge
-  struct AtomCons {
-    Atom *atom;
-    Constraint *cons;
-    AtomCons(Atom *A, Constraint *C) : atom(A), cons(C) {}
-  };
+  typedef DataEdge<Atom*> EdgeType;
 
-  bool getNeighbors(Atom *A, std::vector<AtomCons> &DataSet, bool Succ,
+  bool getNeighbors(Atom *A, std::vector<EdgeType*> &DataSet, bool Succ,
                     bool Append = false, bool IgnoreSoftEdges = false) {
     NodeType *N = this->findNode(A);
     if (N == nullptr)
@@ -256,16 +251,16 @@ public:
     auto Edges = Succ ? N->getEdges() : N->getPredecessors();
     for (auto *E : Edges)
       if (!E->IsSoft || !IgnoreSoftEdges)
-        DataSet.push_back(AtomCons(E->getTargetNode().getData(),E->EdgeConstraint));
+        DataSet.push_back(E);
     return !DataSet.empty();
   }
 
-  bool getSuccessors(Atom *A, std::vector<AtomCons> &DataSet,
+  bool getSuccessors(Atom *A, std::vector<EdgeType*> &DataSet,
                      bool Append = false) {
     return getNeighbors(A, DataSet, true, Append);
   }
 
-  bool getPredecessors(Atom *A, std::vector<AtomCons> &DataSet,
+  bool getPredecessors(Atom *A, std::vector<EdgeType*> &DataSet,
                        bool Append = false) {
     return getNeighbors(A, DataSet, false, Append);
   }

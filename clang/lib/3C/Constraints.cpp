@@ -178,7 +178,7 @@ bool Constraints::removeReasonBasedConstraint(Constraint *C) {
 static bool
 doSolve(ConstraintsGraph &CG,
         ConstraintsEnv &Env, Constraints *CS, bool DoLeastSolution,
-        std::set<VarAtom *> *InitVs, std::vector<ConstraintsGraph::AtomCons> &Conflicts) {
+        std::set<VarAtom *> *InitVs, std::vector<ConstraintsGraph::EdgeType*> &Conflicts) {
 
   std::vector<Atom *> WorkList;
 
@@ -197,11 +197,11 @@ doSolve(ConstraintsGraph &CG,
     ConstAtom *CurrSol = Env.getAssignment(Curr);
 
     // get its neighbors.
-    std::vector<ConstraintsGraph::AtomCons> Neighbors;
+    std::vector<ConstraintsGraph::EdgeType*> Neighbors;
     CG.getNeighbors(Curr, Neighbors, DoLeastSolution);
     // update each successor's solution.
     for (auto N : Neighbors) {
-      if (VarAtom *Neighbor = dyn_cast<VarAtom>(N.atom)) {
+      if (VarAtom *Neighbor = dyn_cast<VarAtom>(N->getTargetNode().getData())) {
         ConstAtom *NghSol = Env.getAssignment(Neighbor);
         // update solution if doing so would change it
         // checked? --- if sol(Neighbor) <> (sol(Neighbor) JOIN Cur)
@@ -218,12 +218,12 @@ doSolve(ConstraintsGraph &CG,
   }
 
   // Check Upper/lower bounds hold; collect failures in conflicts set.
-  std::vector<ConstraintsGraph::AtomCons> Neighbors;
+  std::vector<ConstraintsGraph::EdgeType*> Neighbors;
   bool Ok = true;
   for (ConstAtom *Cbound : CG.getAllConstAtoms()) {
     if (CG.getNeighbors(Cbound, Neighbors, !DoLeastSolution)) {
       for (auto N : Neighbors) {
-        VarAtom *VA = dyn_cast<VarAtom>(N.atom);
+        VarAtom *VA = dyn_cast<VarAtom>(N->getTargetNode().getData());
         if (VA == nullptr)
           continue;
         ConstAtom *Csol = Env.getAssignment(VA);
@@ -308,10 +308,10 @@ static std::set<VarAtom *> findBounded(ConstraintsGraph &CG,
     auto *Curr = *(Open.begin());
     Open.erase(Open.begin());
 
-    std::vector<ConstraintsGraph::AtomCons> Neighbors;
+    std::vector<ConstraintsGraph::EdgeType*> Neighbors;
     CG.getNeighbors(Curr, Neighbors, Succs, false, true);
     for (auto A : Neighbors) {
-      VarAtom *VA = dyn_cast<VarAtom>(A.atom);
+      VarAtom *VA = dyn_cast<VarAtom>(A->getTargetNode().getData());
       if (VA && Bounded.find(VA) == Bounded.end()) {
         Open.insert(VA);
         Bounded.insert(VA);
@@ -323,7 +323,7 @@ static std::set<VarAtom *> findBounded(ConstraintsGraph &CG,
 }
 
 bool Constraints::graphBasedSolve() {
-  std::vector<ConstraintsGraph::AtomCons> Conflicts;
+  std::vector<ConstraintsGraph::EdgeType*> Conflicts;
   ConstraintsGraph SolChkCG;
   ConstraintsGraph SolPtrTypCG;
   ConstraintsEnv &Env = Environment;
@@ -439,12 +439,23 @@ bool Constraints::graphBasedSolve() {
       std::set<VarAtom *> Rest;
       Env.doCheckedSolve(true);
       for (auto Conflict : Conflicts) {
-        assert(Conflict.atom != nullptr);
-        std::string Rsn = Conflict.cons->getReason();
-        Geq *ConflictConstraint = createGeq(Conflict.atom, getWild(), Rsn);
+        auto ConflictAtom = Conflict->getTargetNode().getData();
+        assert(ConflictAtom != nullptr);
+        std::string Rsn = Conflict->EdgeConstraint->getReason();
+        // determine a second reason
+        for (auto *Pred : Conflict->getTargetNode().getPredecessors()) {
+          if (auto *PredGeq = dyn_cast<Geq>(Pred->EdgeConstraint)) {
+            if (PredGeq->getRHS()->getKind() == PredGeq->getLHS()->getKind()) {
+              Rsn += ", but also, ";
+              Rsn += Pred->EdgeConstraint->getReason();
+              break;
+            }
+          }
+        }
+        Geq *ConflictConstraint = createGeq(ConflictAtom, getWild(), Rsn);
         addConstraint(ConflictConstraint);
         SolChkCG.addConstraint(ConflictConstraint, *this);
-        Rest.insert(cast<VarAtom>(Conflict.atom));
+        Rest.insert(cast<VarAtom>(ConflictAtom));
       }
       Conflicts.clear();
       /* FIXME: Should we propagate the old res? */
