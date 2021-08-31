@@ -242,11 +242,16 @@ static cl::opt<bool> OptInferTypesForUndef(
            "types for undefined functions are inferred according to the same "
            "rules as defined functions with the caveat that an undefined "
            "function will only solve to an itype and not a fully checked type. "
-           "Because 3c is not able to examine the body the function, the "
-           "inferred pointer types and array bounds are not necessarily "
-           "accurate which may lead to inaccurate inference elsewhere in the "
-           "program.  It is important to manually review type inferred for "
-           "undefined functions for this reason." ),
+           "Because 3c is not able to examine the body of the function, the "
+           "inferred pointer types (and array bounds) may not be consistent "
+           "with the actual implementation. By default, the Checked C compiler "
+           "trusts the declared itypes and will not detect a spatial memory "
+           "safety violation if the function is used in a way that is "
+           "consistent with the itypes but not the assumptions actually made "
+           "by the implementation. Thus, if you want to guarantee spatial "
+           "memory safety, you must manually check the inferred types against "
+           "your understanding of what the function actually does (or any "
+           "available documentation)."),
   cl::init(false), cl::cat(_3CCategory));
 
 #ifdef FIVE_C
