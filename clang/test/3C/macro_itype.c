@@ -20,7 +20,7 @@ struct s { macro0 };
 // rewriting around macros.
 #define macro1 : itype(_Ptr<int>)
 void fn(int *b macro1, int *c) {
-//CHECK: void fn(int *b : itype(_Ptr<int>), _Ptr<int> c) {
+//CHECK: void fn(int *b macro1, _Ptr<int> c) {
   b = 1;
 }
 void caller() {

@@ -831,12 +831,17 @@ void FunctionDeclBuilder::buildDeclVar(const FVComponentVariable *CV,
   ParmVarDecl *PVD = dyn_cast_or_null<ParmVarDecl>(Decl);
   if (PVD && !PVD->getName().empty()) {
     SourceRange Range = PVD->getSourceRange();
+    // Test retrieval of itypes from the original source.
+    // TODO: Figure out how this should interact with bounds.
+    if (PVD->hasInteropTypeExpr())
+      Range.setEnd(PVD->getInteropTypeExpr()->getEndLoc());
     if (PVD->hasBoundsExpr())
       Range.setEnd(PVD->getBoundsExpr()->getEndLoc());
     if (Range.isValid() && !inParamMultiDecl(PVD)) {
       Type = getSourceText(Range, *Context);
       if (!Type.empty()) {
-        IType = getExistingIType(CV->getExternal()) + BoundsStr;
+        //IType = getExistingIType(CV->getExternal()) + BoundsStr;
+        IType = BoundsStr;
         return;
       }
     }
