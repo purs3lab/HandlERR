@@ -12,10 +12,10 @@ struct s { macro0 };
 //CHECK: struct s { macro0 };
 
 // Just removing the assertion that failed on the above example caused this to
-// rewrite incorectly. The ItypeStr would be left empty, so first paramter
-// would be rewritten to `int *b` even though the rewriter intened to give it
-// an itype. If the paramter was then passed a checked pointer, there would a
-// Checked C compiler error. Ideally, 3C wouldn't need to change the
+// rewrite incorrectly. The ItypeStr would be left empty, so first parameter
+// would be rewritten to `int *b` even though the rewriter intended to give it
+// an itype. If the parameter was then passed a checked pointer, there would be
+// a Checked C compiler error. Ideally, 3C wouldn't need to change the
 // declaration of `b` at all, but this is the usual limitation we have with
 // rewriting around macros.
 #define macro1 : itype(_Ptr<int>)
