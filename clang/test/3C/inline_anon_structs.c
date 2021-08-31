@@ -1,7 +1,3 @@
-// Until I get around to updating the expected output of this test for the
-// inline-struct-fixes branch:
-// XFAIL: *
-
 // RUN: rm -rf %t*
 // RUN: 3c -base-dir=%S -alltypes -addcr %s -- | FileCheck -match-full-lines -check-prefixes="CHECK_ALL","CHECK" %s
 // RUN: 3c -base-dir=%S -addcr %s -- | FileCheck -match-full-lines -check-prefixes="CHECK_NOALL","CHECK" %s
@@ -15,17 +11,29 @@
 an inlinestruct and its associated VarDecl have different locations*/
 int valuable;
 
+// When -alltypes is on, the addition of _Checked to the array triggers
+// rewriting of the multi-decl, including splitting of the struct definition.
+// When it is off, the multi-decl as such is not rewritten, but in either case,
+// the fields of the struct are rewritten as appropriate.
 static struct foo {
   // When an inline struct definition is separated from variable declarations,
   // if there was a `static` keyword that applied to the variables, we should
   // remove it from the separated struct (where it is not meaningful).
+  //CHECK_NOALL: static struct foo {
   //CHECK_ALL: struct foo {
   const char *name;
+  // TODO: Why is this affected by alltypes if it's a _Ptr?
   //CHECK_NOALL: const char *name;
   //CHECK_ALL:   _Ptr<const char> name;
   int *p_valuable;
   //CHECK: _Ptr<int> p_valuable;
 } array[] = {{"mystery", &valuable}};
+// {{...}} in a CHECK directive delimits a regular expression
+// (https://llvm.org/docs/CommandGuide/FileCheck.html#filecheck-regex-matching-syntax)
+// and there isn't a way to escape that construct itself, so we use a regular
+// expression and escape the contents as needed.
+//CHECK_NOALL: {{\} array\[\] = \{\{"mystery", &valuable\}\};}}
+//CHECK_ALL: {{static struct foo array _Checked\[\] = \{\{"mystery", &valuable\}\};}}
 
 /*This code is a series of more complex tests for inline structs*/
 /* a, b, c below all stay as WILD pointers; d can be a _Ptr<...>*/
@@ -75,15 +83,14 @@ void foo(void) {
 
 /*This code tests anonymous structs */
 struct {
+  //CHECK: struct x_struct_1 {
   /*the fields of the anonymous struct are free to be marked checked*/
   int *data;
   //CHECK_NOALL: int *data;
-
-  /* but the actual pointer can't be when alltypes is disabled */
-  /* when alltypes is enabled, this whole structure is rewritten
-   improperly, but that's OK, because we signal a warning to the user*/
+  //CHECK_ALL: _Array_ptr<int> data : count(4);
 } * x;
-//CHECK_ALL: _Ptr<struct> x = ((void *)0);
+//CHECK:      };
+//CHECK-NEXT: _Ptr<struct x_struct_1> x = ((void *)0);
 
 /*ensure trivial conversion*/
 void foo1(int *w) {
@@ -101,15 +108,19 @@ struct alpha *al[4];
 //CHECK_NOALL: struct alpha *al[4];
 //CHECK_ALL: _Ptr<struct alpha> al _Checked[4] = {((void *)0)};
 
-/*be should be made wild, whereas a should be converted*/
+// The anonymous struct no longer blocks `be` from being converted, but we
+// still need -alltypes for the array.
 struct {
   int *a;
-  //CHECK_NOALL: _Ptr<int> a;
+  //CHECK: _Ptr<int> a;
 } * be[4];
+//CHECK_NOALL:    } * be[4];
+//CHECK_ALL:      };
+//CHECK_ALL-NEXT: _Ptr<struct be_struct_1> be _Checked[4] = {((void *)0)};
 
 /*this code checks inline structs withiin functions*/
 void foo2(int *x) {
-  //CHECK: void foo2(_Ptr<int> x) {
+  //CHECK: void foo2(_Ptr<int> x) _Checked {
   struct bar {
     int *x;
   } *y = 0;
@@ -118,29 +129,38 @@ void foo2(int *x) {
   //CHECK-NEXT: };
   //CHECK-NEXT: _Ptr<struct bar> y = 0;
 
-  /*A non-pointer struct without an init will be marked wild*/
+  // Now that the multi-decl rewriter supports struct splitting in all cases, we
+  // no longer constrain struct fields wild in an attempt to avoid needing to
+  // add an initializer to non-pointer variables of the struct type and thereby
+  // triggering rewriting.
   struct something {
     int *x;
   } z;
   //CHECK:      struct something {
-  //CHECK-NEXT:   int *x;
-  //CHECK-NEXT: } z;
+  //CHECK-NEXT:   _Ptr<int> x;
+  //CHECK-NEXT: };
+  //CHECK-NEXT: struct something z = {};
 
-  /*so will ones that are anonymous*/
+  // Ditto with an anonymous struct.
   struct {
     int *x;
   } a;
-  //CHECK:      struct {
-  //CHECK-NEXT:   int *x;
-  //CHECK-NEXT: } a;
+  //CHECK:      struct a_struct_1 {
+  //CHECK-NEXT:   _Ptr<int> x;
+  //CHECK-NEXT: };
+  //CHECK-NEXT: struct a_struct_1 a = {};
 
-  /*if it have an initializer, the rewriter won't have trouble*/
+  // If the variable already has an initializer, then there is no initializer
+  // addition to trigger rewriting and splitting of the struct.
   struct {
     int *c;
   } b = {};
   //CHECK:      struct {
   //CHECK-NEXT:   _Ptr<int> c;
   //CHECK-NEXT: } b = {};
+
+  // Additional regression tests (only checking compilation with no crash) from
+  // https://github.com/correctcomputation/checkedc-clang/pull/497.
   struct {
     int *i;
   } * f;
