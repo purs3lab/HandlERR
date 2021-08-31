@@ -102,7 +102,7 @@ PointerVariableConstraint *PointerVariableConstraint::addAtomPVConstraint(
   std::vector<ConstAtom *> &SrcVars = Copy->SrcVars;
 
   VarAtom *NewA = CS.getFreshVar("&" + Copy->Name, VarAtom::V_Other);
-  CS.addConstraint(CS.createGeq(NewA, PtrTyp, INNER_POINTER_REASON, false));
+  CS.addConstraint(CS.createGeq(NewA, PtrTyp, REFERENCE_REASON, false));
 
   // Add a constraint between the new atom and any existing atom for this
   // pointer. This is the same constraint that is added between atoms of a
@@ -1840,7 +1840,7 @@ void constrainConsVarGeq(ConstraintVariable *LHS, ConstraintVariable *RHS,
         } else {
           // Constrain both to be top.
           std::string Rsn =
-              "Assigning from:" + FCRHS->getName() + " to " + FCLHS->getName();
+              "Assigning from " + FCRHS->getName() + " to " + FCLHS->getName();
           RHS->constrainToWild(CS, Rsn, PL);
           LHS->constrainToWild(CS, Rsn, PL);
         }
@@ -1856,7 +1856,8 @@ void constrainConsVarGeq(ConstraintVariable *LHS, ConstraintVariable *RHS,
                                                PCRHS->getBoundsKey());
         }
 
-        std::string Rsn = "";
+        std::string Rsn =
+            "Assigning from " + PCRHS->getName() + " to " + PCLHS->getName();
         // This is to handle function subtyping. Try to add LHS and RHS
         // to each others argument constraints.
         PCLHS->addArgumentConstraint(PCRHS, *Info);
@@ -1889,7 +1890,7 @@ void constrainConsVarGeq(ConstraintVariable *LHS, ConstraintVariable *RHS,
             // unless assigning to a generic type.
           } else {
             // Constrain both to be top.
-            std::string Rsn = "Assigning from:" + std::to_string(CRHS.size()) +
+            std::string Rsn = "Assigning from " + std::to_string(CRHS.size()) +
                               " depth pointer to " +
                               std::to_string(CLHS.size()) + " depth pointer.";
             PCLHS->constrainToWild(CS, Rsn, PL);

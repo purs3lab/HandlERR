@@ -443,11 +443,15 @@ bool Constraints::graphBasedSolve() {
         assert(ConflictAtom != nullptr);
         std::string Rsn = Conflict->EdgeConstraint->getReason();
         // determine a second reason
-        for (auto *Pred : Conflict->getTargetNode().getPredecessors()) {
-          if (auto *PredGeq = dyn_cast<Geq>(Pred->EdgeConstraint)) {
-            if (PredGeq->getRHS()->getKind() == PredGeq->getLHS()->getKind()) {
-              Rsn += ", but also, ";
-              Rsn += Pred->EdgeConstraint->getReason();
+        auto Succs = Conflict->getTargetNode().getEdges();
+        for (auto *Succ : Succs) {
+          if (auto *SuccGeq = dyn_cast<Geq>(Succ->EdgeConstraint)) {
+            if (Env.getAssignment(ConflictAtom) ==
+                Env.getAssignment(SuccGeq->getLHS()) ||
+                Env.getAssignment(ConflictAtom) ==
+                    Env.getAssignment(SuccGeq->getRHS())) {
+              Rsn += ", conflicts with, ";
+              Rsn += Succ->EdgeConstraint->getReason();
               break;
             }
           }

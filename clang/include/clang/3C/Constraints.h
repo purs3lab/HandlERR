@@ -41,7 +41,7 @@ class ConstraintsGraph;
 #define SPECIAL_REASON "Special case for "
 #define COPY_REASON "Identical Copy"
 #define LINK_REASON "Function Internal/External Link"
-#define REFERENCE_REASON "Target of & operator"
+#define REFERENCE_REASON "Use of & operator"
 
 template <typename T> struct PComp {
   bool operator()(const T Lhs, const T Rhs) const { return *Lhs < *Rhs; }
