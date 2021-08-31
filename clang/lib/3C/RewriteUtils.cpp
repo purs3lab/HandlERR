@@ -21,12 +21,13 @@
 using namespace llvm;
 using namespace clang;
 
-std::string mkStringForDeclWithUnchangedType(DeclaratorDecl *DD,
+std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *MMD,
                                              ASTContext &Context,
                                              ProgramInfo &Info) {
+  QualType DType = getTypeOfMultiDeclMember(MMD);
   std::string TypeWithName;
-  if (isPtrOrArrayType(DD->getType())) {
-    CVarOption CVO = Info.getVariable(DD, &Context);
+  if (isPtrOrArrayType(DType)) {
+    CVarOption CVO = Info.getVariable(MMD, &Context);
     assert(CVO.hasValue() &&
            "Missing ConstraintVariable for unchanged variable in multi-decl");
     TypeWithName = CVO.getValue().mkString(Info.getConstraints());
@@ -36,53 +37,17 @@ std::string mkStringForDeclWithUnchangedType(DeclaratorDecl *DD,
     // PointerVariableConstraint::extractBaseType doesn't include qualifiers,
     // but since we know the type is not a pointer, it should be safe to just
     // add any qualifiers at the beginning of the string.
-    std::string QualifierPrefix = DD->getType().getQualifiers().getAsString();
+    std::string QualifierPrefix = DType.getQualifiers().getAsString();
     if (!QualifierPrefix.empty())
       QualifierPrefix += " ";
+    // extractBaseType can handle TSI == nullptr. Don't duplicate that code
+    // here.
     TypeWithName = QualifierPrefix +
                    PointerVariableConstraint::extractBaseType(
-                       DD, DD->getTypeSourceInfo(), DD->getType(),
-                       DD->getType().getTypePtr(), Context, Info) +
-                   " " + std::string(DD->getName());
+                       MMD, nullptr, DType, DType.getTypePtr(), Context, Info) +
+                   " " + std::string(MMD->getName());
   }
-  return getStorageQualifierString(DD) + TypeWithName;
-}
-
-void GlobalVariableGroups::addGlobalDecl(Decl *VD, std::vector<Decl *> *VDVec) {
-  if (VD && GlobVarGroups.find(VD) == GlobVarGroups.end()) {
-    if (VDVec == nullptr)
-      VDVec = new std::vector<Decl *>();
-    assert("Decls in group are not ordered correctly." &&
-           (VDVec->empty() ||
-            SM.isBeforeInTranslationUnit(VDVec->back()->getEndLoc(),
-                                         VD->getEndLoc())));
-    VDVec->push_back(VD);
-    GlobVarGroups[VD] = VDVec;
-    // Process the next decl.
-    Decl *NDecl = VD->getNextDeclInContext();
-    if (isa_and_nonnull<VarDecl>(NDecl) || isa_and_nonnull<FieldDecl>(NDecl))
-      if (VD->getBeginLoc() == NDecl->getBeginLoc())
-        addGlobalDecl(dyn_cast<Decl>(NDecl), VDVec);
-  }
-}
-
-std::vector<Decl *> &GlobalVariableGroups::getVarsOnSameLine(Decl *D) {
-  assert(GlobVarGroups.find(D) != GlobVarGroups.end() &&
-         "Expected to find the group.");
-  return *(GlobVarGroups[D]);
-}
-
-GlobalVariableGroups::~GlobalVariableGroups() {
-  std::set<std::vector<Decl *> *> VVisited;
-  // Free each of the group.
-  for (auto &CurrV : GlobVarGroups) {
-    // Avoid double free by caching deleted sets.
-    if (VVisited.find(CurrV.second) != VVisited.end())
-      continue;
-    VVisited.insert(CurrV.second);
-    delete (CurrV.second);
-  }
-  GlobVarGroups.clear();
+  return getStorageQualifierString(MMD) + TypeWithName;
 }
 
 // Test to see if we can rewrite a given SourceRange.

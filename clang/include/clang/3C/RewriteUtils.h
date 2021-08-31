@@ -32,10 +32,8 @@ public:
 
   // Discriminator for LLVM-style RTTI (dyn_cast<> et al.).
   enum DRKind {
-    DRK_VarDecl,
+    DRK_MultiDeclMember,
     DRK_FunctionDecl,
-    DRK_FieldDecl,
-    DRK_TypedefDecl
   };
 
   DRKind getKind() const { return Kind; }
@@ -70,12 +68,8 @@ protected:
   DeclT *Decl;
 };
 
-typedef DeclReplacementTempl<VarDecl, DeclReplacement::DRK_VarDecl>
-    VarDeclReplacement;
-typedef DeclReplacementTempl<FieldDecl, DeclReplacement::DRK_FieldDecl>
-    FieldDeclReplacement;
-typedef DeclReplacementTempl<TypedefDecl, DeclReplacement::DRK_TypedefDecl>
-    TypedefDeclReplacement;
+typedef DeclReplacementTempl<NamedDecl, DeclReplacement::DRK_MultiDeclMember>
+    MultiDeclMemberReplacement;
 
 class FunctionDeclReplacement
     : public DeclReplacementTempl<FunctionDecl,
@@ -108,34 +102,12 @@ typedef std::map<Decl *, DeclReplacement *> RSet;
 
 // Generate a string for the declaration that includes the name, type, and
 // storage qualifier (if any) but not a trailing semicolon. Honors names
-// assigned to unnamed structs by 3C. Used by DeclRewriter::rewriteMultiDecl for
-// variables that don't have a replacement and by StructVariableInitializer
+// assigned to unnamed TagDecls by 3C. Used by DeclRewriter::rewriteMultiDecl
+// for variables that don't have a replacement and by StructVariableInitializer
 // (which appends an initializer).
-std::string mkStringForDeclWithUnchangedType(DeclaratorDecl *DD,
+std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *D,
                                              ASTContext &Context,
                                              ProgramInfo &Info);
-
-// This class is used to figure out which global variables are part of
-// multi-variable declarations. For local variables, all variables in a single
-// multi declaration are grouped together in a DeclStmt object. This is not the
-// case for global variables, so this class is required to correctly group
-// global variable declarations. Declarations in the same multi-declarations
-// have the same beginning source locations, so it is used to group variables.
-class GlobalVariableGroups {
-public:
-  GlobalVariableGroups(SourceManager &SourceMgr) : SM(SourceMgr) {}
-  void addGlobalDecl(Decl *VD, std::vector<Decl *> *VDVec = nullptr);
-
-  std::vector<Decl *> &getVarsOnSameLine(Decl *VD);
-
-  virtual ~GlobalVariableGroups();
-
-  SourceManager &getSourceManager() { return SM; }
-
-private:
-  SourceManager &SM;
-  std::map<Decl *, std::vector<Decl *> *> GlobVarGroups;
-};
 
 // Class that handles rewriting bounds information for all the
 // detected array variables.

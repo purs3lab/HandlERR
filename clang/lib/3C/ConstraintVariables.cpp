@@ -557,7 +557,7 @@ PointerVariableConstraint::PointerVariableConstraint(
   }
 }
 
-std::string PointerVariableConstraint::tryExtractBaseType(DeclaratorDecl *D,
+std::string PointerVariableConstraint::tryExtractBaseType(MultiDeclMemberDecl *D,
                                                           TypeSourceInfo *TSI,
                                                           QualType QT,
                                                           const Type *Ty,
@@ -572,7 +572,7 @@ std::string PointerVariableConstraint::tryExtractBaseType(DeclaratorDecl *D,
     return "";
 
   if (!TSI)
-    TSI = D->getTypeSourceInfo();
+    TSI = getTypeSourceInfoOfMultiDeclMember(D);
   if (!QT->isOrContainsCheckedType() && !Ty->getAs<TypedefType>() && TSI) {
     // Try to extract the type from original source to preserve defines
     TypeLoc TL = TSI->getTypeLoc();
@@ -585,7 +585,7 @@ std::string PointerVariableConstraint::tryExtractBaseType(DeclaratorDecl *D,
         return "";
       TL = TL.getAs<clang::FunctionTypeLoc>().getReturnLoc();
     } else {
-      FoundBaseTypeInSrc = D->getType() == QT;
+      FoundBaseTypeInSrc = getTypeOfMultiDeclMember(D) == QT;
     }
     if (!TL.isNull()) {
       TypeLoc BaseLoc = getBaseTypeLoc(TL);
@@ -602,28 +602,16 @@ std::string PointerVariableConstraint::tryExtractBaseType(DeclaratorDecl *D,
   return "";
 }
 
-std::string PointerVariableConstraint::extractBaseType(DeclaratorDecl *D,
+std::string PointerVariableConstraint::extractBaseType(MultiDeclMemberDecl *D,
                                                        TypeSourceInfo *TSI,
                                                        QualType QT,
                                                        const Type *Ty,
                                                        const ASTContext &C,
                                                        ProgramInfo &Info) {
-  // If the base type is an unnamed RecordType to which we assigned a name, use
-  // that name.
-  const Type *UnelaboratedTy = Ty;
-  if (const ElaboratedType *ETy = dyn_cast<ElaboratedType>(Ty))
-    UnelaboratedTy = ETy->getNamedType().getTypePtr();
-  if (const RecordType *RTy = dyn_cast<RecordType>(UnelaboratedTy)) {
-    RecordDecl *RD = RTy->getDecl();
-    if (RD->getName().empty()) {
-      // REVIEW: Can this const_cast be avoided?
-      PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(RD, const_cast<ASTContext &>(C));
-      auto Iter = Info.AssignedRecordNames.find(PSL);
-      if (Iter != Info.AssignedRecordNames.end())
-        return std::string(RD->getKindName()) + " " + Iter->second;
-      // XXX: Can we get here in writable code? We should have named all unnamed RecordDecls in writable code.
-    }
-  }
+  // REVIEW: Can we get rid of the const_cast?
+  if (llvm::Optional<std::string> TypeStrOverride =
+      Info.TheMultiDeclsInfo.getTypeStrOverride(Ty, const_cast<ASTContext &>(C)))
+    return *TypeStrOverride;
 
   std::string BaseTypeStr = tryExtractBaseType(D, TSI, QT, Ty, C);
   // Fall back to rebuilding the base type based on type passed to constructor

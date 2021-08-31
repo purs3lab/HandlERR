@@ -120,13 +120,20 @@ static std::string storageClassToString(StorageClass SC) {
 }
 
 // This method gets the storage qualifier for the
-// provided declaration i.e., static, extern, etc.
+// provided declaration including any trailing space, i.e., "static ",
+// "extern ", etc., or "" if none.
 std::string getStorageQualifierString(Decl *D) {
   if (FunctionDecl *FD = dyn_cast<FunctionDecl>(D)) {
     return storageClassToString(FD->getStorageClass());
   }
   if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
     return storageClassToString(VD->getStorageClass());
+  }
+  if (isa<TypedefDecl>(D)) {
+    // `typedef` goes in the same syntactic position as a storage qualifier and
+    // needs to be inserted when breaking up a multi-decl, just like a real
+    // storage qualifier.
+    return "typedef ";
   }
   return "";
 }

@@ -133,7 +133,7 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
                 Var.mkString(Info.getConstraints(),
                              MKSTRING_OPTS(UnmaskTypedef = true));
             RewriteThese.insert(std::make_pair(
-                TD, new TypedefDeclReplacement(TD, nullptr, NewTy)));
+                TD, new MultiDeclMemberReplacement(TD, nullptr, NewTy)));
           }
         }
       }
@@ -147,17 +147,8 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
   for (const auto &I : Info.getVarMap())
     Keys.insert(I.first);
   MappingVisitor MV(Keys, Context);
-  LastRecordDecl = nullptr;
   for (const auto &D : TUD->decls()) {
     MV.TraverseDecl(D);
-    detectInlineStruct(D, Context.getSourceManager());
-    if (FunctionDecl *FD = dyn_cast<FunctionDecl>(D)) {
-      if (FD->hasBody() && FD->isThisDeclarationADefinition()) {
-        for (auto &D : FD->decls()) {
-          detectInlineStruct(D, Context.getSourceManager());
-        }
-      }
-    }
   }
   SourceToDeclMapType PSLMap;
   VariableDecltoStmtMap VDLToStmtMap;
@@ -211,35 +202,22 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
           NewTy += PV->mkString(Info.getConstraints()) +
                    ABRewriter.getBoundsString(PV, D);
         }
-        if (auto *VD = dyn_cast<VarDecl>(D))
-          RewriteThese.insert(
-              std::make_pair(VD, new VarDeclReplacement(VD, DS, NewTy)));
-        else if (auto *FD = dyn_cast<FieldDecl>(D))
-          RewriteThese.insert(
-              std::make_pair(FD, new FieldDeclReplacement(FD, DS, NewTy)));
+        if (MultiDeclMemberDecl *MMD = getAsMultiDeclMember(D))
+          RewriteThese.insert(std::make_pair(MMD, new MultiDeclMemberReplacement(MMD, DS, NewTy)));
         else
           llvm_unreachable("Unrecognized declaration type.");
       }
     }
   }
 
-  // Build sets of variables that are declared in the same statement so we can
-  // rewrite things like int x, *y, **z;
-  GlobalVariableGroups GVG(R.getSourceMgr());
-  for (const auto &D : TUD->decls()) {
-    GVG.addGlobalDecl(dyn_cast<VarDecl>(D));
-    //Search through the AST for fields that occur on the same line
-    FieldFinder::gatherSameLineFields(GVG, D);
-  }
-
   // Do the declaration rewriting
-  DeclRewriter DeclR(R, Info, Context, GVG);
+  DeclRewriter DeclR(R, Info, Context);
   DeclR.rewrite(RewriteThese);
 
   for (auto Pair : RewriteThese)
     delete Pair.second;
 
-  DeclR.denestRecordDecls();
+  DeclR.denestTagDecls();
 }
 
 void DeclRewriter::rewrite(RSet &ToRewrite) {
@@ -254,35 +232,33 @@ void DeclRewriter::rewrite(RSet &ToRewrite) {
     }
 
     // Exact rewriting procedure depends on declaration type
-    if (auto *VR = dyn_cast<VarDeclReplacement>(N)) {
-      rewriteFieldOrVarDecl(VR, ToRewrite);
+    if (auto *MR = dyn_cast<MultiDeclMemberReplacement>(N)) {
+      MultiDeclInfo &MDI = Info.TheMultiDeclsInfo.findContainingMultiDecl(MR->getDecl(), A);
+      if (!MDI.AlreadyRewritten)
+        rewriteMultiDecl(MDI, ToRewrite);
     } else if (auto *FR = dyn_cast<FunctionDeclReplacement>(N)) {
       rewriteFunctionDecl(FR);
-    } else if (auto *FdR = dyn_cast<FieldDeclReplacement>(N)) {
-      rewriteFieldOrVarDecl(FdR, ToRewrite);
-    } else if (auto *TDR = dyn_cast<TypedefDeclReplacement>(N)) {
-      rewriteTypedefDecl(TDR, ToRewrite);
     } else {
       assert(false && "Unknown replacement type");
     }
   }
 }
 
-void DeclRewriter::denestRecordDecls() {
-  // When there are multiple levels of nested RecordDecls, we need to process
-  // all the children of a RecordDecl RD before RD itself so that (1) the
-  // definitions of the children end up before the definition of RD (since the
+void DeclRewriter::denestTagDecls() {
+  // When there are multiple levels of nested TagDecls, we need to process
+  // all the children of a TagDecl TD before TD itself so that (1) the
+  // definitions of the children end up before the definition of TD (since the
   // rewriter preserves order of insertions) and (2) the definitions of the
-  // children have been removed from the body of RD before we read the body of
-  // RD to move it. In effect, we want to process the RecordDecls in postorder.
+  // children have been removed from the body of TD before we read the body of
+  // TD to move it. In effect, we want to process the TagDecls in postorder.
   // The easiest way to achieve this is to process them in order of their _end_
   // locations.
-  std::sort(RecordDeclsToDenest.begin(), RecordDeclsToDenest.end(),
-            [&](RecordDecl *RD1, RecordDecl *RD2) {
+  std::sort(TagDeclsToDenest.begin(), TagDeclsToDenest.end(),
+            [&](TagDecl *TD1, TagDecl *TD2) {
               return A.getSourceManager().isBeforeInTranslationUnit(
-                  RD1->getEndLoc(), RD2->getEndLoc());
+                  TD1->getEndLoc(), TD2->getEndLoc());
             });
-  for (RecordDecl *RD : RecordDeclsToDenest) {
+  for (TagDecl *TD : TagDeclsToDenest) {
     // rewriteMultiDecl replaced the final "}" in the original source range with
     // "};\n", so the new content of the source range should include the ";\n",
     // which is what we want here. Except the rewriter has a bug where it
@@ -291,7 +267,7 @@ void DeclRewriter::denestRecordDecls() {
     // around the bug by adjusting the token range before calling the rewriter
     // at all.
     CharSourceRange CSR = Lexer::makeFileCharRange(
-        CharSourceRange::getTokenRange(RD->getSourceRange()), R.getSourceMgr(),
+        CharSourceRange::getTokenRange(TD->getSourceRange()), R.getSourceMgr(),
         R.getLangOpts());
     std::string DefinitionStr = R.getRewrittenText(CSR);
     // Delete the definition from the old location.
@@ -299,8 +275,8 @@ void DeclRewriter::denestRecordDecls() {
     // We want to insert RD as a new child of its original semantic DeclContext,
     // just before the existing child of that DeclContext of which RD was
     // originally a descendant.
-    DeclContext *TopChild = RD;
-    while (TopChild->getLexicalParent() != RD->getDeclContext()) {
+    DeclContext *TopChild = TD;
+    while (TopChild->getLexicalParent() != TD->getDeclContext()) {
       TopChild = TopChild->getLexicalParent();
     }
     // TODO: Use a wrapper like rewriteSourceRange.
@@ -308,71 +284,10 @@ void DeclRewriter::denestRecordDecls() {
   }
 }
 
-void DeclRewriter::rewriteTypedefDecl(TypedefDeclReplacement *TDR,
-                                      RSet &ToRewrite) {
-  rewriteSingleDecl(TDR, ToRewrite);
-}
-
-// In alltypes mode we need to handle inline structs inside functions specially.
-// Because both the recorddecl and vardecl are inside one DeclStmt, the
-// SourceLocations will be generated incorrectly if we rewrite it as a
-// normal multidecl.
-bool isInlineStruct(std::vector<Decl *> &InlineDecls) {
-  if (InlineDecls.size() >= 2)
-    return isa<RecordDecl>(InlineDecls[0]) &&
-           std::all_of(InlineDecls.begin() + 1, InlineDecls.end(),
-                       [](Decl *D) { return isa<VarDecl>(D); });
-  return false;
-}
-
-template <typename DRType>
-void DeclRewriter::rewriteFieldOrVarDecl(DRType *N, RSet &ToRewrite) {
-  static_assert(std::is_same<DRType, FieldDeclReplacement>::value ||
-                    std::is_same<DRType, VarDeclReplacement>::value,
-                "Method expects variable or field declaration replacement.");
-
-  bool IsVisitedMultiDeclMember = (VisitedMultiDeclMembers.find(N->getDecl()) !=
-                                   VisitedMultiDeclMembers.end());
-  if (InlineVarDecls.find(N->getDecl()) != InlineVarDecls.end() &&
-      !IsVisitedMultiDeclMember) {
-    std::vector<Decl *> SameLineDecls;
-    getDeclsOnSameLine(N, SameLineDecls);
-    if (std::find(SameLineDecls.begin(), SameLineDecls.end(),
-                  VDToRDMap[N->getDecl()]) == SameLineDecls.end())
-      SameLineDecls.insert(SameLineDecls.begin(), VDToRDMap[N->getDecl()]);
-    rewriteMultiDecl(N, ToRewrite, SameLineDecls, true);
-  } else if (isSingleDeclaration(N)) {
-    rewriteSingleDecl(N, ToRewrite);
-  } else if (!IsVisitedMultiDeclMember) {
-    std::vector<Decl *> SameLineDecls;
-    getDeclsOnSameLine(N, SameLineDecls);
-    rewriteMultiDecl(N, ToRewrite, SameLineDecls, isInlineStruct(SameLineDecls));
-  } else {
-    // Anything that reaches this case should be a multi-declaration that has
-    // already been rewritten.
-    assert("Declaration should have been rewritten." &&
-           !isSingleDeclaration(N) && IsVisitedMultiDeclMember);
-  }
-}
-
-void DeclRewriter::rewriteSingleDecl(DeclReplacement *N, RSet &ToRewrite) {
-  bool IsSingleDecl =
-      dyn_cast<TypedefDecl>(N->getDecl()) || isSingleDeclaration(N);
-  assert("Declaration is not a single declaration." && IsSingleDecl);
-  // This is the easy case, we can rewrite it locally, at the declaration.
-  SourceManager &SM = N->getDecl()->getASTContext().getSourceManager();
-  SourceRange TR = N->getSourceRange(SM);
-  doDeclRewrite(TR, N);
-}
-
-void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
-                                    std::vector<Decl *> SameLineDecls,
-                                    bool ContainsInlineStruct) {
+void DeclRewriter::rewriteMultiDecl(MultiDeclInfo &MDI, RSet &ToRewrite) {
   // Rewriting is more difficult when there are multiple variables declared in a
   // single statement. When this happens, we need to find all the declaration
-  // replacement for this statement and apply them at the same time. We also
-  // need to avoid rewriting any of these declarations twice by updating the
-  // Skip set to include the processed declarations.
+  // replacement for this statement and apply them at the same time.
 
   // For each decl in the original, build up a new string. If the
   // original decl was re-written, write that out instead. Existing
@@ -381,52 +296,63 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
 
   bool IsFirst = true;
   SourceLocation PrevEnd;
-  for (const auto &DL : SameLineDecls) {
-    std::string ReplaceText = ";\n";
+
+  if (MDI.TagDefToSplit != nullptr) {
+    TagDecl *TD = MDI.TagDefToSplit;
+    // `static struct T { ... } x;` -> `struct T { ... }; static struct T x;`
+    // A storage qualifier such as `static` applies to the members but is not
+    // meaningful on TD after it is split, and we need to remove it to avoid a
+    // compiler warning. The beginning location of the first member should be
+    // the `static` and the beginning location of TD should be the `struct`, so
+    // we just remove anything between those locations. (Can other things appear
+    // there? We hope it makes sense to remove them too.)
+    //
+    // We use `getCharRange` to get a range that excludes the first token of TD,
+    // unlike the default conversion of a SourceRange to a "token range", which
+    // would include it.
+    rewriteSourceRange(R, CharSourceRange::getCharRange(
+                          MDI.Members[0]->getBeginLoc(), TD->getBeginLoc()), "");
+    if (TD->getName().empty()) {
+      // If the record is unnamed, insert the name that we assigned it:
+      // `struct {` -> `struct T {`
+      PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(TD, A);
+      // This will assert if we can't find the new name. Is that what we want?
+      std::string NewTypeStr =
+          *Info.TheMultiDeclsInfo.getTypeStrOverride(A.getTagDeclType(TD).getTypePtr(), A);
+      // This token should be the tag kind, e.g., `struct`.
+      std::string ExistingToken = getSourceText(SourceRange(TD->getBeginLoc()), A);
+      if (ExistingToken == TD->getKindName()) {
+        rewriteSourceRange(R, TD->getBeginLoc(), NewTypeStr);
+      } else {
+        // TODO: We should probably report this as a rewrite failure diagnostic,
+        // which requires factoring out the code to get the correct severity
+        // based on -allow-rewrite-failures, etc.
+        llvm_unreachable("Failed to find place to insert assigned TagDecl name.");
+      }
+    }
+    // Make a note if the RecordDecl needs to be de-nested later.
+    if (TD->getLexicalDeclContext() != TD->getDeclContext())
+      TagDeclsToDenest.push_back(TD);
+    // `struct T { ... } foo;` -> `struct T { ... };\nfoo;`
+    rewriteSourceRange(R, TD->getEndLoc(), "};\n");
+    IsFirst = false;
+    // Offset by one to skip past what we've just added so it isn't overwritten.
+    PrevEnd = TD->getEndLoc().getLocWithOffset(1);
+  }
+
+  for (auto It = MDI.Members.begin(); It != MDI.Members.end(); It++) {
+    MultiDeclMemberDecl *DL = *It;
+
     // Find the declaration replacement object for the current declaration.
     DeclReplacement *SameLineReplacement;
     bool Found = false;
-    auto It = ToRewrite.find(DL);
-    if (It != ToRewrite.end()) {
-      SameLineReplacement = It->second;
+    auto TRIt = ToRewrite.find(DL);
+    if (TRIt != ToRewrite.end()) {
+      SameLineReplacement = TRIt->second;
       Found = true;
-      VisitedMultiDeclMembers.insert(DL);
     }
 
-    if (IsFirst && ContainsInlineStruct) {
-      // If it is an inline struct, the first thing we have to do
-      // is separate the RecordDecl from the VarDecl.
-      ReplaceText = "};\n";
-      // Between the beginning of the VarDecls and the beginning of the
-      // RecordDecl, there could be a `static` keyword that applies to the
-      // VarDecls but is not meaningful on the RecordDecl after it is separated.
-      // So remove anything in that range. (Can other things besides `static`
-      // appear there? We hope it makes sense to remove them too.) Unlike the
-      // usual interpretation of SourceRange, `getCharRange` gives a range that
-      // excludes the first token of the RecordDecl.
-      assert(SameLineDecls.size() >= 2 &&
-             "DeclRewriter::rewriteMultiDecl called with an inline struct but "
-             "no other decls?");
-      rewriteSourceRange(R, CharSourceRange::getCharRange(
-          SameLineDecls[1]->getBeginLoc(), DL->getBeginLoc()), "");
-      RecordDecl *RD = cast<RecordDecl>(DL);
-      // If the record is unnamed, insert the name that we assigned it.
-      if (RD->getName().empty()) {
-        PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(RD, A);
-        auto Iter = Info.AssignedRecordNames.find(PSL);
-        if (Iter != Info.AssignedRecordNames.end()) {
-          // We hope that the token we are inserting after is the tag kind
-          // keyword, e.g., `struct`. TODO: Verify this? And is that always the
-          // correct place to insert the name?
-          // TODO: Use a wrapper like rewriteSourceRange that reports failures
-          // and tries harder to cope with macros.
-          R.InsertTextAfterToken(DL->getBeginLoc(), " " + Iter->second);
-        }
-      }
-      // Make a note if the RecordDecl needs to be de-nested later.
-      if (RD->getLexicalDeclContext() != RD->getDeclContext())
-        RecordDeclsToDenest.push_back(RD);
-    } else if (IsFirst) {
+    if (IsFirst) {
       // Rewriting the first declaration is easy. Nothing should change if its
       // type does not to be rewritten. When rewriting is required, it is
       // essentially the same as the single declaration case.
@@ -446,13 +372,7 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
       } else {
         // When the type hasn't changed, we still need to insert the original
         // type for the variable.
-
-        // Note: rewriteMultiDecl is currently called only by
-        // rewriteFieldOrVarDecl with VarDecls or FieldDecls, and DeclaratorDecl
-        // is a superclass of both. When we add support for typedef multi-decls,
-        // we'll need to change this code.
-        DeclaratorDecl *DD = cast<DeclaratorDecl>(DL);
-        std::string NewDeclStr = mkStringForDeclWithUnchangedType(DD, A, Info);
+        std::string NewDeclStr = mkStringForDeclWithUnchangedType(DL, A, Info);
 
         // If the variable has an initializer, we want this rewrite to end
         // before the initializer to avoid interfering with any other rewrites
@@ -460,7 +380,11 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
         // VarDecl's implementation of the getSourceRange virtual method
         // includes the initializer, but we can manually call DeclaratorDecl's
         // implementation, which excludes the initializer.
-        SourceLocation EndLoc = DD->DeclaratorDecl::getSourceRange().getEnd();
+        SourceLocation EndLoc;
+        if (VarDecl *VD = dyn_cast<VarDecl>(DL))
+          EndLoc = VD->DeclaratorDecl::getSourceRange().getEnd();
+        else
+          EndLoc = DL->getSourceRange().getEnd();
 
         // Do the replacement. PrevEnd is setup to be the source location of the
         // comma after the previous declaration in the multi-decl.
@@ -469,22 +393,18 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
       }
     }
 
-    SourceRange End;
-    // In the event that IsFirst was not set to false, that implies we are
-    // separating the RecordDecl and VarDecl, so instead of searching for
-    // the next comma, we simply specify the end of the RecordDecl.
-    if (IsFirst) {
-      IsFirst = false;
-      End = DL->getEndLoc();
-    }
-    // Variables in a mutli-decl are delimited by commas. The rewritten decls
+    // Variables in a multi-decl are delimited by commas. The rewritten decls
     // are separate statements separated by a semicolon and a newline.
-    else
-      End = getNextCommaOrSemicolon(DL->getEndLoc());
-    rewriteSourceRange(R, End, ReplaceText);
-    // Offset by one to skip past what we've just added so it isn't overwritten.
-    PrevEnd = End.getEnd().getLocWithOffset(1);
+    bool IsLast = (It + 1 == MDI.Members.end());
+    if (!IsLast) {
+      SourceRange End = getNextComma(DL->getEndLoc());
+      rewriteSourceRange(R, End, ";\n");
+      // Offset by one to skip past what we've just added so it isn't overwritten.
+      PrevEnd = End.getEnd().getLocWithOffset(1);
+    }
   }
+
+  MDI.AlreadyRewritten = true;
 }
 
 // Common rewriting logic used to replace a single decl either on its own or as
@@ -492,8 +412,6 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
 // invoking the rewriter) is to add any required initializer expression.
 void DeclRewriter::doDeclRewrite(SourceRange &SR, DeclReplacement *N) {
   std::string Replacement = N->getReplacement();
-  if (isa<TypedefDecl>(N->getDecl()))
-    Replacement = "typedef " + Replacement;
   if (auto *VD = dyn_cast<VarDecl>(N->getDecl())) {
     if (VD->hasInit()) {
       // Make sure we preserve any existing initializer
@@ -524,77 +442,19 @@ void DeclRewriter::rewriteFunctionDecl(FunctionDeclReplacement *N) {
                      N->getReplacement());
 }
 
-// A function to detect the presence of inline struct declarations
-// by tracking VarDecls and RecordDecls and populating data structures
-// later used in rewriting.
-
-// These variables are duplicated in the header file and here because static
-// vars need to be initialized in the cpp file where the class is defined.
-/*static*/ RecordDecl *DeclRewriter::LastRecordDecl = nullptr;
-/*static*/ std::map<Decl *, Decl *> DeclRewriter::VDToRDMap;
-/*static*/ std::set<Decl *> DeclRewriter::InlineVarDecls;
-void DeclRewriter::detectInlineStruct(Decl *D, SourceManager &SM) {
-  RecordDecl *RD = dyn_cast<RecordDecl>(D);
-  if (RD != nullptr && RD->isCompleteDefinition() &&
-      // With -fms-extensions (default on Windows), Clang injects an implicit
-      // `struct _GUID` with an invalid location, which would cause an assertion
-      // failure in SM.isPointWithin below.
-      RD->getBeginLoc().isValid()) {
-    LastRecordDecl = RD;
-  }
-  if (isa<VarDecl>(D) || isa<FieldDecl>(D)) {
-    if (LastRecordDecl != nullptr) {
-      auto LastRecordLocation = LastRecordDecl->getBeginLoc();
-      auto Begin = D->getBeginLoc();
-      auto End = D->getEndLoc();
-      bool IsInLineStruct = SM.isPointWithin(LastRecordLocation, Begin, End);
-      if (IsInLineStruct) {
-        VDToRDMap[D] = LastRecordDecl;
-        InlineVarDecls.insert(D);
-      }
-    }
-  }
-}
-
-// Uses clangs lexer to find the location of the next comma or semicolon after
+// Uses clangs lexer to find the location of the next comma after
 // the given source location. This is used to find the end of each declaration
 // within a multi-declaration.
-SourceRange DeclRewriter::getNextCommaOrSemicolon(SourceLocation L) {
+SourceRange DeclRewriter::getNextComma(SourceLocation L) {
   SourceManager &SM = A.getSourceManager();
   auto Tok = Lexer::findNextToken(L, SM, A.getLangOpts());
   while (Tok.hasValue() && !Tok->is(clang::tok::eof)) {
-    if (Tok->is(clang::tok::comma) || Tok->is(clang::tok::semi))
+    if (Tok->is(clang::tok::comma))
       return SourceRange(Tok->getLocation(), Tok->getLocation());
     Tok = Lexer::findNextToken(Tok->getEndLoc(), A.getSourceManager(),
                                A.getLangOpts());
   }
-  llvm_unreachable("Unable to find comma or semicolon at source location.");
-}
-
-bool DeclRewriter::isSingleDeclaration(DeclReplacement *N) {
-  DeclStmt *Stmt = N->getStatement();
-  if (Stmt == nullptr) {
-    auto &VDGroup = GP.getVarsOnSameLine(N->getDecl());
-    return VDGroup.size() == 1;
-  }
-  return Stmt->isSingleDecl();
-}
-
-void DeclRewriter::getDeclsOnSameLine(DeclReplacement *N,
-                                      std::vector<Decl *> &Decls) {
-  if (N->getStatement() != nullptr) {
-    Decls.insert(Decls.begin(), N->getStatement()->decls().begin(),
-                 N->getStatement()->decls().end());
-  } else {
-    std::vector<Decl *> GlobalLine = GP.getVarsOnSameLine(N->getDecl());
-    Decls.insert(Decls.begin(), GlobalLine.begin(), GlobalLine.end());
-  }
-
-  assert("Invalid ordering in same line decls" &&
-         std::is_sorted(Decls.begin(), Decls.end(), [&](Decl *D0, Decl *D1) {
-           return A.getSourceManager().isBeforeInTranslationUnit(
-               D0->getEndLoc(), D1->getEndLoc());
-         }));
+  llvm_unreachable("Unable to find comma at source location.");
 }
 
 // This function checks how to re-write a function declaration.
@@ -936,20 +796,4 @@ bool FunctionDeclBuilder::inParamMultiDecl(const ParmVarDecl *PVD) {
         return true;
   }
   return false;
-}
-
-bool FieldFinder::VisitRecordDecl(RecordDecl *RD) {
-  DeclRewriter::detectInlineStruct(RD, GVG.getSourceManager());
-  return true;
-}
-
-bool FieldFinder::VisitFieldDecl(FieldDecl *FD) {
-  DeclRewriter::detectInlineStruct(FD, GVG.getSourceManager());
-  GVG.addGlobalDecl(FD);
-  return true;
-}
-
-void FieldFinder::gatherSameLineFields(GlobalVariableGroups &GVG, Decl *D) {
-  FieldFinder FF(GVG);
-  FF.TraverseDecl(D);
 }

@@ -16,6 +16,7 @@
 #include "clang/3C/3CStats.h"
 #include "clang/3C/AVarBoundsInfo.h"
 #include "clang/3C/ConstraintVariables.h"
+#include "clang/3C/MultiDecls.h"
 #include "clang/3C/PersistentSourceLoc.h"
 #include "clang/3C/Utils.h"
 #include "clang/AST/ASTConsumer.h"
@@ -178,22 +179,7 @@ public:
   void registerTranslationUnits(
       const std::vector<std::unique_ptr<clang::ASTUnit>> &ASTs);
 
-  // Members related to automatic name generation for unnamed inline
-  // RecordDecls:
-
-  // Set of RecordDecl names already used at least once in the program, so we
-  // can avoid colliding with them.
-  std::set<std::string> UsedRecordNames;
-
-  // Map from PSL of an originally unnamed RecordDecl to the name we assigned to
-  // it, so we can ensure that names are assigned consistently when 3C naively
-  // rewrites the same header file multiple times as part of different
-  // translation units (see
-  // https://github.com/correctcomputation/checkedc-clang/issues/374#issuecomment-804283984).
-  std::map<PersistentSourceLoc, std::string> AssignedRecordNames;
-
-  void findUsedRecordNames(DeclContext *DC, ASTContext &Context);
-  void nameUnnamedRecords(DeclContext *DC, ASTContext &Context);
+  MultiDeclsInfo TheMultiDeclsInfo;
 
 private:
   // List of constraint variables for declarations, indexed by their location in
