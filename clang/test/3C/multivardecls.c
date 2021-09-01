@@ -148,3 +148,10 @@ void test5() {
 // CHECK: _Ptr<int> c;
 // CHECK: _Ptr<int> d;
 // CHECK: };
+
+// TODO for https://github.com/correctcomputation/checkedc-clang/pull/657:
+// - Explicit test that macros are preserved in the base type of unchanged
+//   multi-decl members
+//   (https://github.com/correctcomputation/checkedc-clang/issues/652)?
+// - Typedef multi-decls
+//   (https://github.com/correctcomputation/checkedc-clang/issues/651)

@@ -1,5 +1,9 @@
+// 3C no longer has incomplete handling of inline structs behind the -alltypes
+// flag, so we can test compilation with -alltypes as well as without it.
+
 // RUN: rm -rf %t*
 // RUN: 3c -base-dir=%S -alltypes -addcr %s -- | FileCheck -match-full-lines -check-prefixes="CHECK_ALL","CHECK" %s
+// RUN: 3c -base-dir=%S -alltypes -addcr %s -- | %clang -c -fcheckedc-extension -x c -o /dev/null -
 // RUN: 3c -base-dir=%S -addcr %s -- | FileCheck -match-full-lines -check-prefixes="CHECK_NOALL","CHECK" %s
 // RUN: 3c -base-dir=%S -addcr %s -- | %clang -c -fcheckedc-extension -x c -o /dev/null -
 // RUN: 3c -base-dir=%S -output-dir=%t.checked %s --
@@ -168,3 +172,118 @@ void foo2(int *x) {
     int *il
   } * g, *h, *i;
 }
+
+// Tests of new functionality from
+// https://github.com/correctcomputation/checkedc-clang/pull/657.
+// TODO: Do we want to put this in a separate file?
+
+// Test that 3C doesn't mangle the code by attempting to split a forward
+// declaration of a struct out of a multi-decl as if it were a definition
+// (https://github.com/correctcomputation/checkedc-clang/issues/644).
+struct fwd *p;
+//CHECK: _Ptr<struct fwd> p = ((void *)0);
+
+// Test the handling of inline TagDecls when the containing multi-decl is
+// rewritten:
+// - TagDecls are de-nested in postorder whether or not they were originally
+//   named, and this does not interfere with rewrites inside those TagDecls
+//   (https://github.com/correctcomputation/checkedc-clang/issues/531).
+// - Storage and type qualifiers preceding an inline TagDecl are not copied to
+//   the split TypeDecl (where they wouldn't be meaningful) but remain
+//   associated with the fields to which they originally applied
+//   (https://github.com/correctcomputation/checkedc-clang/issues/647).
+// - Unnamed TagDecls are automatically named
+//   (https://github.com/correctcomputation/checkedc-clang/issues/542).
+// This big combined test may be a bit hard to understand, but it may provide
+// better coverage of any interactions among these features than separate tests
+// would.
+
+// Use up the c_struct_1 name.
+struct c_struct_1 {};
+
+static struct A {
+  const struct B {
+    struct {
+      int *c2i;
+    } *c;
+  } *ab, ab_arr[2];
+  volatile struct D {
+    struct {
+      int *c3i;
+    } *c;
+    struct E {
+      int *ei;
+    } *de;
+    const enum F { F_0, F_1 } *df;
+    enum { G_0, G_1 } *dg;
+    struct H {
+      int *hi;
+    } *dh;
+    union U {
+      int *ui;
+    } *du;
+    union {
+      int *vi;
+    } *dv;
+  } *ad;
+} *global_a, global_a_arr[2];
+
+void constrain_dh(void) {
+  struct D d;
+  d.dh = (struct H *)1;
+}
+
+// Points of note:
+// - We have two unnamed inline structs that get automatically named after a
+//   field `c`, but the name `c_struct_1` is taken, so the names `c_struct_2`
+//   and `c_struct_3` are assigned.
+// - All kinds of TagDecls (structs, unions, and enums) can be moved out of a
+//   containing struct and automatically named if needed. In principle, 3C
+//   should be able to move TagDecls out of a union, but I couldn't find any way
+//   to force a union field to be rewritten in order to demonstrate this, since
+//   3C constrains union fields to wild. As far as I know, TagDecls can't be
+//   nested in an enum in C.
+// - `struct H` does not get moved because there is nothing to trigger rewriting
+//   of the containing multi-decl since `dh` is constrained wild by
+//   `constrain_dh`.
+
+//CHECK:      struct c_struct_2 {
+//CHECK-NEXT:   _Ptr<int> c2i;
+//CHECK-NEXT: };
+//CHECK-NEXT: struct B {
+//CHECK-NEXT:   _Ptr<struct c_struct_2> c;
+//CHECK-NEXT: };
+//CHECK-NEXT: struct c_struct_3 {
+//CHECK-NEXT:   _Ptr<int> c3i;
+//CHECK-NEXT: };
+//CHECK-NEXT: struct E {
+//CHECK-NEXT:   _Ptr<int> ei;
+//CHECK-NEXT: };
+//CHECK-NEXT: enum F { F_0, F_1 };
+//CHECK-NEXT: enum dg_enum_1 { G_0, G_1 };
+//CHECK-NEXT: union U {
+//CHECK-NEXT:   int *ui;
+//CHECK-NEXT: };
+//CHECK-NEXT: union dv_union_1 {
+//CHECK-NEXT:   int *vi;
+//CHECK-NEXT: };
+//CHECK-NEXT: struct D {
+//CHECK-NEXT:   _Ptr<struct c_struct_3> c;
+//CHECK-NEXT:   _Ptr<struct E> de;
+//CHECK-NEXT:   _Ptr<const enum F> df;
+//CHECK-NEXT:   _Ptr<enum dg_enum_1> dg;
+//CHECK-NEXT:   struct H {
+//CHECK-NEXT:     _Ptr<int> hi;
+//CHECK-NEXT:   } *dh;
+//CHECK-NEXT:   _Ptr<union U> du;
+//CHECK-NEXT:   _Ptr<union dv_union_1> dv;
+//CHECK-NEXT: };
+//CHECK-NEXT: struct A {
+//CHECK-NEXT:   _Ptr<const struct B> ab;
+//CHECK_NOALL-NEXT:   const struct B ab_arr[2];
+//CHECK_ALL-NEXT:     const struct B ab_arr _Checked[2];
+//CHECK-NEXT:   _Ptr<volatile struct D> ad;
+//CHECK-NEXT: };
+//CHECK-NEXT: static _Ptr<struct A> global_a = ((void *)0);
+//CHECK_NOALL-NEXT: static struct A global_a_arr[2];
+//CHECK_ALL-NEXT:   static struct A global_a_arr _Checked[2];
