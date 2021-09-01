@@ -444,17 +444,23 @@ bool Constraints::graphBasedSolve() {
         std::string Rsn = Conflict->EdgeConstraint->getReason();
         // determine a second reason
         auto Succs = Conflict->getTargetNode().getEdges();
+        std::string Rsn2 = "";
         for (auto *Succ : Succs) {
           if (auto *SuccGeq = dyn_cast<Geq>(Succ->EdgeConstraint)) {
             if (Env.getAssignment(ConflictAtom) ==
                 Env.getAssignment(SuccGeq->getLHS()) ||
                 Env.getAssignment(ConflictAtom) ==
                     Env.getAssignment(SuccGeq->getRHS())) {
-              Rsn += ", conflicts with, ";
-              Rsn += Succ->EdgeConstraint->getReason();
+              Rsn2 += ", conflicts with, ";
+              Rsn2 += Succ->EdgeConstraint->getReason();
               break;
             }
           }
+        }
+        if (Rsn2.empty()) {
+          Rsn += ", which conflicts with another type.";
+        } else {
+          Rsn += Rsn2;
         }
         Geq *ConflictConstraint = createGeq(ConflictAtom, getWild(), Rsn);
         addConstraint(ConflictConstraint);
