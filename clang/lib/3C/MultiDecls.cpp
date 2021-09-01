@@ -133,6 +133,7 @@ void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
           // Otherwise, just generate a new tag name based on the member name.
           // Example: `struct { ... } foo;` ->
           // `struct foo_struct_1 { ... }; struct foo_struct_1 foo;`
+          // If `foo_struct_1` is already taken, use `foo_struct_2`, etc.
           std::string KindName = std::string(LastTagDef->getKindName());
           std::string NewName;
           for (int Num = 1; ; Num++) {
@@ -142,8 +143,16 @@ void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
           }
           AssignedTagTypeStrs.insert(std::make_pair(TagDefPSL, KindName + " " + NewName));
           TagDefNeedsName = false;
-          // This name is now taken; other automatically generated names must not
-          // collide with it.
+          // Consider this name taken and ensure that other automatically
+          // generated names do not collide with it.
+          //
+          // If the multi-decl doesn't end up getting rewritten, this name
+          // ultimately may not be used, creating a gap in the numbering in 3C's
+          // output. But this cosmetic inconsistency is a small price to pay for
+          // the architectural convenience of being able to store the assigned
+          // names in the PointerVariableConstraints when they are constructed
+          // rather than trying to assign and store the names after we know
+          // which multi-decls will be rewritten.
           UsedTagNames.insert(NewName);
         }
       }

@@ -272,15 +272,30 @@ void DeclRewriter::denestTagDecls() {
     std::string DefinitionStr = R.getRewrittenText(CSR);
     // Delete the definition from the old location.
     rewriteSourceRange(R, CSR, "");
-    // We want to insert RD as a new child of its original semantic DeclContext,
-    // just before the existing child of that DeclContext of which RD was
-    // originally a descendant.
-    DeclContext *TopChild = TD;
-    while (TopChild->getLexicalParent() != TD->getDeclContext()) {
-      TopChild = TopChild->getLexicalParent();
+    // We want to find the nearest ancestor DeclContext of TD that is _not_ a
+    // TagDecl and make TD a child of that DeclContext (named `Parent` below),
+    // just before the child `TopTagDecl` of `Parent` of which TD was originally
+    // a descendant.
+    //
+    // As of this writing, it seems that if TD is named, we get
+    // `Parent == TD->getDeclContext()` due to the code at
+    // https://github.com/correctcomputation/checkedc-clang/blob/fd4d8af4383d40af10ee8bc92b7bf88061a11035/clang/lib/Sema/SemaDecl.cpp#L16980-L16981,
+    // But that code doesn't run if TD is unnamed (which makes some sense
+    // because name visibility isn't an issue for TagDecls that have no name),
+    // and we want to de-nest TagDecls with names we assigned just like ones
+    // that were originally named, so we can't just use `TD->getDeclContext()`.
+    // In any event, maybe we wouldn't want to rely on this kind of internal
+    // Clang behavior.
+    DeclContext *TopTagDecl = TD;
+    for (;;) {
+      DeclContext *Parent = TopTagDecl->getLexicalParent();
+      if (!isa<TagDecl>(Parent))
+        break;
+      TopTagDecl = Parent;
     }
-    // TODO: Use a wrapper like rewriteSourceRange.
-    R.InsertText(cast<Decl>(TopChild)->getBeginLoc(), DefinitionStr);
+    // TODO: Use a wrapper like rewriteSourceRange that tries harder with
+    // macros, reports failure, etc.
+    R.InsertText(cast<Decl>(TopTagDecl)->getBeginLoc(), DefinitionStr);
   }
 }
 
@@ -330,8 +345,8 @@ void DeclRewriter::rewriteMultiDecl(MultiDeclInfo &MDI, RSet &ToRewrite) {
         llvm_unreachable("Failed to find place to insert assigned TagDecl name.");
       }
     }
-    // Make a note if the RecordDecl needs to be de-nested later.
-    if (TD->getLexicalDeclContext() != TD->getDeclContext())
+    // Make a note if the TagDecl needs to be de-nested later.
+    if (isa<TagDecl>(TD->getLexicalDeclContext()))
       TagDeclsToDenest.push_back(TD);
     // `struct T { ... } foo;` -> `struct T { ... };\nfoo;`
     rewriteSourceRange(R, TD->getEndLoc(), "};\n");
