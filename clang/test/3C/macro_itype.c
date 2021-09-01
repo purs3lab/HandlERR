@@ -16,8 +16,7 @@ struct s { macro0 };
 // would be rewritten to `int *b` even though the rewriter intended to give it
 // an itype. If the parameter was then passed a checked pointer, there would be
 // a Checked C compiler error. Ideally, 3C wouldn't need to change the
-// declaration of `b` at all, but this is the usual limitation we have with
-// rewriting around macros.
+// declaration of `b` at all (see issue correctcomputation/checkedc-clang#694).
 #define macro1 : itype(_Ptr<int>)
 void fn(int *b macro1, int *c) {
 //CHECK: void fn(int *b : itype(_Ptr<int>), _Ptr<int> c) {
