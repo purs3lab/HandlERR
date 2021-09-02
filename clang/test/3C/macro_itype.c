@@ -11,6 +11,11 @@
 struct s { macro0 };
 //CHECK: struct s { macro0 };
 
+// Example from issue correctcomputation/checkedc-clang#594.
+#define PARAM_DECL_WITH_ITYPE int *p : itype(_Ptr<int>)
+void foo(PARAM_DECL_WITH_ITYPE);
+//CHECK: void foo(PARAM_DECL_WITH_ITYPE);
+
 // Just removing the assertion that failed on the above example caused this to
 // rewrite incorrectly. The ItypeStr would be left empty, so first parameter
 // would be rewritten to `int *b` even though the rewriter intended to give it
