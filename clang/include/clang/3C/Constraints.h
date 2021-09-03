@@ -279,7 +279,9 @@ private:
   PersistentSourceLoc PL;
 
 public:
+  struct ReasonLoc {std::string Reason;PersistentSourceLoc Location;};
   std::string REASON = DEFAULT_REASON;
+  std::vector<ReasonLoc> ExtraReasons;
 
   Constraint(ConstraintKind K) : Kind(K) {}
   Constraint(ConstraintKind K, const std::string &Rsn) : Kind(K) {
@@ -299,6 +301,13 @@ public:
   virtual bool operator<(const Constraint &Other) const = 0;
   virtual std::string getReason() const { return REASON; }
   virtual void setReason(const std::string &Rsn) { REASON = Rsn; }
+  virtual std::vector<ReasonLoc> &additionalReasons() { return ExtraReasons; }
+  virtual void addReason(const std::string &Rsn, PersistentSourceLoc PSL) {
+    ReasonLoc RL;
+    RL.Reason = Rsn;
+    RL.Location = PSL;
+    ExtraReasons.push_back(RL);
+  }
 
   bool isUnwritable(void) const {
     return getReason() == UNWRITABLE_REASON;

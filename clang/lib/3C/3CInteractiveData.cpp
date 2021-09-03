@@ -66,7 +66,7 @@ void ConstraintsInfo::printStats(llvm::raw_ostream &O) {
   std::map<std::string, std::set<ConstraintKey>> RsnBasedWildCKeys;
   for (auto &PtrR : RootWildAtomsWithReason) {
     if (AllWildAtoms.find(PtrR.first) != AllWildAtoms.end()) {
-      RsnBasedWildCKeys[PtrR.second.getWildPtrReason()].insert(PtrR.first);
+      RsnBasedWildCKeys[PtrR.second.getReason()].insert(PtrR.first);
     }
   }
   bool AddComma = false;
@@ -111,8 +111,8 @@ void ConstraintsInfo::printConstraintStats(llvm::raw_ostream &O,
                                            ConstraintKey Cause) {
   O << "{\"ConstraintKey\":" << Cause << ", ";
   O << "\"Name\":\"" << CS.getVar(Cause)->getStr() << "\", ";
-  WildPointerInferenceInfo PtrInfo = RootWildAtomsWithReason.at(Cause);
-  O << "\"Reason\":\"" << PtrInfo.getWildPtrReason() << "\", ";
+  Feedback PtrInfo = RootWildAtomsWithReason.at(Cause);
+  O << "\"Reason\":\"" << PtrInfo.getReason() << "\", ";
   O << "\"InSrc\":" << (InSrcWildAtoms.find(Cause) != InSrcWildAtoms.end())
     << ", ";
   O << "\"Location\":";

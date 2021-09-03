@@ -441,7 +441,7 @@ bool Constraints::graphBasedSolve() {
       for (auto Conflict : Conflicts) {
         auto ConflictAtom = Conflict->getTargetNode().getData();
         assert(ConflictAtom != nullptr);
-        std::string Rsn = Conflict->EdgeConstraint->getReason();
+        std::string Rsn1 = Conflict->EdgeConstraint->getReason();
         // determine a second reason
         auto Succs = Conflict->getTargetNode().getEdges();
         std::string Rsn2 = "";
@@ -451,18 +451,18 @@ bool Constraints::graphBasedSolve() {
                 Env.getAssignment(SuccGeq->getLHS()) ||
                 Env.getAssignment(ConflictAtom) ==
                     Env.getAssignment(SuccGeq->getRHS())) {
-              Rsn2 += ", conflicts with, ";
-              Rsn2 += Succ->EdgeConstraint->getReason();
+              Rsn2 = Succ->EdgeConstraint->getReason();
               break;
             }
           }
         }
-        if (Rsn2.empty()) {
-          Rsn += ", which conflicts with another type.";
-        } else {
-          Rsn += Rsn2;
-        }
+        std::string Rsn = "Inferred conflicting types";
+//            Rsn2.empty() ?
+//              Rsn1 + ", which conflicts with another type." :
+//              Rsn1 + ", conflicts with, " + Rsn2;
         Geq *ConflictConstraint = createGeq(ConflictAtom, getWild(), Rsn);
+        ConflictConstraint->addReason(Rsn1,PersistentSourceLoc());
+        ConflictConstraint->addReason(Rsn2,PersistentSourceLoc());
         addConstraint(ConflictConstraint);
         SolChkCG.addConstraint(ConflictConstraint, *this);
         Rest.insert(cast<VarAtom>(ConflictAtom));

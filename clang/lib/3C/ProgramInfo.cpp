@@ -1038,7 +1038,7 @@ bool ProgramInfo::computeInterimConstraintState(
     CState.AtomSourceMap.insert(std::make_pair(E.first, E.second));
 
   auto &WildPtrsReason = CState.RootWildAtomsWithReason;
-  for (auto *CurrC : CS.getConstraints()) {
+  for (Constraint *CurrC : CS.getConstraints()) {
     if (Geq *EC = dyn_cast<Geq>(CurrC)) {
       VarAtom *VLhs = dyn_cast<VarAtom>(EC->getLHS());
       if (EC->constraintIsChecked() && dyn_cast<WildAtom>(EC->getRHS())) {
@@ -1046,7 +1046,13 @@ bool ProgramInfo::computeInterimConstraintState(
         PersistentSourceLoc APSL = CState.AtomSourceMap[VLhs->getLoc()];
         if (!PSL.valid() && APSL.valid())
           PSL = APSL;
-        WildPointerInferenceInfo Info(EC->getReason(), PSL);
+        Feedback Info(EC->getReason(), PSL);
+        for (auto Reason : CurrC->additionalReasons()) {
+          PersistentSourceLoc P = Reason.Location;
+          if (!P.valid() && APSL.valid())
+            P = APSL;
+          Info.addReason(Reason.Reason,P);
+        }
         WildPtrsReason.insert(std::make_pair(VLhs->getLoc(), Info));
       }
     }
