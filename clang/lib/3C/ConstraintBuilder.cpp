@@ -320,47 +320,6 @@ private:
   ConstraintResolver CB;
 };
 
-class PtrToStructDef : public RecursiveASTVisitor<PtrToStructDef> {
-public:
-  explicit PtrToStructDef(TypedefDecl *TDT) : TDT(TDT) {}
-
-  bool VisitPointerType(clang::PointerType *PT) {
-    IsPointer = true;
-    return true;
-  }
-
-  bool VisitRecordType(RecordType *RT) {
-    auto *Decl = RT->getDecl();
-    auto DeclRange = Decl->getSourceRange();
-    auto TypedefRange = TDT->getSourceRange();
-    bool DeclContained = (TypedefRange.getBegin() < DeclRange.getBegin()) &&
-                         !(TypedefRange.getEnd() < DeclRange.getEnd());
-    if (DeclContained) {
-      StructDefInTD = true;
-      return false;
-    }
-    return true;
-  }
-
-  bool VisitFunctionProtoType(FunctionProtoType *FPT) {
-    IsPointer = true;
-    return true;
-  }
-
-  bool getResult(void) { return StructDefInTD; }
-
-  static bool containsPtrToStructDef(TypedefDecl *TDT) {
-    PtrToStructDef Traverser(TDT);
-    Traverser.TraverseDecl(TDT);
-    return Traverser.getResult();
-  }
-
-private:
-  TypedefDecl *TDT = nullptr;
-  bool IsPointer = false;
-  bool StructDefInTD = false;
-};
-
 // This class visits a global declaration, generating constraints
 // for functions, variables, types, etc. that are visited.
 class ConstraintGenVisitor : public RecursiveASTVisitor<ConstraintGenVisitor> {
@@ -447,10 +406,8 @@ public:
     // typedef map. If we have seen it before, and we need to preserve the
     // constraints contained within it
     if (!VarAdder.seenTypedef(PSL))
-      // Add this typedef to the program info, if it contains a ptr to
-      // an anonymous struct we mark as not being rewritable
-      VarAdder.addTypedef(PSL, !PtrToStructDef::containsPtrToStructDef(TD), TD,
-                          *Context);
+      // Add this typedef to the program info.
+      VarAdder.addTypedef(PSL, TD, *Context);
     return true;
   }
 

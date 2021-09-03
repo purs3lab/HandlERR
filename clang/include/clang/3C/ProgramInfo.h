@@ -35,7 +35,7 @@ public:
 
   virtual bool seenTypedef(PersistentSourceLoc PSL) = 0;
 
-  virtual void addTypedef(PersistentSourceLoc PSL, bool CanRewriteDef,
+  virtual void addTypedef(PersistentSourceLoc PSL,
                           TypedefDecl *TD, ASTContext &C) = 0;
 
 protected:
@@ -170,7 +170,7 @@ public:
 
   bool seenTypedef(PersistentSourceLoc PSL) override;
 
-  void addTypedef(PersistentSourceLoc PSL, bool CanRewriteDef, TypedefDecl *TD,
+  void addTypedef(PersistentSourceLoc PSL, TypedefDecl *TD,
                   ASTContext &C) override;
 
   // Store mapping from ASTContexts to a unique index in the ASTs vector in
