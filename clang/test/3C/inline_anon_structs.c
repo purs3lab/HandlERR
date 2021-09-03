@@ -287,3 +287,27 @@ void constrain_dh(void) {
 //CHECK-NEXT: static _Ptr<struct A> global_a = ((void *)0);
 //CHECK_NOALL-NEXT: static struct A global_a_arr[2];
 //CHECK_ALL-NEXT:   static struct A global_a_arr _Checked[2];
+
+// Tests of the special case where we use the first member of a typedef
+// multi-decl as the name of the inline TagDecl.
+
+typedef struct { int *x; } SFOO, *PSFOO;
+//CHECK:      typedef struct { _Ptr<int> x; } SFOO;
+//CHECK-NEXT: typedef _Ptr<SFOO> PSFOO;
+
+// The other way around, we can't do it because SBAR would be defined too late
+// to use it in the definition of PSBAR.
+typedef struct { int *x; } *PSBAR, SBAR;
+//CHECK:      struct PSBAR_struct_1 { _Ptr<int> x; };
+//CHECK-NEXT: typedef _Ptr<struct PSBAR_struct_1> PSBAR;
+//CHECK-NEXT: typedef struct PSBAR_struct_1 SBAR;
+
+// Borderline case: Since SFOO_CONST has a qualifier, we don't use it as the
+// name of the inline struct. If we did, we'd end up with `typedef
+// _Ptr<const SFOO_CONST> PSFOO_CONST`, which still expands to
+// `_Ptr<const struct { ... }>`, but the duplicate `const` may be a bit
+// confusing to the reader, so we don't do that.
+typedef const struct { int *x; } SFOO_CONST, *PSFOO_CONST;
+//CHECK:      struct SFOO_CONST_struct_1 { _Ptr<int> x; };
+//CHECK-NEXT: typedef const struct SFOO_CONST_struct_1 SFOO_CONST;
+//CHECK-NEXT: typedef _Ptr<const struct SFOO_CONST_struct_1> PSFOO_CONST;

@@ -64,6 +64,17 @@ void MultiDeclsInfo::findUsedTagNames(ASTContext &Context) {
   findUsedTagNames(Context.getTranslationUnitDecl());
 }
 
+static const Type *unelaborateType(const Type *Ty) {
+  if (const ElaboratedType *ETy = dyn_cast<ElaboratedType>(Ty)) {
+    QualType QT = ETy->getNamedType();
+    Ty = QT.getTypePtr();
+    // Can an ElaboratedType add qualifiers to its underlying type in C? I don't
+    // think so, but if it does, make sure we don't silently lose them.
+    assert(QualType(Ty, 0) == QT);
+  }
+  return Ty;
+}
+
 void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
   // This will automatically create a new, empty map for the TU if needed.
   TUMultiDeclsInfo &TUInfo = TUInfos[&Context];
@@ -121,9 +132,14 @@ void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
         // first member so that it is defined in time for other members to refer
         // to it.)
         TypedefDecl *TyD;
+        QualType Underlying;
         if (CurrentMultiDecl->Members.size() == 1 &&
             (TyD = dyn_cast<TypedefDecl>(MMD)) != nullptr &&
-            TyD->getUnderlyingType() == Context.getTagDeclType(LastTagDef)) {
+            // FIXME: This is a terrible mess. Figure out how we should be
+            // handling the difference between Type and QualType.
+            !(Underlying = TyD->getUnderlyingType()).hasLocalQualifiers() &&
+            QualType(unelaborateType(Underlying.getTypePtr()), 0) ==
+                Context.getTagDeclType(LastTagDef)) {
           AssignedTagTypeStrs.insert(std::make_pair(TagDefPSL, MemberName));
           TagDefNeedsName = false;
           // Tell the rewriter that the tag definition should not be moved out of
@@ -168,10 +184,8 @@ void MultiDeclsInfo::findMultiDecls(ASTContext &Context) {
 }
 
 llvm::Optional<std::string> MultiDeclsInfo::getTypeStrOverride(const Type *Ty, ASTContext &C) {
-  const Type *UnelaboratedTy = Ty;
-  if (const ElaboratedType *ETy = dyn_cast<ElaboratedType>(Ty))
-    UnelaboratedTy = ETy->getNamedType().getTypePtr();
-  if (const TagType *TTy = dyn_cast<TagType>(UnelaboratedTy)) {
+  Ty = unelaborateType(Ty);
+  if (const TagType *TTy = dyn_cast<TagType>(Ty)) {
     TagDecl *TD = TTy->getDecl();
     if (TD->getName().empty()) {
       PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(TD, C);
