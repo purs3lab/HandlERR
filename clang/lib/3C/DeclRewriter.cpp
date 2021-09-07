@@ -36,62 +36,58 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
                                   std::string &Type, std::string &IType,
                                   ProgramInfo &Info, ArrayBoundsRewriter &ABR) {
   const EnvironmentMap &Env = Info.getConstraints().getVariables();
-  bool IsTypedefVarUnchecked =
+  // True when the type of this variable is defined by a typedef, and the
+  // constraint variable representing the typedef solved to an unchecked type.
+  // In these cases, the typedef should be used in the unchecked part of the
+  // itype. The typedef is expanded using checked pointer types for the checked
+  // portion. In ItypesForExtern mode, typedefs are treated as unchecked because
+  // 3C will not rewrite the typedef to a checked type. Even if it solves to a
+  // checked type, it is not rewritten, so it remains unchecked in the converted
+  // code.
+  bool IsUncheckedTypedef =
     Defn->isTypedef() && (_3COpts.ItypesForExtern ||
                           !Defn->getTypedefVar()->isSolutionChecked(Env));
-  if (Defn->getFV()) {
-    // This declaration is for a function pointer. Writing itypes on function
-    // pointers is a little bit harder since the original type string will not
-    // work for the unchecked portion of the itype. We need to generate the
-    // unchecked type from the PVConstraint. The last argument of this call
-    // tells mkString to generate a string using unchecked types instead of
-    // checked types.
-    if (Defn->isTypedef() && !IsTypedefVarUnchecked)
-      Type = Defn->mkString(Info.getConstraints(),
-                            MKSTRING_OPTS(UnmaskTypedef = true,
-                                          ForItypeBase = true));
-    else
-      Type = Defn->mkString(Info.getConstraints(),
-                            MKSTRING_OPTS(ForItypeBase = true));
+  // True if this variable is defined by a typedef, and the constraint variable
+  // representing the typedef solves to a checked type. Notably not the negation
+  // of IsUncheckedTypedef because both require the variable type be defined
+  // by a typedef. The checked typedef is expanded using unchecked types in the
+  // unchecked portion of the itype. The typedef is used directly in the checked
+  // portion of the itype.
+  bool IsCheckedTypedef = Defn->isTypedef() && !IsUncheckedTypedef;
+  if (IsCheckedTypedef || Defn->getFV() || Defn->hasSomeSizedArr()) {
+    // Generate the type string from PVC if we need to unmask a typedef, this is
+    // a function pointer, or this is a constant size array. When unmasking a
+    // typedef, the expansion of the typedef does not exist in the original
+    // source, so it must be constructed. For function pointers, a function
+    // pointer appearing in the unchecked portion of an itype must contain an
+    // extra set of parenthesis (e.g. `void ((*f)())` instead of `void (f*)()`)
+    // for the declaration to parse correctly. For function pointers as well as
+    // constant size arrays, part of the type appears after the identifier
+    // (the parameter list and length respectively). This breaks the assumption
+    // in the next case that the declaration is type + identifier + itype.
+    Type = Defn->mkString(Info.getConstraints(),
+                          MKSTRING_OPTS(UnmaskTypedef = IsCheckedTypedef,
+                                        ForItypeBase = true));
   } else {
-    if (Defn->isTypedef() && !IsTypedefVarUnchecked)
-      Type = Defn->mkString(Info.getConstraints(),
-                            MKSTRING_OPTS(UnmaskTypedef = true,
-                                          ForItypeBase = true,
-                                          EmitName = false));
-    else
-      Type = Defn->getRewritableOriginalTy();
+    // In the remaining cases, the unchecked portion of the itype is just the
+    // original type of the pointer.
+    // TODO: We could extract the original declaration string from the source
+    //       code instead of using the string stored in the constraint variable.
+    //       This would help preserve macros and potentially make this less
+    //       susceptible to other rewriting errors.
+    Type = Defn->getRewritableOriginalTy();
 
-    if (isa_and_nonnull<ParmVarDecl>(Decl)) {
-      if (Decl->getName().empty())
-        Type += Defn->getName();
-      else
-        Type += Decl->getNameAsString();
-    } else {
-      std::string Name = Defn->getName();
-      if (Name != RETVAR)
-        Type += Name;
-    }
+    std::string Name = Defn->getName();
+    if (isa_and_nonnull<ParmVarDecl>(Decl) && !Decl->getName().empty())
+      Name = Decl->getNameAsString();
+    if (Name != RETVAR)
+     Type += Name;
   }
 
   IType = " : itype(";
-
-  if (IsTypedefVarUnchecked) {
-    // In -itypes-for-extern mode we do not rewrite typedefs to checked types.
-    // They are given a checked itype instead. The unchecked portion of the
-    // itype continues to use the original typedef, but the typedef in the
-    // checked portion is expanded and rewritten to use a checked type. This
-    // lets the typedef be used in unchecked code while still giving a checked
-    // type to the declaration so that it can be used in checked code.
-    // TODO: This could potentially be applied to typedef types even when the
-    //       flag is not passed to limit spread of wildness through typedefs.
-    IType += Defn->mkString(Info.getConstraints(),
-                            MKSTRING_OPTS(EmitName = false, ForItype = true,
-                                          UnmaskTypedef = true));
-  } else {
-    IType += Defn->mkString(Info.getConstraints(),
-                            MKSTRING_OPTS(EmitName = false, ForItype = true));
-  }
+  IType += Defn->mkString(Info.getConstraints(),
+                          MKSTRING_OPTS(EmitName = false, ForItype = true,
+                                        UnmaskTypedef = IsUncheckedTypedef));
   IType += ")" + ABR.getBoundsString(Defn, Decl, true);
 }
 
