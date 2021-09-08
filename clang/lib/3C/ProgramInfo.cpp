@@ -447,6 +447,12 @@ void ProgramInfo::linkFunction(FunctionVariableConstraint *FV) {
   // it is actually used).
   FV->equateWithItype(*this, Rsn, nullptr);
 
+  // Used to apply constraints to parameters and returns for function without a
+  // body. In the default configuration, the function is fully constrained so
+  // that parameters and returns are considered unchecked. When 3C is run with
+  // --infer-types-for-undefs, only internal variables are constrained, allowing
+  // external variables to solve to checked types meaning the parameter will be
+  // rewritten to an itype.
   auto LinkComponent = [this, Rsn](const FVComponentVariable *FVC) {
     FVC->getInternal()->constrainToWild(CS, Rsn);
     if (!_3COpts.InferTypesForUndefs &&
@@ -454,8 +460,6 @@ void ProgramInfo::linkFunction(FunctionVariableConstraint *FV) {
       FVC->getExternal()->constrainToWild(CS, Rsn);
   };
 
-  // If we've seen this symbol, but never seen a body for it, constrain
-  // everything about it.
   if (!FV->hasBody()) {
     LinkComponent(FV->getCombineReturn());
     for (unsigned I = 0; I < FV->numParams(); I++)
