@@ -319,9 +319,8 @@ void DeclRewriter::rewriteSingleDecl(DeclReplacement *N, RSet &ToRewrite) {
       dyn_cast<TypedefDecl>(N->getDecl()) || isSingleDeclaration(N);
   assert("Declaration is not a single declaration." && IsSingleDecl);
   // This is the easy case, we can rewrite it locally, at the declaration.
-  // TODO why do we call getDecl() and getSourceRange() directly,
-  // TODO as opposed to getSourceRange()?
-  SourceRange TR = N->getDecl()->getSourceRange();
+  SourceManager &SM = N->getDecl()->getASTContext().getSourceManager();
+  SourceRange TR = N->getSourceRange(SM);
   doDeclRewrite(TR, N);
 }
 
