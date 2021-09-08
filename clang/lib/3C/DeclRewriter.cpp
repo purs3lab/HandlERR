@@ -35,6 +35,7 @@ using namespace clang;
 void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
                                   std::string &Type, std::string &IType,
                                   ProgramInfo &Info, ArrayBoundsRewriter &ABR) {
+  assert(Decl != nullptr);
   const EnvironmentMap &Env = Info.getConstraints().getVariables();
   // True when the type of this variable is defined by a typedef, and the
   // constraint variable representing the typedef solved to an unchecked type.
@@ -54,7 +55,7 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
   // unchecked portion of the itype. The typedef is used directly in the checked
   // portion of the itype.
   bool IsCheckedTypedef = Defn->isTypedef() && !IsUncheckedTypedef;
-  if (IsCheckedTypedef || Defn->getFV() || Defn->hasSomeSizedArr()) {
+  if (IsCheckedTypedef || Defn->getFV()) { //|| Defn->hasSomeSizedArr()) {
     // Generate the type string from PVC if we need to unmask a typedef, this is
     // a function pointer, or this is a constant size array. When unmasking a
     // typedef, the expansion of the typedef does not exist in the original
@@ -75,13 +76,27 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
     //       code instead of using the string stored in the constraint variable.
     //       This would help preserve macros and potentially make this less
     //       susceptible to other rewriting errors.
-    Type = Defn->getRewritableOriginalTy();
+    // Type = Defn->getRewritableOriginalTy();
 
-    std::string Name = Defn->getName();
-    if (isa_and_nonnull<ParmVarDecl>(Decl) && !Decl->getName().empty())
+    std::string Name;
+    if (isa<ParmVarDecl>(Decl) && !Decl->getName().empty())
       Name = Decl->getNameAsString();
-    if (Name != RETVAR)
-     Type += Name;
+    else if (Defn->getName() != RETVAR)
+      Name = Defn->getName();
+
+    QualType T;
+    if (auto *FD = dyn_cast<FunctionDecl>(Decl))
+      T = FD->getReturnType();
+    else
+      T = Decl->getType();
+    Type = qtyToStr(T, Name);
+
+    if (Defn->getName() == RETVAR && IsUncheckedTypedef) {
+      // This adds a space between the type and function name for function
+      // returns using a typedef in the unchecked part of the itype to avoid
+      // having the function and typedef identifiers run together.
+      Type += " ";
+    }
   }
 
   IType = " : itype(";
@@ -629,8 +644,11 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
     }
   } else if (FDConstraint->numParams() != 0) {
     // lacking params but the constraint has them: mirror the constraint
+    FunctionDecl *Proto = getPrototype(FD);
+    assert("Unable to find prototype for function constraint with parameters" &&
+           Proto && Proto->getNumParams() == FDConstraint->numParams());
     for (unsigned I = 0; I < FDConstraint->numParams(); ++I) {
-      ParmVarDecl *PVDecl = nullptr;
+      ParmVarDecl *PVDecl = Proto->getParamDecl(I);
       const FVComponentVariable *CV = FDConstraint->getCombineParam(I);
       std::string Type, IType;
       this->buildDeclVar(CV, PVDecl, Type, IType, "", RewriteGeneric,

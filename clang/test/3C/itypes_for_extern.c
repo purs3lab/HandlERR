@@ -103,7 +103,7 @@ int const_arr0[10];
 //CHECK_NOALL: int const_arr0[10];
 
 int *const_arr1[10];
-//CHECK_ALL: int * const_arr1[10] : itype(_Ptr<int> _Checked[10]) = {((void *)0)};
+//CHECK_ALL: int *const_arr1[10] : itype(_Ptr<int> _Checked[10]) = {((void *)0)};
 //CHECK_NOALL: int *const_arr1[10];
 
 // Itypes for constants sized arrays when there a declaration with and without
@@ -114,8 +114,8 @@ int *const_arr1[10];
 
 void const_arr_fn();
 void const_arr_fn(int a[10]) {}
-//CHECK_ALL: void const_arr_fn(int a[10] : itype(int _Checked[10]));
-//CHECK_ALL: void const_arr_fn(int a[10] : itype(int _Checked[10])) _Checked {}
+//CHECK_ALL: void const_arr_fn(int *a : itype(int _Checked[10]));
+//CHECK_ALL: void const_arr_fn(int *a : itype(int _Checked[10])) _Checked {}
 
 // Rewriting an existing itype or bounds expression on a global variable. Doing
 // this correctly requires replacing text until the end of the Checked C

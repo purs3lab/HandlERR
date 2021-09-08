@@ -98,6 +98,8 @@ clang::FunctionDecl *getDeclaration(clang::FunctionDecl *FD);
 
 clang::FunctionDecl *getDefinition(clang::FunctionDecl *FD);
 
+clang::FunctionDecl *getPrototype(clang::FunctionDecl *FD);
+
 clang::CheckedPointerKind
 getCheckedPointerKind(clang::InteropTypeExpr *ItypeExpr);
 
