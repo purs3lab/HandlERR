@@ -32,9 +32,10 @@ using namespace clang;
 // is the taken from the constraint graph solution. The unchecked portion is
 // assigned to string reference Type and the checked (itype) portion is assigned
 // to the string reference Itype.
-void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
+void DeclRewriter::buildItypeDecl(PVConstraint *Int, PVConstraint *Ext, DeclaratorDecl *Decl,
                                   std::string &Type, std::string &IType,
                                   ProgramInfo &Info, ArrayBoundsRewriter &ABR) {
+  PVConstraint *Defn = Ext;
   const EnvironmentMap &Env = Info.getConstraints().getVariables();
   // True when the type of this variable is defined by a typedef, and the
   // constraint variable representing the typedef solved to an unchecked type.
@@ -54,7 +55,7 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
   // unchecked portion of the itype. The typedef is used directly in the checked
   // portion of the itype.
   bool IsCheckedTypedef = Defn->isTypedef() && !IsUncheckedTypedef;
-  if (IsCheckedTypedef || Defn->getFV()) {
+  if (IsCheckedTypedef || Defn->getFV() || true /*test*/) {
     // Generate the type string from PVC if we need to unmask a typedef, this is
     // a function pointer, or this is a constant size array. When unmasking a
     // typedef, the expansion of the typedef does not exist in the original
@@ -62,10 +63,12 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
     // pointer appearing in the unchecked portion of an itype must contain an
     // extra set of parenthesis (e.g. `void ((*f)())` instead of `void (f*)()`)
     // for the declaration to parse correctly.
-    Type = Defn->mkString(Info.getConstraints(),
+    Type = (Int ? Int : Ext)->mkString(Info.getConstraints(),
                           MKSTRING_OPTS(UnmaskTypedef = IsCheckedTypedef,
-                                        ForItypeBase = true));
-  } else {
+                                        ForItypeBase = !Int));
+  }
+#if 0
+  else {
     // In the remaining cases, the unchecked portion of the itype is just the
     // original type of the pointer. The first branch tries to generate the type
     // using the type and name for this specific declaration. This is important
@@ -84,6 +87,7 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
       Type += " ";
     }
   }
+#endif
 
   IType = " : itype(";
   IType += Defn->mkString(Info.getConstraints(),
@@ -204,7 +208,7 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
           std::string Type, IType;
           // VarDecl and FieldDecl subclass DeclaratorDecl, so the cast will
           // always succeed.
-          DeclRewriter::buildItypeDecl(PV, cast<DeclaratorDecl>(D), Type, IType,
+          DeclRewriter::buildItypeDecl(nullptr, PV, cast<DeclaratorDecl>(D), Type, IType,
                                        Info, ABRewriter);
           NewTy += Type + IType;
         } else {
@@ -780,12 +784,12 @@ void FunctionDeclBuilder::buildCheckedDecl(
 }
 
 
-void FunctionDeclBuilder::buildItypeDecl(PVConstraint *Defn,
+void FunctionDeclBuilder::buildItypeDecl(PVConstraint *Int, PVConstraint *Ext,
                                          DeclaratorDecl *Decl,
                                          std::string &Type, std::string &IType,
                                          bool &RewriteParm, bool &RewriteRet) {
   Info.getPerfStats().incrementNumITypes();
-  DeclRewriter::buildItypeDecl(Defn, Decl, Type, IType, Info, ABRewriter);
+  DeclRewriter::buildItypeDecl(Int, Ext, Decl, Type, IType, Info, ABRewriter);
   RewriteParm = true;
   RewriteRet |= isa_and_nonnull<FunctionDecl>(Decl);
 }
@@ -804,7 +808,7 @@ void FunctionDeclBuilder::buildDeclVar(const FVComponentVariable *CV,
   bool ItypeSolution = CV->hasItypeSolution(Info.getConstraints());
   if (ItypeSolution ||
       (CheckedSolution && _3COpts.ItypesForExtern && !StaticFunc)) {
-    buildItypeDecl(CV->getExternal(), Decl, Type, IType, RewriteParm,
+    buildItypeDecl(CV->getInternal(), CV->getExternal(), Decl, Type, IType, RewriteParm,
                    RewriteRet);
     return;
   }

@@ -35,7 +35,7 @@ public:
   static void rewriteDecls(ASTContext &Context, ProgramInfo &Info, Rewriter &R);
 
   static void
-  buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl, std::string &Type,
+  buildItypeDecl(PVConstraint *Int, PVConstraint *Ext, DeclaratorDecl *Decl, std::string &Type,
                  std::string &IType, ProgramInfo &Info,
                  ArrayBoundsRewriter &ABR);
 
@@ -111,7 +111,7 @@ protected:
                         std::string &Type, std::string &IType,
                         std::string UseName, bool &RewriteParm,
                         bool &RewriteRet);
-  void buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
+  void buildItypeDecl(PVConstraint *Int, PVConstraint *Ext, DeclaratorDecl *Decl,
                       std::string &Type, std::string &IType, bool &RewriteParm,
                       bool &RewriteRet);
 
