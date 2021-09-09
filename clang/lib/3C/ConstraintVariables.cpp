@@ -972,12 +972,7 @@ PointerVariableConstraint::mkString(Constraints &CS,
 
   // No space after itype.
   if (!EmittedName && !UseName.empty()) {
-    // Avoid emitting an extra space between the last star and the identifier
-    // when generating strings for unchecked pointers. This is used when
-    // emitting the unchecked part of typedef parameters with itypes. Ss.str()
-    // unfortunately copies contents of Ss. With C++20 there will be Ss.view()
-    // which I believe avoids the copy.
-    if (!Ss.str().empty() && Ss.str().back() != '*')
+    if (!StringRef(Ss.str()).endswith("*"))
       Ss << " ";
     Ss << UseName;
   }
