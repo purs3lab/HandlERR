@@ -119,10 +119,7 @@ public:
   virtual bool solutionEqualTo(Constraints &, const ConstraintVariable *,
                                bool ComparePtyp = true) const = 0;
 
-  virtual void constrainToWild(Constraints &CS,
-                               const std::string &Rsn) const = 0;
-  virtual void constrainToWild(Constraints &CS, const std::string &Rsn,
-                               PersistentSourceLoc *PL) const = 0;
+  virtual void constrainToWild(Constraints &CS, const ReasonLoc &Rsn) const = 0;
 
   // Return true if this variable was checked in the input. Checked variables
   // might solve to WILD, and unchecked variables might solve to checked. Use
@@ -154,7 +151,7 @@ public:
   virtual bool hasNtArr(const EnvironmentMap &E, int AIdx = -1) const = 0;
 
   // Force use of equality constraints in function calls for this CV
-  virtual void equateArgumentConstraints(ProgramInfo &I) = 0;
+  virtual void equateArgumentConstraints(ProgramInfo &I, ReasonLoc &Rsn) = 0;
 
   // Internally combine the constraints and other data from the first parameter
   // with this constraint variable. Used with redeclarations, especially of
@@ -186,10 +183,8 @@ public:
   //
   // Some cases in which the itype must not change at all are indicated by
   // passing a reason for the "root cause of wildness" as ReasonUnchangeable.
-  // Otherwise ReasonUnchangeable should be set to the empty string.
   virtual void equateWithItype(ProgramInfo &CS,
-                               const std::string &ReasonUnchangeable,
-                               PersistentSourceLoc *PSL) = 0;
+                               const ReasonLoc &ReasonUnchangeable) = 0;
 
   // Copy this variable and replace all VarAtoms with fresh VarAtoms. Using
   // fresh atoms allows the new variable to solve to different types than the
@@ -206,15 +201,15 @@ enum ConsAction { Safe_to_Wild, Wild_to_Safe, Same_to_Same };
 
 void constrainConsVarGeq(const std::set<ConstraintVariable *> &LHS,
                          const std::set<ConstraintVariable *> &RHS,
-                         Constraints &CS, PersistentSourceLoc *PL,
+                         Constraints &CS, const ReasonLoc &Rsn,
                          ConsAction CA, bool DoEqType, ProgramInfo *Info,
                          bool HandleBoundsKey = true);
 void constrainConsVarGeq(ConstraintVariable *LHS, const CVarSet &RHS,
-                         Constraints &CS, PersistentSourceLoc *PL,
+                         Constraints &CS, const ReasonLoc &Rsn,
                          ConsAction CA, bool DoEqType, ProgramInfo *Info,
                          bool HandleBoundsKey = true);
 void constrainConsVarGeq(ConstraintVariable *LHS, ConstraintVariable *RHS,
-                         Constraints &CS, PersistentSourceLoc *PL,
+                         Constraints &CS, const ReasonLoc &Rsn,
                          ConsAction CA, bool DoEqType, ProgramInfo *Info,
                          bool HandleBoundsKey = true);
 
@@ -252,8 +247,7 @@ public:
   //       This causes problems if the variable is later used as a deeper
   //       pointer type. See correctcomputation/checkedc-clang#673.
   static PointerVariableConstraint *
-  getWildPVConstraint(Constraints &CS, const std::string &Rsn,
-                      PersistentSourceLoc *PSL = nullptr);
+  getWildPVConstraint(Constraints &CS, const ReasonLoc &Rsn);
 
   // Get constraint variables representing values that are not pointers. If a
   // meaningful name can be assigned to the value, the second method should be
@@ -495,13 +489,11 @@ public:
   void dump() const override { print(llvm::errs()); }
   void dumpJson(llvm::raw_ostream &O) const override;
 
-  void constrainToWild(Constraints &CS, const std::string &Rsn) const override;
-  void constrainToWild(Constraints &CS, const std::string &Rsn,
-                       PersistentSourceLoc *PL) const override;
-  void constrainOuterTo(Constraints &CS, ConstAtom *C, const std::string &Rsn,
+  void constrainToWild(Constraints &CS, const ReasonLoc &Rsn) const override;
+  void constrainOuterTo(Constraints &CS, ConstAtom *C, const ReasonLoc &Rsn,
                         bool DoLB = false, bool Soft = false);
   void constrainIdxTo(Constraints &CS, ConstAtom *C, unsigned int Idx,
-                      const std::string &Rsn,
+                      const ReasonLoc &Rsn,
                       bool DoLB = false, bool Soft = false);
   bool anyChanges(const EnvironmentMap &E) const override;
   bool anyArgumentIsWild(const EnvironmentMap &E);
@@ -509,11 +501,12 @@ public:
   bool hasArr(const EnvironmentMap &E, int AIdx = -1) const override;
   bool hasNtArr(const EnvironmentMap &E, int AIdx = -1) const override;
 
-  void equateArgumentConstraints(ProgramInfo &I) override;
+  void equateArgumentConstraints(ProgramInfo &I, ReasonLoc &Rsn) override;
 
   bool isPartOfFunctionPrototype() const { return PartOfFuncPrototype; }
   // Add the provided constraint variable as an argument constraint.
-  bool addArgumentConstraint(ConstraintVariable *DstCons, ProgramInfo &Info);
+  bool addArgumentConstraint(ConstraintVariable *DstCons,
+                             ReasonLoc &Rsn, ProgramInfo &Info);
   // Get the set of constraint variables corresponding to the arguments.
   const std::set<ConstraintVariable *> &getArgumentConstraints() const;
 
@@ -526,8 +519,8 @@ public:
 
   ~PointerVariableConstraint() override{};
 
-  void equateWithItype(ProgramInfo &CS, const std::string &ReasonUnchangeable,
-                       PersistentSourceLoc *PSL) override;
+  void equateWithItype(ProgramInfo &CS,
+                       const ReasonLoc &ReasonUnchangeable) override;
 };
 
 typedef PointerVariableConstraint PVConstraint;
@@ -585,8 +578,8 @@ public:
     InternalConstraint->setGenericIndex(idx);
   }
 
-  void equateWithItype(ProgramInfo &CS, const std::string &ReasonUnchangeable,
-                       PersistentSourceLoc *PSL) const;
+  void equateWithItype(ProgramInfo &CS,
+                       const ReasonLoc &ReasonUnchangeable) const;
 
   bool solutionEqualTo(Constraints &CS, const FVComponentVariable *CV,
                        bool ComparePtyp) const;
@@ -616,7 +609,8 @@ private:
   // Count of type parameters (originally from `_Itype_for_any(...)`).
   int TypeParams;
 
-  void equateFVConstraintVars(ConstraintVariable *CV, ProgramInfo &Info) const;
+  void equateFVConstraintVars(ConstraintVariable *CV, ProgramInfo &Info,
+                              ReasonLoc &Rsn) const;
 
 public:
   FunctionVariableConstraint(clang::DeclaratorDecl *D, ProgramInfo &I,
@@ -698,15 +692,13 @@ public:
   void dump() const override { print(llvm::errs()); }
   void dumpJson(llvm::raw_ostream &O) const override;
 
-  void constrainToWild(Constraints &CS, const std::string &Rsn) const override;
-  void constrainToWild(Constraints &CS, const std::string &Rsn,
-                       PersistentSourceLoc *PL) const override;
+  void constrainToWild(Constraints &CS, const ReasonLoc &Rsn) const override;
   bool anyChanges(const EnvironmentMap &E) const override;
   bool hasWild(const EnvironmentMap &E, int AIdx = -1) const override;
   bool hasArr(const EnvironmentMap &E, int AIdx = -1) const override;
   bool hasNtArr(const EnvironmentMap &E, int AIdx = -1) const override;
 
-  void equateArgumentConstraints(ProgramInfo &P) override;
+  void equateArgumentConstraints(ProgramInfo &P, ReasonLoc &Rsn) override;
 
   FunctionVariableConstraint *getCopy(Constraints &CS) override;
 
@@ -714,8 +706,8 @@ public:
   bool isSolutionChecked(const EnvironmentMap &E) const override;
   bool isSolutionFullyChecked(const EnvironmentMap &E) const override;
 
-  void equateWithItype(ProgramInfo &CS, const std::string &ReasonUnchangeable,
-                       PersistentSourceLoc *PSL) override;
+  void equateWithItype(ProgramInfo &CS,
+                       const ReasonLoc &ReasonUnchangeable) override;
 
   ~FunctionVariableConstraint() override {}
 };

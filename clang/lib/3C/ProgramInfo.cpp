@@ -381,6 +381,9 @@ bool ProgramInfo::link() {
   if (_3COpts.Verbose)
     llvm::errs() << "Linking!\n";
 
+  auto Rsn = ReasonLoc("Linking global variables",
+                       PersistentSourceLoc());
+
   // Equate the constraints for all global variables.
   // This is needed for variables that are defined as extern.
   for (const auto &V : GlobalVariableSymbols) {
@@ -393,7 +396,7 @@ bool ProgramInfo::link() {
       if (_3COpts.Verbose)
         llvm::errs() << "Global variables:" << V.first << "\n";
       while (J != C.end()) {
-        constrainConsVarGeq(*I, *J, CS, nullptr, Same_to_Same, true, this);
+        constrainConsVarGeq(*I, *J, CS, Rsn, Same_to_Same, true, this);
         ++I;
         ++J;
       }
@@ -405,12 +408,13 @@ bool ProgramInfo::link() {
     // constrain everything about it
     if (!V.second) {
       std::string VarName = V.first;
-      std::string Rsn =
-          "External global variable " + VarName + " has no definition";
+      auto WildReason = ReasonLoc(
+          "External global variable " + VarName + " has no definition",
+          Rsn.Location);
       const std::set<PVConstraint *> &C = GlobalVariableSymbols[VarName];
       for (const auto &Var : C) {
         // TODO: Is there an easy way to get a PSL to attach to the constraint?
-        Var->constrainToWild(CS, Rsn);
+        Var->constrainToWild(CS, WildReason);
       }
     }
   }
@@ -424,7 +428,7 @@ bool ProgramInfo::link() {
     // If there was a checked type on a variable in the input program, it
     // should stay that way. Otherwise, we shouldn't be adding a checked type
     // to an extern function.
-    std::string Rsn = (G->hasBody() ? ""
+    std::string Rsn = (G->hasBody() ? DEFAULT_REASON
                                     : "Unchecked pointer in parameter or "
                                       "return of external function " +
                                           FuncName);
@@ -433,7 +437,8 @@ bool ProgramInfo::link() {
     // unchecked type.
     // TODO: Ditto re getting a PSL (in the case in which Rsn is non-empty and
     // it is actually used).
-    G->equateWithItype(*this, Rsn, nullptr);
+    auto Reason = ReasonLoc(Rsn,PersistentSourceLoc());
+    G->equateWithItype(*this, Reason);
 
     // If we've seen this symbol, but never seen a body for it, constrain
     // everything about it.
@@ -441,17 +446,17 @@ bool ProgramInfo::link() {
     // malloc and free. Check those here and skip if we find them.
     if (!G->hasBody()) {
       const FVComponentVariable *Ret = G->getCombineReturn();
-      Ret->getInternal()->constrainToWild(CS, Rsn);
+      Ret->getInternal()->constrainToWild(CS, Reason);
       if (!Ret->getExternal()->srcHasItype() &&
           !Ret->getExternal()->isGeneric())
-        Ret->getExternal()->constrainToWild(CS, Rsn);
+        Ret->getExternal()->constrainToWild(CS, Reason);
 
       for (unsigned I = 0; I < G->numParams(); I++) {
         const FVComponentVariable *Param = G->getCombineParam(I);
-        Param->getInternal()->constrainToWild(CS, Rsn);
+        Param->getInternal()->constrainToWild(CS, Reason);
         if (!Param->getExternal()->srcHasItype() &&
             !Param->getExternal()->isGeneric())
-          Param->getExternal()->constrainToWild(CS, Rsn);
+          Param->getExternal()->constrainToWild(CS, Reason);
       }
     }
   }
@@ -469,21 +474,22 @@ bool ProgramInfo::link() {
       std::string FuncName = V.first;
       FVConstraint *G = V.second;
 
-      std::string Rsn = (G->hasBody() ? ""
+      std::string Rsn = (G->hasBody() ? DEFAULT_REASON
                                       : "Unchecked pointer in parameter or "
                                         "return of static function " +
                                             FuncName + " in " + FileName);
 
       // TODO: Ditto re getting a PSL
-      G->equateWithItype(*this, Rsn, nullptr);
+      auto Reason = ReasonLoc(Rsn,PersistentSourceLoc());
+      G->equateWithItype(*this, Reason);
 
       if (!G->hasBody()) {
 
         if (!G->getExternalReturn()->isGeneric())
-          G->getExternalReturn()->constrainToWild(CS, Rsn);
+          G->getExternalReturn()->constrainToWild(CS, Reason);
         for (unsigned I = 0; I < G->numParams(); I++)
           if (!G->getExternalParam(I)->isGeneric())
-            G->getExternalParam(I)->constrainToWild(CS, Rsn);
+            G->getExternalParam(I)->constrainToWild(CS, Reason);
       }
     }
   }
@@ -602,7 +608,7 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       // anyways. This happens if the name of the variable is a macro defined
       // differently is different parts of the program.
       std::string Rsn = "Duplicate source location. Possibly part of a macro.";
-      Variables[PLoc]->constrainToWild(CS, Rsn, &PLoc);
+      Variables[PLoc]->constrainToWild(CS, ReasonLoc(Rsn, PLoc));
     }
     return;
   }
@@ -645,20 +651,22 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
     auto RetTy = FD->getReturnType();
     unifyIfTypedef(RetTy, *AstContext, F->getExternalReturn(), Wild_to_Safe);
     unifyIfTypedef(RetTy, *AstContext, F->getInternalReturn(), Safe_to_Wild);
-    ensureNtCorrect(RetTy, *AstContext, F->getExternalReturn());
-    ensureNtCorrect(RetTy, *AstContext, F->getInternalReturn());
+    auto PSL = PersistentSourceLoc::mkPSL(FD,*AstContext);
+    ensureNtCorrect(RetTy, PSL, F->getExternalReturn());
+    ensureNtCorrect(RetTy, PSL, F->getInternalReturn());
 
     // Add mappings from the parameters PLoc to the constraint variables for
     // the parameters.
     for (unsigned I = 0; I < FD->getNumParams(); I++) {
       ParmVarDecl *PVD = FD->getParamDecl(I);
+      auto ParamPSL = PersistentSourceLoc::mkPSL(PVD,*AstContext);
       QualType ParamTy = PVD->getType();
       PVConstraint *PVInternal = F->getInternalParam(I);
       PVConstraint *PVExternal = F->getExternalParam(I);
       unifyIfTypedef(ParamTy, *AstContext, PVExternal, Wild_to_Safe);
       unifyIfTypedef(ParamTy, *AstContext, PVInternal, Safe_to_Wild);
-      ensureNtCorrect(ParamTy, *AstContext, PVInternal);
-      ensureNtCorrect(ParamTy, *AstContext, PVExternal);
+      ensureNtCorrect(ParamTy, ParamPSL, PVInternal);
+      ensureNtCorrect(ParamTy, ParamPSL, PVExternal);
       PVInternal->setValidDecl();
       PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(PVD, *AstContext);
       // Constraint variable is stored on the parent function, so we need to
@@ -667,9 +675,9 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       // If this is "main", constrain its argv parameter to a nested arr
       if (_3COpts.AllTypes && FuncName == "main" && FD->isGlobal() && I == 1) {
         PVInternal->constrainOuterTo(CS, CS.getArr(),
-                                     std::string(SPECIAL_REASON) +"main");
+                                     ReasonLoc(SPECIAL_REASON("main"), PSL));
         PVInternal->constrainIdxTo(CS, CS.getNTArr(), 1,
-                                   std::string(SPECIAL_REASON) +"main");
+                                   ReasonLoc(SPECIAL_REASON("main"), PSL));
       }
       // It is possible to have a param decl in a macro when the function is
       // not.
@@ -687,7 +695,8 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       NewCV = P;
       std::string VarName(VD->getName());
       unifyIfTypedef(QT, *AstContext, P);
-      ensureNtCorrect(VD->getType(), *AstContext, P);
+      auto PSL = PersistentSourceLoc::mkPSL(VD, *AstContext);
+      ensureNtCorrect(VD->getType(), PSL, P);
       if (VD->hasGlobalStorage()) {
         // If we see a definition for this global variable, indicate so in
         // ExternGVars.
@@ -716,17 +725,20 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
 
   assert("We shouldn't be adding a null CV to Variables map." && NewCV);
   if (!canWrite(PLoc.getFileName())) {
-    NewCV->equateWithItype(*this, UNWRITABLE_REASON, &PLoc);
-    NewCV->constrainToWild(CS, UNWRITABLE_REASON, &PLoc);
+    auto Rsn = ReasonLoc(UNWRITABLE_REASON, PLoc);
+    NewCV->equateWithItype(*this, Rsn);
+    NewCV->constrainToWild(CS, Rsn);
   }
   constrainWildIfMacro(NewCV, D->getLocation());
   Variables[PLoc] = NewCV;
 }
 
-void ProgramInfo::ensureNtCorrect(const QualType &QT, const ASTContext &C,
+void ProgramInfo::ensureNtCorrect(const QualType &QT,
+                                  const PersistentSourceLoc &PSL,
                                   PointerVariableConstraint *PV) {
   if (_3COpts.AllTypes && !canBeNtArray(QT)) {
-    PV->constrainOuterTo(CS, CS.getArr(), ARRAY_REASON, true, true);
+    PV->constrainOuterTo(CS, CS.getArr(),
+                         ReasonLoc(ARRAY_REASON, PSL), true, true);
   }
 }
 
@@ -736,10 +748,11 @@ void ProgramInfo::unifyIfTypedef(const QualType &QT, ASTContext &Context,
     auto *TDecl = TDT->getDecl();
     auto PSL = PersistentSourceLoc::mkPSL(TDecl, Context);
     auto O = lookupTypedef(PSL);
+    auto Rsn = ReasonLoc("typedef",PSL);
     if (O.hasValue()) {
       auto *Bounds = &O.getValue();
       P->setTypedef(Bounds, TDecl->getNameAsString());
-      constrainConsVarGeq(P, Bounds, CS, &PSL, CA, false, this);
+      constrainConsVarGeq(P, Bounds, CS, Rsn, CA, false, this);
     }
   }
 }
@@ -788,7 +801,7 @@ void ProgramInfo::storePersistentConstraints(Expr *E, const CSetBkeyPair &Vars,
   auto PSL = PersistentSourceLoc::mkPSL(E, *C);
   if (PSL.valid() && !canWrite(PSL.getFileName()))
     for (ConstraintVariable *CVar : Vars.first)
-      CVar->constrainToWild(CS, UNWRITABLE_REASON, &PSL);
+      CVar->constrainToWild(CS, ReasonLoc(UNWRITABLE_REASON, PSL));
 
   IDAndTranslationUnit Key = getExprKey(E, C);
   ExprConstraintVars[Key] = Vars;
@@ -823,7 +836,7 @@ void ProgramInfo::constrainWildIfMacro(ConstraintVariable *CV,
                                        PersistentSourceLoc *PSL) {
   std::string Rsn = "Pointer in Macro declaration.";
   if (!Rewriter::isRewritable(Location))
-    CV->constrainToWild(CS, Rsn, PSL);
+    CV->constrainToWild(CS, ReasonLoc(Rsn, *PSL));
 }
 
 //std::string ProgramInfo::getUniqueDeclKey(Decl *D, ASTContext *C) {
@@ -1049,7 +1062,7 @@ bool ProgramInfo::computeInterimConstraintState(
         PersistentSourceLoc APSL = CState.AtomSourceMap[VLhs->getLoc()];
         if (!PSL.valid() && APSL.valid())
           PSL = APSL;
-        Feedback Info(EC->getReason(), PSL);
+        Feedback Info(EC->getReasonText(), PSL);
         for (auto Reason : CurrC->additionalReasons()) {
           PersistentSourceLoc P = Reason.Location;
           if (!P.valid() && APSL.valid())
@@ -1180,10 +1193,12 @@ void ProgramInfo::addTypedef(PersistentSourceLoc PSL, bool CanRewriteDef,
     V = new PointerVariableConstraint(TD, *this, C);
 
   if (!CanRewriteDef)
-    V->constrainToWild(this->getConstraints(), "Unable to rewrite a typedef with multiple names", &PSL);
+    V->constrainToWild(this->getConstraints(),
+                       ReasonLoc("Unable to rewrite a typedef with multiple names", PSL));
 
   if (!canWrite(PSL.getFileName()))
-    V->constrainToWild(this->getConstraints(), UNWRITABLE_REASON, &PSL);
+    V->constrainToWild(this->getConstraints(),
+                       ReasonLoc(UNWRITABLE_REASON, PSL));
 
   constrainWildIfMacro(V, TD->getLocation(), &PSL);
   this->TypedefVars[PSL] = {*V};

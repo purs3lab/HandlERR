@@ -36,12 +36,15 @@ class ConstraintsGraph;
 #define VOID_TYPE_REASON "Default void* type"
 #define UNWRITABLE_REASON "Source code in non-writable file."
 #define INNER_POINTER_REASON "Pointer is within an outer pointer"
+#define ALLOCATOR_REASON "Return type from an allocator"
 #define ARRAY_REASON "Lowerbounded to an array type"
-// std::string(SPECIAL_REASON) + name
-#define SPECIAL_REASON "Special case for "
+#define NT_ARRAY_REASON "Lowerbounded to an nt_array type"
+// SPECIAL_REASON("name_of_func")
+#define SPECIAL_REASON(spec) (std::string("Special case for ") + (spec))
 #define COPY_REASON "Identical Copy"
 #define LINK_REASON "Function Internal/External Link"
 #define REFERENCE_REASON "Use of & operator"
+#define STRING_LITERAL_REASON "The type of a string literal"
 
 template <typename T> struct PComp {
   bool operator()(const T Lhs, const T Rhs) const { return *Lhs < *Rhs; }
@@ -268,6 +271,17 @@ public:
   }
 };
 
+// Helper struct requiring locations for every reason, that is,
+// Constraints need reasons and locations to provide good user feedback
+struct ReasonLoc {
+  ReasonLoc() : Reason(DEFAULT_REASON), Location(PersistentSourceLoc()) {}
+  ReasonLoc(std::string Reason, PersistentSourceLoc Loc)
+      : Reason(Reason), Location(Loc) {}
+  bool isDefault() const { return Reason == DEFAULT_REASON; }
+  std::string Reason;
+  PersistentSourceLoc Location;
+};
+
 // Represents constraints of the form:
 //  - a >= b
 class Constraint {
@@ -276,18 +290,12 @@ public:
 
 private:
   const ConstraintKind Kind;
-  PersistentSourceLoc PL;
-
-public:
-  struct ReasonLoc {std::string Reason;PersistentSourceLoc Location;};
-  std::string REASON = DEFAULT_REASON;
+  ReasonLoc Reason;
   std::vector<ReasonLoc> ExtraReasons;
 
+public:
   Constraint(ConstraintKind K) : Kind(K) {}
-  Constraint(ConstraintKind K, const std::string &Rsn) : Kind(K) {
-    REASON = Rsn;
-  }
-  Constraint(ConstraintKind K, const std::string &Rsn, PersistentSourceLoc *PL);
+  Constraint(ConstraintKind K, const ReasonLoc &Rsn) : Kind(K), Reason(Rsn) {}
 
   virtual ~Constraint() {}
 
@@ -299,21 +307,20 @@ public:
   virtual bool operator==(const Constraint &Other) const = 0;
   virtual bool operator!=(const Constraint &Other) const = 0;
   virtual bool operator<(const Constraint &Other) const = 0;
-  virtual std::string getReason() const { return REASON; }
-  virtual void setReason(const std::string &Rsn) { REASON = Rsn; }
+  virtual std::string getReasonText() const { return Reason.Reason; }
+  virtual const ReasonLoc &getReason() const { return Reason; }
+  virtual void setReason(const ReasonLoc &Rsn) { Reason = Rsn; }
   virtual std::vector<ReasonLoc> &additionalReasons() { return ExtraReasons; }
-  virtual void addReason(const std::string &Rsn, PersistentSourceLoc PSL) {
-    ReasonLoc RL;
-    RL.Reason = Rsn;
-    RL.Location = PSL;
-    ExtraReasons.push_back(RL);
+  // include additional reasons that will appear in output as notes
+  virtual void addReason(const ReasonLoc &Rsn) {
+    ExtraReasons.push_back(Rsn);
   }
 
   bool isUnwritable(void) const {
-    return getReason() == UNWRITABLE_REASON;
+    return getReasonText() == UNWRITABLE_REASON;
   }
 
-  const PersistentSourceLoc &getLocation() const { return PL; }
+  const PersistentSourceLoc &getLocation() const { return Reason.Location; }
 };
 
 // a >= b
@@ -321,15 +328,10 @@ class Geq : public Constraint {
   friend class VarAtom;
 
 public:
-  Geq(Atom *Lhs, Atom *Rhs, const std::string &Rsn, bool IsCC = true,
+  Geq(Atom *Lhs, Atom *Rhs, const ReasonLoc &Rsn, bool IsCC = true,
       bool Soft = false)
       : Constraint(C_Geq, Rsn), Lhs(Lhs), Rhs(Rhs), IsCheckedConstraint(IsCC),
         IsSoft(Soft) {}
-
-  Geq(Atom *Lhs, Atom *Rhs, const std::string &Rsn, PersistentSourceLoc *PL,
-      bool IsCC = true, bool Soft = false)
-      : Constraint(C_Geq, Rsn, PL), Lhs(Lhs), Rhs(Rhs),
-        IsCheckedConstraint(IsCC), IsSoft(Soft) {}
 
   static bool classof(const Constraint *C) { return C->getKind() == C_Geq; }
 
@@ -338,7 +340,7 @@ public:
     std::string Kind = IsCheckedConstraint ? " (C)>= " : " (P)>= ";
     O << Kind;
     Rhs->print(O);
-    O << ", Reason:" << REASON;
+    O << ", Reason: " << getReasonText();
   }
 
   void dump(void) const override { print(llvm::errs()); }
@@ -351,7 +353,7 @@ public:
     O << ", \"isChecked\":";
     O << (IsCheckedConstraint ? "true" : "false");
     O << ", \"Reason\":";
-    llvm::json::Value ReasonVal(REASON);
+    llvm::json::Value ReasonVal(getReasonText());
     O << ReasonVal;
     O << "}}";
   }
@@ -481,14 +483,11 @@ public:
   void print(llvm::raw_ostream &) const;
   void dumpJson(llvm::raw_ostream &) const;
 
-  Geq *createGeq(Atom *Lhs, Atom *Rhs, const std::string &Rsn,
+  Geq *createGeq(Atom *Lhs, Atom *Rhs, ReasonLoc Rsn,
                  bool IsCheckedConstraint = true, bool Soft = false);
-  Geq *createGeq(Atom *Lhs, Atom *Rhs, const std::string &Rsn,
-                 PersistentSourceLoc *PL, bool IsCheckedConstraint = true);
 
   VarAtom *createFreshGEQ(std::string Name, VarAtom::VarKind VK, ConstAtom *Con,
-                          std::string Rsn = DEFAULT_REASON,
-                          PersistentSourceLoc *PSL = nullptr);
+                          ReasonLoc Rsn = ReasonLoc());
 
   VarAtom *getFreshVar(std::string Name, VarAtom::VarKind VK);
   VarAtom *getOrCreateVar(ConstraintKey V, std::string Name,

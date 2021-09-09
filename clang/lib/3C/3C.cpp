@@ -668,7 +668,8 @@ bool _3CInterface::makeSinglePtrNonWild(ConstraintKey TargetPtr) {
 
   // Delete the constraint that make the provided targetPtr WILD.
   VarAtom *VA = CS.getOrCreateVar(TargetPtr, "q", VarAtom::V_Other);
-  Geq NewE(VA, CS.getWild(), INTERNAL_USE_REASON);
+  Geq NewE(VA, CS.getWild(), ReasonLoc(INTERNAL_USE_REASON,
+                                       PersistentSourceLoc()));
   Constraint *OriginalConstraint = *CS.getConstraints().find(&NewE);
   CS.removeConstraint(OriginalConstraint);
   VA->getAllConstraints().erase(OriginalConstraint);
@@ -698,7 +699,7 @@ bool _3CInterface::makeSinglePtrNonWild(ConstraintKey TargetPtr) {
 void _3CInterface::invalidateAllConstraintsWithReason(
     Constraint *ConstraintToRemove) {
   // Get the reason for the current constraint.
-  std::string ConstraintRsn = ConstraintToRemove->getReason();
+  std::string ConstraintRsn = ConstraintToRemove->getReasonText();
   Constraints::ConstraintSet ToRemoveConstraints;
   Constraints &CS = GlobalProgramInfo.getConstraints();
   // Remove all constraints that have the reason.
@@ -731,7 +732,7 @@ bool _3CInterface::invalidateWildReasonGlobally(ConstraintKey PtrKey) {
   VarAtom *VA = CS.getOrCreateVar(PtrKey, "q", VarAtom::V_Other);
   // TODO: there was previously no reason here. This code may have relied on
   // lack of reasons elsewhere.
-  Geq NewE(VA, CS.getWild(), DEFAULT_REASON);
+  Geq NewE(VA, CS.getWild(), ReasonLoc());
   Constraint *OriginalConstraint = *CS.getConstraints().find(&NewE);
   invalidateAllConstraintsWithReason(OriginalConstraint);
 

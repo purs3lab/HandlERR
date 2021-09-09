@@ -33,15 +33,6 @@ static cl::opt<bool>
                  cl::desc("Perform only least solution for Pty Constrains."),
                  cl::init(false), cl::cat(SolverCategory));
 
-Constraint::Constraint(ConstraintKind K, const std::string &Rsn,
-                       PersistentSourceLoc *PL)
-    : Constraint(K, Rsn) {
-  if (PL != nullptr && PL->valid())
-    this->PL = *PL;
-  else
-    this->PL = PersistentSourceLoc();
-}
-
 // Remove the constraint from the global constraint set.
 bool Constraints::removeConstraint(Constraint *C) {
   bool RetVal = false;
@@ -77,13 +68,17 @@ void Constraints::editConstraintHook(Constraint *C) {
         if (RHSA) {
           if (!dyn_cast<PtrAtom>(E->getLHS())) {
             E->setChecked(getWild());
-            E->setReason(POINTER_IS_ARRAY_REASON);
+            ReasonLoc Rsn = E->getReason();
+            Rsn.Reason = POINTER_IS_ARRAY_REASON;
+            E->setReason(Rsn);
           }
         } else {
           assert(LHSA && "Adding constraint between constants?!");
           if (!dyn_cast<PtrAtom>(E->getRHS())) {
             E->setChecked(getWild());
-            E->setReason(POINTER_IS_ARRAY_REASON);
+            ReasonLoc Rsn = E->getReason();
+            Rsn.Reason = POINTER_IS_ARRAY_REASON;
+            E->setReason(Rsn);
           }
         }
       }
@@ -140,8 +135,9 @@ bool Constraints::addConstraint(Constraint *C) {
 bool Constraints::addReasonBasedConstraint(Constraint *C) {
   // Only insert if this is an Eq constraint and has a valid reason.
   if (Geq *E = dyn_cast<Geq>(C)) {
-    if (E->getReason() != DEFAULT_REASON && !E->getReason().empty())
-      return this->ConstraintsByReason[E->getReason()].insert(E).second;
+    if (E->getReasonText() != DEFAULT_REASON && !E->getReasonText().empty() &&
+        E->getReason().Location.valid())
+      return this->ConstraintsByReason[E->getReasonText()].insert(E).second;
   }
   return false;
 }
@@ -149,9 +145,9 @@ bool Constraints::addReasonBasedConstraint(Constraint *C) {
 bool Constraints::removeReasonBasedConstraint(Constraint *C) {
   if (Geq *E = dyn_cast<Geq>(C)) {
     // Remove if the constraint is present.
-    if (this->ConstraintsByReason.find(E->getReason()) !=
+    if (this->ConstraintsByReason.find(E->getReasonText()) !=
         this->ConstraintsByReason.end())
-      return this->ConstraintsByReason[E->getReason()].erase(E) > 0;
+      return this->ConstraintsByReason[E->getReasonText()].erase(E) > 0;
   }
   return false;
 }
@@ -441,10 +437,10 @@ bool Constraints::graphBasedSolve() {
       for (auto Conflict : Conflicts) {
         auto ConflictAtom = Conflict->getTargetNode().getData();
         assert(ConflictAtom != nullptr);
-        std::string Rsn1 = Conflict->EdgeConstraint->getReason();
+        ReasonLoc Rsn1 = Conflict->EdgeConstraint->getReason();
         // determine a second reason
         auto Succs = Conflict->getTargetNode().getEdges();
-        std::string Rsn2 = "";
+        ReasonLoc Rsn2;
         for (auto *Succ : Succs) {
           if (auto *SuccGeq = dyn_cast<Geq>(Succ->EdgeConstraint)) {
             if (Env.getAssignment(ConflictAtom) ==
@@ -456,13 +452,11 @@ bool Constraints::graphBasedSolve() {
             }
           }
         }
-        std::string Rsn = "Inferred conflicting types";
-//            Rsn2.empty() ?
-//              Rsn1 + ", which conflicts with another type." :
-//              Rsn1 + ", conflicts with, " + Rsn2;
+        auto Rsn = ReasonLoc("Inferred conflicting types",
+                             PersistentSourceLoc());
         Geq *ConflictConstraint = createGeq(ConflictAtom, getWild(), Rsn);
-        ConflictConstraint->addReason(Rsn1,PersistentSourceLoc());
-        ConflictConstraint->addReason(Rsn2,PersistentSourceLoc());
+        ConflictConstraint->addReason(Rsn1);
+        ConflictConstraint->addReason(Rsn2);
         addConstraint(ConflictConstraint);
         SolChkCG.addConstraint(ConflictConstraint, *this);
         Rest.insert(cast<VarAtom>(ConflictAtom));
@@ -558,10 +552,9 @@ VarAtom *Constraints::getVar(ConstraintKey V) const {
 // should generally be used instead of using constant atoms directly if the the
 // VarAtom will be used in the variables vector of a PVConstraint.
 VarAtom *Constraints::createFreshGEQ(std::string Name, VarAtom::VarKind VK,
-                                     ConstAtom *Con, std::string Rsn,
-                                     PersistentSourceLoc *PSL) {
+                                     ConstAtom *Con, ReasonLoc Rsn) {
   VarAtom *VA = getFreshVar(Name, VK);
-  addConstraint(createGeq(VA, Con, Rsn, PSL));
+  addConstraint(createGeq(VA, Con, Rsn));
   return VA;
 }
 
@@ -586,21 +579,16 @@ ConstraintsGraph &Constraints::getPtrTypCG() {
   return *PtrTypCG;
 }
 
-Geq *Constraints::createGeq(Atom *Lhs, Atom *Rhs, const std::string &Rsn,
+Geq *Constraints::createGeq(Atom *Lhs, Atom *Rhs, ReasonLoc Rsn,
                             bool IsCheckedConstraint, bool Soft) {
-  return new Geq(Lhs, Rhs, Rsn, IsCheckedConstraint, Soft);
-}
-
-Geq *Constraints::createGeq(Atom *Lhs, Atom *Rhs, const std::string &Rsn,
-                            PersistentSourceLoc *PL, bool IsCheckedConstraint) {
-  if (PL != nullptr && PL->valid()) {
+  if (Rsn.Location.valid()) {
     // Make this invalid, if the source location is not absolute path
     // this is to avoid crashes in clangd.
-    if (!llvm::sys::path::is_absolute(PL->getFileName()))
-      PL = nullptr;
+    if (!llvm::sys::path::is_absolute(Rsn.Location.getFileName()))
+      Rsn.Location = PersistentSourceLoc();
   }
   assert("Shouldn't be constraining WILD >= VAR" && Lhs != getWild());
-  return new Geq(Lhs, Rhs, Rsn, PL, IsCheckedConstraint);
+  return new Geq(Lhs, Rhs, Rsn, IsCheckedConstraint, Soft);
 }
 
 void Constraints::resetEnvironment() {
