@@ -59,16 +59,6 @@ FunctionDecl *getDefinition(FunctionDecl *FD) {
   return nullptr;
 }
 
-FunctionDecl *getPrototype(FunctionDecl *FD) {
-  if (FD->hasPrototype())
-    return FD;
-  for (FunctionDecl *Redecl : FD->redecls()) {
-    if (Redecl->hasPrototype())
-      return Redecl;
-  }
-  return nullptr;
-}
-
 //This should only be used as a fall back for when the clang library function
 // FunctionTypeLoc::getRParenLoc cannot be called due to a null FunctionTypeLoc
 // or for when the function returns an invalid source location.

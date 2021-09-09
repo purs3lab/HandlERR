@@ -35,7 +35,6 @@ using namespace clang;
 void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
                                   std::string &Type, std::string &IType,
                                   ProgramInfo &Info, ArrayBoundsRewriter &ABR) {
-  assert(Decl != nullptr);
   const EnvironmentMap &Env = Info.getConstraints().getVariables();
   // True when the type of this variable is defined by a typedef, and the
   // constraint variable representing the typedef solved to an unchecked type.
@@ -55,41 +54,28 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
   // unchecked portion of the itype. The typedef is used directly in the checked
   // portion of the itype.
   bool IsCheckedTypedef = Defn->isTypedef() && !IsUncheckedTypedef;
-  if (IsCheckedTypedef || Defn->getFV()) { //|| Defn->hasSomeSizedArr()) {
+  if (IsCheckedTypedef || Defn->getFV()) {
     // Generate the type string from PVC if we need to unmask a typedef, this is
     // a function pointer, or this is a constant size array. When unmasking a
     // typedef, the expansion of the typedef does not exist in the original
     // source, so it must be constructed. For function pointers, a function
     // pointer appearing in the unchecked portion of an itype must contain an
     // extra set of parenthesis (e.g. `void ((*f)())` instead of `void (f*)()`)
-    // for the declaration to parse correctly. For function pointers as well as
-    // constant size arrays, part of the type appears after the identifier
-    // (the parameter list and length respectively). This breaks the assumption
-    // in the next case that the declaration is type + identifier + itype.
+    // for the declaration to parse correctly.
     Type = Defn->mkString(Info.getConstraints(),
                           MKSTRING_OPTS(UnmaskTypedef = IsCheckedTypedef,
                                         ForItypeBase = true));
   } else {
     // In the remaining cases, the unchecked portion of the itype is just the
-    // original type of the pointer.
-    // TODO: We could extract the original declaration string from the source
-    //       code instead of using the string stored in the constraint variable.
-    //       This would help preserve macros and potentially make this less
-    //       susceptible to other rewriting errors.
-    // Type = Defn->getRewritableOriginalTy();
-
-    std::string Name;
-    if (isa<ParmVarDecl>(Decl) && !Decl->getName().empty())
-      Name = Decl->getNameAsString();
-    else if (Defn->getName() != RETVAR)
-      Name = Defn->getName();
-
-    QualType T;
-    if (auto *FD = dyn_cast<FunctionDecl>(Decl))
-      T = FD->getReturnType();
+    // original type of the pointer. The first branch tries to generate the type
+    // using the type and name for this specific declaration. This is important
+    // because it avoids changing parameter names, particularly in cases where
+    // multiple functions sharing the same name are defined in different
+    // translation units.
+    if (isa_and_nonnull<ParmVarDecl>(Decl) && !Decl->getName().empty())
+      Type = qtyToStr(Decl->getType(), Decl->getNameAsString());
     else
-      T = Decl->getType();
-    Type = qtyToStr(T, Name);
+      Type = Defn->getOriginalDecl();
 
     if (Defn->getName() == RETVAR && IsUncheckedTypedef) {
       // This adds a space between the type and function name for function
@@ -644,11 +630,8 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
     }
   } else if (FDConstraint->numParams() != 0) {
     // lacking params but the constraint has them: mirror the constraint
-    FunctionDecl *Proto = getPrototype(FD);
-    assert("Unable to find prototype for function constraint with parameters" &&
-           Proto && Proto->getNumParams() == FDConstraint->numParams());
     for (unsigned I = 0; I < FDConstraint->numParams(); ++I) {
-      ParmVarDecl *PVDecl = Proto->getParamDecl(I);
+      ParmVarDecl *PVDecl = nullptr;
       const FVComponentVariable *CV = FDConstraint->getCombineParam(I);
       std::string Type, IType;
       this->buildDeclVar(CV, PVDecl, Type, IType, "", RewriteGeneric,

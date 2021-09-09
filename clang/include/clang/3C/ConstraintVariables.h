@@ -52,6 +52,9 @@ struct MkStringOpts {
 };
 #define MKSTRING_OPTS(...) PACK_OPTS(MkStringOpts, __VA_ARGS__)
 
+// Name for function return, for debugging
+#define RETVAR "$ret"
+
 // Base class for ConstraintVariables. A ConstraintVariable can either be a
 // PointerVariableConstraint or a FunctionVariableConstraint. The difference
 // is that FunctionVariableConstraints have constraints on the return value
@@ -69,6 +72,7 @@ protected:
   std::string OriginalType;
   // Underlying name of the C variable this ConstraintVariable represents.
   std::string Name;
+  std::string OriginalDecl;
   // Set of constraint variables that have been constrained due to a
   // bounds-safe interface (itype). They are remembered as being constrained
   // so that later on we do not introduce a spurious constraint
@@ -85,9 +89,15 @@ protected:
   bool IsForDecl;
 
   // Only subclasses should call this
-  ConstraintVariable(ConstraintVariableKind K, std::string T, std::string N)
-      : Kind(K), OriginalType(T), Name(N), HasEqArgumentConstraints(false),
-        ValidBoundsKey(false), IsForDecl(false) {}
+  ConstraintVariable(ConstraintVariableKind K, std::string T, std::string N,
+                     std::string D)
+    : Kind(K), OriginalType(T), Name(N), OriginalDecl(D),
+      HasEqArgumentConstraints(false), ValidBoundsKey(false),
+      IsForDecl(false) {}
+
+  ConstraintVariable(ConstraintVariableKind K, QualType QT, std::string N)
+    : ConstraintVariable(K, qtyToStr(QT), N,
+                         qtyToStr(QT, N == RETVAR ? "" : N)) {}
 
 public:
   // Create a "for-rewriting" representation of this ConstraintVariable.
@@ -166,6 +176,7 @@ public:
   // Get the original type string that can be directly
   // used for rewriting.
   std::string getRewritableOriginalTy() const;
+  std::string getOriginalDecl() const;
   std::string getName() const { return Name; }
 
   void setValidDecl() { IsForDecl = true; }
@@ -378,7 +389,7 @@ private:
   // other fields are initialized to default values. This is used to construct
   // variables for non-pointer expressions.
   PointerVariableConstraint(std::string Name) :
-    ConstraintVariable(PointerVariable, "", Name), FV(nullptr),
+    ConstraintVariable(PointerVariable, "", Name, ""), FV(nullptr),
     SrcHasItype(false), PartOfFuncPrototype(false), Parent(nullptr),
     SourceGenericIndex(-1), InferredGenericIndex(-1),
     IsZeroWidthArray(false), IsTypedef(false),
@@ -530,8 +541,6 @@ public:
 };
 
 typedef PointerVariableConstraint PVConstraint;
-// Name for function return, for debugging
-#define RETVAR "$ret"
 
 // This class contains a pair of PVConstraints that represent an internal and
 // external view of a variable for use as the parameter and return constraints
@@ -622,9 +631,10 @@ public:
                              const clang::ASTContext &C);
   FunctionVariableConstraint(clang::TypedefDecl *D, ProgramInfo &I,
                              const clang::ASTContext &C);
-  FunctionVariableConstraint(const clang::Type *Ty, clang::DeclaratorDecl *D,
-                             std::string N, ProgramInfo &I,
-                             const clang::ASTContext &C,
+
+  FunctionVariableConstraint(const clang::QualType Ty,
+                             clang::DeclaratorDecl *D, std::string N,
+                             ProgramInfo &I, const clang::ASTContext &C,
                              TypeSourceInfo *TSI = nullptr);
 
   PVConstraint *getExternalReturn() const {
