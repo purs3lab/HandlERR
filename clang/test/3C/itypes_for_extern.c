@@ -106,6 +106,10 @@ int *const_arr1[10];
 //CHECK_ALL: int *const_arr1[10] : itype(_Ptr<int> _Checked[10]) = {((void *)0)};
 //CHECK_NOALL: int *const_arr1[10];
 
+int (*const_arr2)[10];
+//CHECK_ALL: int (*const_arr2)[10] : itype(_Ptr<int _Checked[10]>) = ((void *)0);
+//CHECK_NOALL: int (*const_arr2)[10] : itype(_Ptr<int[10]>) = ((void *)0);
+
 // Itypes for constants sized arrays when there a declaration with and without
 // a parameter list take slightly different paths that need to be tested. If
 // there is no parameter list, then the unchecked component of the itype can't
