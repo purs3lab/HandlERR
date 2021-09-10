@@ -606,7 +606,7 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
         // function to the function map anyways. The function map indexes by
         // function name, so there's no collision.
         insertNewFVConstraint(FD, F, AstContext);
-        constrainWildIfMacro(F, FD->getLocation());
+        constrainWildIfMacro(F, FD->getLocation(),ReasonLoc(MACRO_REASON, PLoc));
       } else {
         // A function with the same name exists in the same source location.
         // This happens when a function is defined in a header file which is
@@ -646,7 +646,8 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(PVD, *AstContext);
       // Constraint variable is stored on the parent function, so we need to
       // constrain to WILD even if we don't end up storing this in the map.
-      constrainWildIfMacro(PVExternal, PVD->getLocation());
+      constrainWildIfMacro(PVExternal, PVD->getLocation(),
+                           ReasonLoc(MACRO_REASON, PSL));
       // If this is "main", constrain its argv parameter to a nested arr
       if (_3COpts.AllTypes && FuncName == "main" && FD->isGlobal() && I == 1) {
         PVInternal->constrainOuterTo(CS, CS.getArr(),
@@ -704,7 +705,7 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
     NewCV->equateWithItype(*this, Rsn);
     NewCV->constrainToWild(CS, Rsn);
   }
-  constrainWildIfMacro(NewCV, D->getLocation());
+  constrainWildIfMacro(NewCV, D->getLocation(), ReasonLoc(MACRO_REASON, PLoc));
   Variables[PLoc] = NewCV;
 }
 
@@ -808,10 +809,9 @@ void ProgramInfo::removePersistentConstraints(Expr *E, ASTContext *C) {
 // in macros.
 void ProgramInfo::constrainWildIfMacro(ConstraintVariable *CV,
                                        SourceLocation Location,
-                                       PersistentSourceLoc *PSL) {
-  std::string Rsn = "Pointer in Macro declaration.";
+                                       const ReasonLoc &Rsn) {
   if (!Rewriter::isRewritable(Location))
-    CV->constrainToWild(CS, ReasonLoc(Rsn, *PSL));
+    CV->constrainToWild(CS, Rsn);
 }
 
 //std::string ProgramInfo::getUniqueDeclKey(Decl *D, ASTContext *C) {
@@ -1175,7 +1175,7 @@ void ProgramInfo::addTypedef(PersistentSourceLoc PSL, bool CanRewriteDef,
     V->constrainToWild(this->getConstraints(),
                        ReasonLoc(UNWRITABLE_REASON, PSL));
 
-  constrainWildIfMacro(V, TD->getLocation(), &PSL);
+  constrainWildIfMacro(V, TD->getLocation(), ReasonLoc(MACRO_REASON, PSL));
   this->TypedefVars[PSL] = {*V};
 }
 

@@ -21,21 +21,20 @@ ConstraintResolver::~ConstraintResolver() {}
 void ConstraintResolver::constraintAllCVarsToWild(const CVarSet &CSet,
                                                   const std::string &Rsn,
                                                   Expr *AtExpr) {
-  PersistentSourceLoc Psl;
-  PersistentSourceLoc *PslP = nullptr;
+  PersistentSourceLoc PSL;
   if (AtExpr != nullptr) {
-    Psl = PersistentSourceLoc::mkPSL(AtExpr, *Context);
-    PslP = &Psl;
+    PSL = PersistentSourceLoc::mkPSL(AtExpr, *Context);
   }
+  auto Reason = ReasonLoc(Rsn, PSL);
   auto &CS = Info.getConstraints();
 
   for (const auto &A : CSet) {
-    if (PVConstraint *PVC = dyn_cast<PVConstraint>(A))
-      PVC->constrainToWild(CS, ReasonLoc(Rsn, *PslP));
+    if (auto *PVC = dyn_cast<PVConstraint>(A))
+      PVC->constrainToWild(CS, Reason);
     else {
-      FVConstraint *FVC = dyn_cast<FVConstraint>(A);
+      auto *FVC = dyn_cast<FVConstraint>(A);
       assert(FVC != nullptr);
-      FVC->constrainToWild(CS, ReasonLoc(Rsn, *PslP));
+      FVC->constrainToWild(CS, Reason);
     }
   }
 }
@@ -822,7 +821,7 @@ bool ConstraintResolver::isCastofGeneric(CastExpr *C) {
 PVConstraint *ConstraintResolver::getRewritablePVConstraint(Expr *E) {
   PVConstraint *P = new PVConstraint(E, Info, *Context);
   auto PSL = PersistentSourceLoc::mkPSL(E, *Context);
-  Info.constrainWildIfMacro(P, E->getExprLoc(), &PSL);
+  Info.constrainWildIfMacro(P, E->getExprLoc(), ReasonLoc(MACRO_REASON, PSL));
   return P;
 }
 

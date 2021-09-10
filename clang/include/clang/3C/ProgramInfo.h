@@ -157,7 +157,7 @@ public:
                                                      ASTContext *C) const;
 
   void constrainWildIfMacro(ConstraintVariable *CV, SourceLocation Location,
-                            PersistentSourceLoc *PSL = nullptr);
+                            const ReasonLoc &Rsn);
 
   void ensureNtCorrect(const QualType &QT, const PersistentSourceLoc &PSL,
                        PointerVariableConstraint *PV);

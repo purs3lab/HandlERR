@@ -45,6 +45,7 @@ class ConstraintsGraph;
 #define LINK_REASON "Function Internal/External Link"
 #define REFERENCE_REASON "Use of & operator"
 #define STRING_LITERAL_REASON "The type of a string literal"
+#define MACRO_REASON "Pointer in Macro declaration."
 
 template <typename T> struct PComp {
   bool operator()(const T Lhs, const T Rhs) const { return *Lhs < *Rhs; }
