@@ -24,8 +24,6 @@ class DeclReplacement {
 public:
   virtual Decl *getDecl() const = 0;
 
-  DeclStmt *getStatement() const { return Statement; }
-
   std::string getReplacement() const { return Replacement; }
 
   virtual SourceRange getSourceRange(SourceManager &SM) const;
@@ -41,11 +39,8 @@ public:
   virtual ~DeclReplacement() {}
 
 protected:
-  explicit DeclReplacement(DeclStmt *S, std::string R, DRKind K)
-      : Statement(S), Replacement(R), Kind(K) {}
-
-  // The Stmt, if it exists (may be nullptr).
-  DeclStmt *Statement;
+  explicit DeclReplacement(std::string R, DRKind K)
+      : Replacement(R), Kind(K) {}
 
   // The string to replace the declaration with.
   std::string Replacement;
@@ -57,8 +52,8 @@ private:
 template <typename DeclT, DeclReplacement::DRKind K>
 class DeclReplacementTempl : public DeclReplacement {
 public:
-  explicit DeclReplacementTempl(DeclT *D, DeclStmt *DS, std::string R)
-      : DeclReplacement(DS, R, K), Decl(D) {}
+  explicit DeclReplacementTempl(DeclT *D, std::string R)
+      : DeclReplacement(R, K), Decl(D) {}
 
   DeclT *getDecl() const override { return Decl; }
 
@@ -77,7 +72,7 @@ class FunctionDeclReplacement
 public:
   explicit FunctionDeclReplacement(FunctionDecl *D, std::string R, bool Return,
                                    bool Params, bool Generic = false)
-      : DeclReplacementTempl(D, nullptr, R), RewriteGeneric(Generic),
+      : DeclReplacementTempl(D, R), RewriteGeneric(Generic),
         RewriteReturn(Return), RewriteParams(Params) {
     assert("Doesn't make sense to rewrite nothing!" &&
            (RewriteGeneric || RewriteReturn || RewriteParams));

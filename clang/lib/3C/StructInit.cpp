@@ -62,7 +62,7 @@ void StructVariableInitializer::insertVarDecl(VarDecl *VD, DeclStmt *S) {
     std::string ToReplace =
         mkStringForDeclWithUnchangedType(VD, *Context, I) + " = {}";
     RewriteThese.insert(
-        std::make_pair(VD, new MultiDeclMemberReplacement(VD, S, ToReplace)));
+        std::make_pair(VD, new MultiDeclMemberReplacement(VD, ToReplace)));
   }
 }
 

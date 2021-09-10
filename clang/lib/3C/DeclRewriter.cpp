@@ -133,7 +133,7 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
                 Var.mkString(Info.getConstraints(),
                              MKSTRING_OPTS(UnmaskTypedef = true));
             RewriteThese.insert(std::make_pair(
-                TD, new MultiDeclMemberReplacement(TD, nullptr, NewTy)));
+                TD, new MultiDeclMemberReplacement(TD, NewTy)));
           }
         }
       }
@@ -151,8 +151,7 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
     MV.TraverseDecl(D);
   }
   SourceToDeclMapType PSLMap;
-  VariableDecltoStmtMap VDLToStmtMap;
-  std::tie(PSLMap, VDLToStmtMap) = MV.getResults();
+  PSLMap = MV.getResults();
 
   // Add declarations from this map into the rewriting set
   for (const auto &V : Info.getVarMap()) {
@@ -175,9 +174,6 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
         assert(!isa<ParmVarDecl>(D) &&
                "Got a PVConstraint for a ParmVarDecl where "
                "isPartOfFunctionPrototype returns false?");
-        DeclStmt *DS = nullptr;
-        if (VDLToStmtMap.find(D) != VDLToStmtMap.end())
-          DS = VDLToStmtMap[D];
 
         std::string NewTy = getStorageQualifierString(D);
         bool IsExternGlobalVar =
@@ -203,7 +199,7 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
                    ABRewriter.getBoundsString(PV, D);
         }
         if (MultiDeclMemberDecl *MMD = getAsMultiDeclMember(D))
-          RewriteThese.insert(std::make_pair(MMD, new MultiDeclMemberReplacement(MMD, DS, NewTy)));
+          RewriteThese.insert(std::make_pair(MMD, new MultiDeclMemberReplacement(MMD, NewTy)));
         else
           llvm_unreachable("Unrecognized declaration type.");
       }

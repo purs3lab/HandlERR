@@ -43,15 +43,6 @@ bool MappingVisitor::VisitDeclStmt(DeclStmt *S) {
       if (So == nullptr)
         PSLtoSDT[PSL] = StmtDecl(S, D);
     }
-
-    if (DeclStmt *DL = dyn_cast<DeclStmt>(S)) {
-      if (DL->isSingleDecl()) {
-        if (VarDecl *VD = dyn_cast<VarDecl>(DL->getSingleDecl()))
-          DeclToDeclStmt[VD] = DL;
-      } else
-        for (auto *I : DL->decls())
-          DeclToDeclStmt[I] = DL;
-    }
   }
 
   return true;

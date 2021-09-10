@@ -23,8 +23,6 @@
 
 typedef std::tuple<clang::Stmt *, clang::Decl *> StmtDecl;
 typedef std::map<PersistentSourceLoc, StmtDecl> SourceToDeclMapType;
-typedef std::pair<SourceToDeclMapType, VariableDecltoStmtMap>
-    MappingResultsType;
 
 class MappingVisitor : public clang::RecursiveASTVisitor<MappingVisitor> {
 public:
@@ -35,9 +33,8 @@ public:
 
   bool VisitDecl(clang::Decl *D);
 
-  MappingResultsType getResults() {
-    return std::pair<std::map<PersistentSourceLoc, StmtDecl>,
-                     VariableDecltoStmtMap>(PSLtoSDT, DeclToDeclStmt);
+  SourceToDeclMapType getResults() {
+    return PSLtoSDT;
   }
 
 private:
@@ -50,8 +47,6 @@ private:
   // The ASTContext for the particular AST that the MappingVisitor is
   // traversing.
   clang::ASTContext &Context;
-  // A mapping of individual Decls to the DeclStmt that contains them.
-  VariableDecltoStmtMap DeclToDeclStmt;
 };
 
 #endif
