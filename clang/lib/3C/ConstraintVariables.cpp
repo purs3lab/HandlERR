@@ -2282,10 +2282,12 @@ void FVComponentVariable::equateWithItype(ProgramInfo &I,
   // constrain both the external and internal types to not change.
   bool MustConstrainInternalType = !ReasonUnchangeable2.empty();
   // Otherwise, if a pointer is an array pointer with declared bounds or is a
-  // constant size array, then it must solve to either ARR or NTARR. This avoids
+  // constant size array, then we want to ensure the external type continues to
+  // solve to ARR or NTARR; see the comment on
+  // ConstraintVariable::equateWithItype re how this is achieved. This avoids
   // losing bounds on array pointers, and converting constant sized arrays into
-  // pointers. but we still allow the internal type to change so that the type
-  // can change from an itype to fully checked.
+  // pointers. We still allow the internal type to change so that the type can
+  // change from an itype to fully checked.
   bool MustBeArray =
     ExternalConstraint->srcHasBounds() || ExternalConstraint->hasSomeSizedArr();
   if (HasItype && (MustConstrainInternalType || MustBeArray)) {
