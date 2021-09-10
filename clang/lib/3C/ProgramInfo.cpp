@@ -440,8 +440,9 @@ bool ProgramInfo::link() {
 void ProgramInfo::linkFunction(FunctionVariableConstraint *FV) {
   // If there was a checked type on a variable in the input program, it
   // should stay that way. Otherwise, we shouldn't be adding a checked type
-  // to an undefined function.
-  std::string Rsn = (FV->hasBody() ? "" : "Unchecked pointer in parameter or "
+  // to an undefined function. DEFAULT_REASON is a sentinel for
+  // ConstraintVariable::equateWithItype; see the comment there.
+  std::string Rsn = (FV->hasBody() ? DEFAULT_REASON : "Unchecked pointer in parameter or "
                                           "return of undefined function " +
                                           FV->getName());
 

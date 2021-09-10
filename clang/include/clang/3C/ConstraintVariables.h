@@ -181,8 +181,18 @@ public:
   // achieve that, we additionally constrain the internal variables to not
   // change.
   //
-  // Some cases in which the itype must not change at all are indicated by
-  // passing a reason for the "root cause of wildness" as ReasonUnchangeable.
+  // Some cases in which the itype needs to be constrained not change at all are
+  // indicated by passing a non-default reason for the "root cause of wildness"
+  // in ReasonUnchangeable. If the reason is DEFAULT_REASON, this is a sentinel
+  // meaning that the caller is not requesting such a constraint. Other cases
+  // that need the constraint are detected within equateWithItype itself, and
+  // the appropriate reason is attached there.
+  //
+  // TODO: It looks like there may be some unusual cases in which
+  // equateWithType generates constraints using the reason from
+  // ReasonUnchangeable even if it is the DEFAULT_REASON sentinel. Rethink the
+  // equateWithItype design to figure out what reason should actually be used or
+  // if those constraints should be generated at all.
   virtual void equateWithItype(ProgramInfo &CS,
                                const ReasonLoc &ReasonUnchangeable) = 0;
 

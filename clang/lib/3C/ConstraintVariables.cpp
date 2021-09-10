@@ -2266,21 +2266,22 @@ FVComponentVariable::FVComponentVariable(const QualType &QT,
 void FVComponentVariable::equateWithItype(ProgramInfo &I,
                                  const ReasonLoc &ReasonUnchangeable) const {
   Constraints &CS = I.getConstraints();
-  const std::string Reason2 =
+  const ReasonLoc &ReasonUnchangeable2 =
       (ReasonUnchangeable.isDefault() && ExternalConstraint->isGeneric())
-          ? "Internal constraint for generic function declaration, "
-            "for which 3C currently does not support re-solving."
-          : ReasonUnchangeable.Reason;
+          ? ReasonLoc("Internal constraint for generic function declaration, "
+                      "for which 3C currently does not support re-solving.",
+                      // TODO: What PSL should we actually use here?
+                      ReasonUnchangeable.Location)
+          : ReasonUnchangeable;
   bool HasBounds = ExternalConstraint->srcHasBounds();
   bool HasItype = ExternalConstraint->srcHasItype();
-  ReasonLoc ReasonUnchangeable2 = ReasonLoc(Reason2, ReasonUnchangeable.Location);
   // If the type cannot change at all (ReasonUnchangeable2 is set), then we
   // constrain both the external and internal types to not change. Otherwise, if
   // the variable has bounds, then we don't want the checked (external) portion
   // of the type to change because that could blow away the bounds, but we still
   // allow the internal type to change so that the type can change from an itype
   // to fully checked.
-  bool MustConstrainInternalType = !Reason2.empty();
+  bool MustConstrainInternalType = !ReasonUnchangeable2.isDefault();
   if (HasItype && (MustConstrainInternalType || HasBounds)) {
     ExternalConstraint->equateWithItype(I, ReasonUnchangeable2);
     if (ExternalConstraint != InternalConstraint)
