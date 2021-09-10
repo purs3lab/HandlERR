@@ -2277,19 +2277,17 @@ void FVComponentVariable::equateWithItype(ProgramInfo &I,
           ? "Internal constraint for generic function declaration, "
             "for which 3C currently does not support re-solving."
           : ReasonUnchangeable;
-  // If a pointer is an array pointer with declared bounds or is a constant size
-  // array, then it must solve to either ARR or NTARR. This avoids losing bounds
-  // on array pointers, and converting constant sized arrays into pointers.
-  bool MustBeArray =
-    ExternalConstraint->srcHasBounds() || ExternalConstraint->hasSomeSizedArr();
   bool HasItype = ExternalConstraint->srcHasItype();
   // If the type cannot change at all (ReasonUnchangeable2 is set), then we
-  // constrain both the external and internal types to not change. Otherwise, if
-  // the variable has bounds, then we don't want the checked (external) portion
-  // of the type to change because that could blow away the bounds, but we still
-  // allow the internal type to change so that the type can change from an itype
-  // to fully checked.
+  // constrain both the external and internal types to not change.
   bool MustConstrainInternalType = !ReasonUnchangeable2.empty();
+  // Otherwise, if a pointer is an array pointer with declared bounds or is a
+  // constant size array, then it must solve to either ARR or NTARR. This avoids
+  // losing bounds on array pointers, and converting constant sized arrays into
+  // pointers. but we still allow the internal type to change so that the type
+  // can change from an itype to fully checked.
+  bool MustBeArray =
+    ExternalConstraint->srcHasBounds() || ExternalConstraint->hasSomeSizedArr();
   if (HasItype && (MustConstrainInternalType || MustBeArray)) {
     ExternalConstraint->equateWithItype(I, ReasonUnchangeable2, PSL);
     if (ExternalConstraint != InternalConstraint)

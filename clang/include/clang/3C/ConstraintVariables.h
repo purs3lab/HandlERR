@@ -69,9 +69,22 @@ private:
   ConstraintVariableKind Kind;
 
 protected:
+  // A string representation for the type of this variable. Note that for
+  // complex types (e.g., function pointer, constant sized arrays), you cannot
+  // concatenate the type string with an identifier and expect to obtain a valid
+  // variable declaration.
   std::string OriginalType;
-  // Underlying name of the C variable this ConstraintVariable represents.
+  // Underlying name of the C variable this ConstraintVariable represents. This
+  // is not always a valid C identifier. It will be empty if no name was given
+  // (e.g., some parameter declarations). It will be the predefined string
+  // "$ret" when the ConstraintVariable represents a function return. It may
+  // take other values if the ConstraintVariable does not represent a C
+  // variable (e.g., explict casts and compound literals) .
   std::string Name;
+  // The combination of the type and name of the represented C variable. The
+  // combination is handled by clang library routines, so complex types
+  // like function pointers and constant size are handled correctly. See
+  // comments on Name for when name should be a valid identifier.
   std::string OriginalTypeWithName;
   // Set of constraint variables that have been constrained due to a
   // bounds-safe interface (itype). They are remembered as being constrained
