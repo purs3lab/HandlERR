@@ -46,10 +46,10 @@ std::string ConstraintVariable::getRewritableOriginalTy() const {
   return OrigTyString;
 }
 
-std::string ConstraintVariable::getOriginalDecl() const {
+std::string ConstraintVariable::getOriginalTypeWithName() const {
   if (Name == RETVAR)
     return getRewritableOriginalTy();
-  return OriginalDecl;
+  return OriginalTypeWithName;
 }
 
 PointerVariableConstraint *PointerVariableConstraint::getWildPVConstraint(
@@ -127,9 +127,9 @@ PointerVariableConstraint *PointerVariableConstraint::addAtomPVConstraint(
 PointerVariableConstraint::PointerVariableConstraint(
     PointerVariableConstraint *Ot)
   : ConstraintVariable(ConstraintVariable::PointerVariable, Ot->OriginalType,
-                       Ot->Name, Ot->OriginalDecl), BaseType(Ot->BaseType),
-    Vars(Ot->Vars), SrcVars(Ot->SrcVars), FV(Ot->FV), QualMap(Ot->QualMap),
-    ArrSizes(Ot->ArrSizes), ArrSizeStrs(Ot->ArrSizeStrs),
+                       Ot->Name, Ot->OriginalTypeWithName),
+    BaseType(Ot->BaseType), Vars(Ot->Vars), SrcVars(Ot->SrcVars), FV(Ot->FV),
+    QualMap(Ot->QualMap), ArrSizes(Ot->ArrSizes), ArrSizeStrs(Ot->ArrSizeStrs),
     SrcHasItype(Ot->SrcHasItype), ItypeStr(Ot->ItypeStr),
     PartOfFuncPrototype(Ot->PartOfFuncPrototype), Parent(Ot),
     BoundsAnnotationStr(Ot->BoundsAnnotationStr),
@@ -1013,7 +1013,7 @@ const CVarSet &PVConstraint::getArgumentConstraints() const {
 
 FunctionVariableConstraint::FunctionVariableConstraint(FVConstraint *Ot)
   : ConstraintVariable(ConstraintVariable::FunctionVariable, Ot->OriginalType,
-                       Ot->getName(), Ot->OriginalDecl),
+                       Ot->getName(), Ot->OriginalTypeWithName),
     ReturnVar(Ot->ReturnVar), ParamVars(Ot->ParamVars), FileName(Ot->FileName),
     Hasproto(Ot->Hasproto), Hasbody(Ot->Hasbody), IsStatic(Ot->IsStatic),
     Parent(Ot), IsFunctionPtr(Ot->IsFunctionPtr), TypeParams(Ot->TypeParams) {
@@ -2016,7 +2016,7 @@ void PointerVariableConstraint::mergeDeclaration(ConstraintVariable *FromCV,
   SrcVars = NewSrcAtoms;
   if (Name.empty()) {
     Name = From->Name;
-    OriginalDecl = From->OriginalDecl;
+    OriginalTypeWithName = From->OriginalTypeWithName;
   }
   SrcHasItype = SrcHasItype || From->SrcHasItype;
   if (!From->ItypeStr.empty())

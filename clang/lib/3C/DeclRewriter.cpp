@@ -75,7 +75,7 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
     if (isa_and_nonnull<ParmVarDecl>(Decl) && !Decl->getName().empty())
       Type = qtyToStr(Decl->getType(), Decl->getNameAsString());
     else
-      Type = Defn->getOriginalDecl();
+      Type = Defn->getOriginalTypeWithName();
 
     if (Defn->getName() == RETVAR && IsUncheckedTypedef) {
       // This adds a space between the type and function name for function

@@ -72,7 +72,7 @@ protected:
   std::string OriginalType;
   // Underlying name of the C variable this ConstraintVariable represents.
   std::string Name;
-  std::string OriginalDecl;
+  std::string OriginalTypeWithName;
   // Set of constraint variables that have been constrained due to a
   // bounds-safe interface (itype). They are remembered as being constrained
   // so that later on we do not introduce a spurious constraint
@@ -91,7 +91,7 @@ protected:
   // Only subclasses should call this
   ConstraintVariable(ConstraintVariableKind K, std::string T, std::string N,
                      std::string D)
-    : Kind(K), OriginalType(T), Name(N), OriginalDecl(D),
+    : Kind(K), OriginalType(T), Name(N), OriginalTypeWithName(D),
       HasEqArgumentConstraints(false), ValidBoundsKey(false),
       IsForDecl(false) {}
 
@@ -176,7 +176,7 @@ public:
   // Get the original type string that can be directly
   // used for rewriting.
   std::string getRewritableOriginalTy() const;
-  std::string getOriginalDecl() const;
+  std::string getOriginalTypeWithName() const;
   std::string getName() const { return Name; }
 
   void setValidDecl() { IsForDecl = true; }
