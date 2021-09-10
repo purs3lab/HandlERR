@@ -27,9 +27,12 @@ std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *MMD,
   QualType DType = getTypeOfMultiDeclMember(MMD);
   std::string TypeWithName;
   if (isPtrOrArrayType(DType)) {
-    CVarOption CVO = Info.getVariable(MMD, &Context);
+    CVarOption CVO =
+        (isa<TypedefDecl>(MMD)
+             ? Info.lookupTypedef(PersistentSourceLoc::mkPSL(MMD, Context))
+             : Info.getVariable(MMD, &Context));
     assert(CVO.hasValue() &&
-           "Missing ConstraintVariable for unchanged variable in multi-decl");
+           "Missing ConstraintVariable for unchanged multi-decl member");
     TypeWithName = CVO.getValue().mkString(Info.getConstraints());
   } else {
     // In this case, the type should just be the base type except for top-level

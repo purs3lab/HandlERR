@@ -153,5 +153,27 @@ void test5() {
 // - Explicit test that macros are preserved in the base type of unchanged
 //   multi-decl members
 //   (https://github.com/correctcomputation/checkedc-clang/issues/652)?
-// - Typedef multi-decls
-//   (https://github.com/correctcomputation/checkedc-clang/issues/651)
+
+// Simple tests of typedef multi-decls from
+// https://github.com/correctcomputation/checkedc-clang/issues/651.
+// inline_anon_structs.c has a few additional tests of typedef multi-decls
+// involving inline structs.
+// TODO: Are there other cases we should test?
+
+typedef int *A, *B;
+// CHECK: typedef _Ptr<int> A;
+// CHECK: typedef _Ptr<int> B;
+
+void foo(void) {
+  A a;
+  B b;
+}
+
+typedef int *C, *D;
+// CHECK: typedef _Ptr<int> C;
+// CHECK: typedef int *D;
+
+void bar(void) {
+  C c;
+  D d = (D)1;
+}
