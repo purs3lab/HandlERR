@@ -96,7 +96,7 @@ void has_itype1(int *a : itype(_Ptr<int>)) { a = 0; }
 // Test rewriting itypes for constant sized arrays. As with function pointers,
 // part of the type (the array size) occurs after the name of the variable
 // being declared. This complicates rewriting. These examples caused errors in
-// libjepg.
+// libjpeg.
 
 int const_arr0[10];
 //CHECK_ALL: int const_arr0[10] : itype(int _Checked[10]);
@@ -110,11 +110,11 @@ int (*const_arr2)[10];
 //CHECK_ALL: int (*const_arr2)[10] : itype(_Ptr<int _Checked[10]>) = ((void *)0);
 //CHECK_NOALL: int (*const_arr2)[10] : itype(_Ptr<int[10]>) = ((void *)0);
 
-// Itypes for constants sized arrays when there a declaration with and without
-// a parameter list take slightly different paths that need to be tested. If
-// there is no parameter list, then the unchecked component of the itype can't
-// be copied from the declaration, and it instead must be generated from the
-// constraint variable.
+// Itypes for constants sized arrays when there is a declaration with and
+// without a parameter list take slightly different paths that need to be
+// tested. If there is no parameter list, then the unchecked component of the
+// itype can't be copied from the declaration, and it instead must be generated
+// from the constraint variable.
 
 void const_arr_fn();
 void const_arr_fn(int a[10]) {}
