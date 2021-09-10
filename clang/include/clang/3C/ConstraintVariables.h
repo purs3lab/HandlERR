@@ -103,8 +103,8 @@ protected:
 
   // Only subclasses should call this
   ConstraintVariable(ConstraintVariableKind K, std::string T, std::string N,
-                     std::string D)
-    : Kind(K), OriginalType(T), Name(N), OriginalTypeWithName(D),
+                     std::string TN)
+    : Kind(K), OriginalType(T), Name(N), OriginalTypeWithName(TN),
       HasEqArgumentConstraints(false), ValidBoundsKey(false),
       IsForDecl(false) {}
 
