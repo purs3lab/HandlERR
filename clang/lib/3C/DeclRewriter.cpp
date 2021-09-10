@@ -83,13 +83,6 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
       Type = qtyToStr(Decl->getType(), Decl->getNameAsString());
     else
       Type = Defn->getOriginalTypeWithName();
-
-    if (Defn->getName() == RETVAR && IsUncheckedTypedef) {
-      // This adds a space between the type and function name for function
-      // returns using a typedef in the unchecked part of the itype to avoid
-      // having the function and typedef identifiers run together.
-      Type += " ";
-    }
   }
 
   IType = " : itype(";
