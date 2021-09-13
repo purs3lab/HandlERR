@@ -20,31 +20,22 @@
 class Feedback {
 public:
   Feedback() = default;
-  Feedback(std::string Reason, PersistentSourceLoc &PSL)
-      : Main(Inline(Reason,PSL)) {}
-
-  struct Inline {
-    Inline() = default;
-    Inline(std::string R, PersistentSourceLoc &L)
-        : Reason(R), Location(L) {}
-    std::string Reason;
-    PersistentSourceLoc Location;
-  };
+  explicit Feedback(ReasonLoc &Rsn) : Main(Rsn) {}
 
   std::string &getReason() { return Main.Reason; }
   void setReason(std::string &Rsn) { Main.Reason = Rsn; }
 
-  const PersistentSourceLoc &getLocation() { return Main.Location; }
+  const PersistentSourceLoc &getLocation() const { return Main.Location; }
 
-  void addReason(std::string &Reason, PersistentSourceLoc &PSL) {
-    Supplemental.push_back(Inline(Reason,PSL));
+  void addReason(const ReasonLoc &Rsn) {
+    Supplemental.push_back(Rsn);
   }
 
-  std::vector<Inline> &additionalNotes() { return Supplemental; }
+  std::vector<ReasonLoc> &additionalNotes() { return Supplemental; }
 
 private:
-  Inline Main;
-  std::vector<Inline> Supplemental;
+  ReasonLoc Main;
+  std::vector<ReasonLoc> Supplemental;
 };
 
 // Constraints information.

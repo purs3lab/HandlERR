@@ -1038,12 +1038,13 @@ bool ProgramInfo::computeInterimConstraintState(
         PersistentSourceLoc APSL = CState.AtomSourceMap[VLhs->getLoc()];
         if (!PSL.valid() && APSL.valid())
           PSL = APSL;
-        Feedback Info(EC->getReasonText(), PSL);
-        for (auto Reason : CurrC->additionalReasons()) {
+        auto Rsn = ReasonLoc(EC->getReasonText(), PSL);
+        Feedback Info(Rsn);
+        for (const auto& Reason : CurrC->additionalReasons()) {
           PersistentSourceLoc P = Reason.Location;
           if (!P.valid() && APSL.valid())
             P = APSL;
-          Info.addReason(Reason.Reason,P);
+          Info.addReason(ReasonLoc(Reason.Reason,P));
         }
         WildPtrsReason.insert(std::make_pair(VLhs->getLoc(), Info));
       }
