@@ -64,11 +64,11 @@ CVarSet ConstraintResolver::handleDeref(CVarSet T) {
 // of indirection (when the constraint is PVConstraint), or return the
 // constraint unchanged (when the constraint is a function constraint).
 CVarSet ConstraintResolver::addAtomAll(CVarSet CVS, ConstAtom *PtrTyp,
-                                       Constraints &CS) {
+                                       ReasonLoc &Rsn, Constraints &CS) {
   CVarSet Result;
   for (auto *CV : CVS) {
     if (PVConstraint *PVC = dyn_cast<PVConstraint>(CV)) {
-      Result.insert(PVConstraint::addAtomPVConstraint(PVC, PtrTyp, CS));
+      Result.insert(PVConstraint::addAtomPVConstraint(PVC, PtrTyp, Rsn,CS));
     } else {
       Result.insert(CV);
     }
@@ -380,15 +380,16 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
           // does permit taking the address of an _Array_ptr when the array
           // pointer has no declared bounds. With this constraint added however,
           // 3C will not generate such code.
+          auto Rsn = ReasonLoc(REFERENCE_REASON,ExprPSL);
           for (auto *CV : T.first)
             if (auto *PCV = dyn_cast<PVConstraint>(CV))
               // On the other hand, CheckedC does let you take the address of
               // constant sized arrays.
               if (!PCV->getArrPresent())
-                PCV->constrainOuterTo(CS, CS.getPtr(),
-                                     ReasonLoc(REFERENCE_REASON,ExprPSL), true);
+                PCV->constrainOuterTo(CS, CS.getPtr(), Rsn, true);
           // Add a VarAtom to UOExpr's PVConstraint, for &.
-          Ret = std::make_pair(addAtomAll(T.first, CS.getPtr(), CS), T.second);
+          Ret = std::make_pair(addAtomAll(T.first, CS.getPtr(),
+                                          Rsn, CS), T.second);
         }
         break;
       }
@@ -541,7 +542,8 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
             if (PCV->hasBoundsKey())
               NewCV->setBoundsKey(PCV->getBoundsKey());
           } else {
-            NewCV = CV->getCopy(CS);
+            auto Rsn = ReasonLoc("Function return R-value", ExprPSL);
+            NewCV = CV->getCopy(Rsn, CS);
           }
         } else {
           // Allocator functions are treated specially, so they do not have
@@ -549,17 +551,16 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
           NewCV = CV;
         }
 
-        auto PSL = PersistentSourceLoc::mkPSL(CE, *Context);
         // Make the bounds key context sensitive.
         if (NewCV->hasBoundsKey()) {
           auto CSensBKey =
-              ABI.getCtxSensCEBoundsKey(PSL, NewCV->getBoundsKey());
+              ABI.getCtxSensCEBoundsKey(ExprPSL, NewCV->getBoundsKey());
           NewCV->setBoundsKey(CSensBKey);
         }
         if (NewCV != CV) {
           // If the call is in a macro, use Same_to_Same to force checked type
           // equality and avoid ever needing to insert a cast inside a macro.
-          auto Rsn = ReasonLoc("Macro call", PSL);
+          auto Rsn = ReasonLoc("Macro call", ExprPSL);
           ConsAction CA = Rewriter::isRewritable(CE->getExprLoc())
                               ? Safe_to_Wild
                               : Same_to_Same;
@@ -567,7 +568,7 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
         }
         TmpCVs.insert(NewCV);
         // If this is realloc, constrain the first arg to flow to the return
-        auto Rsn = ReasonLoc("Flow from realloc", PSL);
+        auto Rsn = ReasonLoc("Flow from realloc", ExprPSL);
         if (!ReallocFlow.empty()) {
           constrainConsVarGeq(NewCV, ReallocFlow, Info.getConstraints(), Rsn,
                               Wild_to_Safe, false, &Info);
@@ -589,7 +590,9 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
       if (ILE->getType()->isArrayType()) {
         // Array initialization is similar AddrOf, so the same pattern is
         // used where a new indirection is added to constraint variables.
-        Ret = std::make_pair(addAtomAll(CVars.first, CS.getArr(), CS),
+        auto Rsn = ReasonLoc("Array initialization", ExprPSL);
+        Ret = std::make_pair(addAtomAll(CVars.first, CS.getArr(),
+                                        Rsn, CS),
                              CVars.second);
       } else {
         // This branch should only be taken on compound literal expressions

@@ -199,7 +199,7 @@ public:
   // Copy this variable and replace all VarAtoms with fresh VarAtoms. Using
   // fresh atoms allows the new variable to solve to different types than the
   // original.
-  virtual ConstraintVariable *getCopy(Constraints &CS) = 0;
+  virtual ConstraintVariable *getCopy(ReasonLoc &Rsn, Constraints &CS) = 0;
 
   virtual ~ConstraintVariable(){};
 };
@@ -272,7 +272,7 @@ public:
   // by the original constraint variable.
   static PointerVariableConstraint *
   addAtomPVConstraint(PointerVariableConstraint *PVC, ConstAtom *PtrTyp,
-                      Constraints &CS);
+                      ReasonLoc &Rsn, Constraints &CS);
 
   // Return a new constraint variable representing the result of dereferencing
   // the input constraint variable. This is accomplished by first copying the
@@ -520,7 +520,7 @@ public:
   // Get the set of constraint variables corresponding to the arguments.
   const std::set<ConstraintVariable *> &getArgumentConstraints() const;
 
-  PointerVariableConstraint *getCopy(Constraints &CS) override;
+  PointerVariableConstraint *getCopy(ReasonLoc &Rsn, Constraints &CS) override;
 
   // Retrieve the atom at the specified index. This function includes special
   // handling for generic constraint variables to create deeper pointers as
@@ -561,7 +561,7 @@ public:
       : InternalConstraint(nullptr), ExternalConstraint(nullptr),
         SourceDeclaration("") {}
 
-  FVComponentVariable(FVComponentVariable *Ot, Constraints &CS);
+  FVComponentVariable(FVComponentVariable *Ot, ReasonLoc &Rsn, Constraints &CS);
 
   FVComponentVariable(const clang::QualType &QT, const clang::QualType &ITypeT,
                       clang::DeclaratorDecl *D, std::string N, ProgramInfo &I,
@@ -710,7 +710,7 @@ public:
 
   void equateArgumentConstraints(ProgramInfo &P, ReasonLoc &Rsn) override;
 
-  FunctionVariableConstraint *getCopy(Constraints &CS) override;
+  FunctionVariableConstraint *getCopy(ReasonLoc &Rsn, Constraints &CS) override;
 
   bool isOriginallyChecked() const override;
   bool isSolutionChecked(const EnvironmentMap &E) const override;

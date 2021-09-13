@@ -96,14 +96,14 @@ PointerVariableConstraint::derefPVConstraint(PointerVariableConstraint *PVC) {
 }
 
 PointerVariableConstraint *PointerVariableConstraint::addAtomPVConstraint(
-    PointerVariableConstraint *PVC, ConstAtom *PtrTyp, Constraints &CS) {
+    PointerVariableConstraint *PVC, ConstAtom *PtrTyp,
+    ReasonLoc &Rsn, Constraints &CS) {
   auto *Copy = new PointerVariableConstraint(PVC);
   std::vector<Atom *> &Vars = Copy->Vars;
   std::vector<ConstAtom *> &SrcVars = Copy->SrcVars;
 
   VarAtom *NewA = CS.getFreshVar("&" + Copy->Name, VarAtom::V_Other);
-  CS.addConstraint(CS.createGeq(NewA, PtrTyp,
-                  ReasonLoc(REFERENCE_REASON,PersistentSourceLoc()), false));
+  CS.addConstraint(CS.createGeq(NewA, PtrTyp, Rsn, false));
 
   // Add a constraint between the new atom and any existing atom for this
   // pointer. This is the same constraint that is added between atoms of a
@@ -1214,13 +1214,14 @@ bool FunctionVariableConstraint::hasNtArr(const EnvironmentMap &E,
   return ReturnVar.ExternalConstraint->hasNtArr(E, AIdx);
 }
 
-FVConstraint *FunctionVariableConstraint::getCopy(Constraints &CS) {
+FVConstraint *FunctionVariableConstraint::getCopy(ReasonLoc &Rsn,
+                                                  Constraints &CS) {
   FunctionVariableConstraint *Copy = new FunctionVariableConstraint(this);
-  Copy->ReturnVar = FVComponentVariable(&Copy->ReturnVar, CS);
+  Copy->ReturnVar = FVComponentVariable(&Copy->ReturnVar, Rsn, CS);
   // Make copy of ParameterCVs too.
   std::vector<FVComponentVariable> FreshParams;
   for (auto &ParmPv : Copy->ParamVars)
-    FreshParams.push_back(FVComponentVariable(&ParmPv, CS));
+    FreshParams.push_back(FVComponentVariable(&ParmPv, Rsn, CS));
   Copy->ParamVars = FreshParams;
   return Copy;
 }
@@ -1375,7 +1376,8 @@ bool PointerVariableConstraint::anyChanges(const EnvironmentMap &E) const {
   return PtrChanged;
 }
 
-PVConstraint *PointerVariableConstraint::getCopy(Constraints &CS) {
+PVConstraint *PointerVariableConstraint::getCopy(ReasonLoc &Rsn,
+                                                 Constraints &CS) {
   auto *Copy = new PointerVariableConstraint(this);
 
   // After the copy construct, the copy Vars vector holds exactly the same
@@ -1390,7 +1392,6 @@ PVConstraint *PointerVariableConstraint::getCopy(Constraints &CS) {
       VarAtom *FreshVA = CS.getFreshVar(VA->getName(), VA->getVarKind());
       FreshVars.push_back(FreshVA);
       if (!isa<WildAtom>(*CAIt)){
-        auto Rsn = ReasonLoc(COPY_REASON, PersistentSourceLoc());
         CS.addConstraint(CS.createGeq(*CAIt, FreshVA, Rsn, false));
       }
     }
@@ -1400,7 +1401,7 @@ PVConstraint *PointerVariableConstraint::getCopy(Constraints &CS) {
   Copy->Vars = FreshVars;
 
   if (Copy->FV != nullptr)
-    Copy->FV = Copy->FV->getCopy(CS);
+    Copy->FV = Copy->FV->getCopy(Rsn, CS);
 
   return Copy;
 }
@@ -2294,7 +2295,7 @@ void FVComponentVariable::equateWithItype(ProgramInfo &I,
 void FVComponentVariable::linkInternalExternal(ProgramInfo &I,
                                                bool EquateChecked) const {
   Constraints &CS = I.getConstraints();
-  auto LinkReason = ReasonLoc(LINK_REASON, PersistentSourceLoc());
+  auto LinkReason = ReasonLoc("Function Internal/External Link", PersistentSourceLoc());
   for (unsigned J = 0; J < InternalConstraint->getCvars().size(); J++) {
     Atom *InternalA = InternalConstraint->getCvars()[J];
     Atom *ExternalA = ExternalConstraint->getCvars()[J];
@@ -2342,7 +2343,8 @@ bool FVComponentVariable::solutionEqualTo(Constraints &CS,
 }
 
 FVComponentVariable::FVComponentVariable(FVComponentVariable *Ot,
+                                         ReasonLoc &Rsn,
                                          Constraints &CS) {
-  InternalConstraint = Ot->InternalConstraint->getCopy(CS);
-  ExternalConstraint = Ot->ExternalConstraint->getCopy(CS);
+  InternalConstraint = Ot->InternalConstraint->getCopy(Rsn,CS);
+  ExternalConstraint = Ot->ExternalConstraint->getCopy(Rsn,CS);
 }
