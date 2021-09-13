@@ -90,3 +90,21 @@ PA pa_test0, pa_test1;
 // unwritable-expected-warning@+2 {{0 unchecked pointers: Source code in non-writable file}}
 // expected-warning@+1 {{1 unchecked pointer: Internal constraint for generic function declaration, for which 3C currently does not support re-solving.}}
 _Itype_for_any(T) void remember(void *p : itype(_Ptr<T>)) {}
+
+// Demonstrate multiple locations in notes
+// unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
+int get_strlen(char *s : itype(_Nt_array_ptr<char>)); // expected-warning {{1 unchecked pointer: Unchecked pointer in parameter or return of undefined function get_strlen}}
+void test_conflict() {
+  char *c; // #decl
+  // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
+  get_strlen(c); // #as_nt
+  // unwritable-expected-warning@+2 {{0 unchecked pointers: Source code in non-writable file}}
+  // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
+  char **cptr = &c; // #as_ptr
+}
+// expected-warning@#decl {{2 unchecked pointers: Inferred conflicting types}}
+// expected-note@#as_ptr {{Use of & operator}}
+// expected-note@#as_nt {{Assigning from c to s}}
+
+
+
