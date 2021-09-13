@@ -13,6 +13,10 @@ MultiDeclMemberDecl *getAsMultiDeclMember(Decl *D) {
   // A FunctionDecl can be part of a multi-decl in C, but 3C currently doesn't
   // handle this
   // (https://github.com/correctcomputation/checkedc-clang/issues/659 part (a)).
+
+  // FIXME: K&R parameter declarations?
+  if (isa<ParmVarDecl>(D))
+    return nullptr;
   if (VarDecl *VD = dyn_cast<VarDecl>(D))
     return VD;
   if (FieldDecl *FD = dyn_cast<FieldDecl>(D))
