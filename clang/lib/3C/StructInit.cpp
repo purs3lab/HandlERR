@@ -56,8 +56,8 @@ bool StructVariableInitializer::hasCheckedMembers(DeclaratorDecl *DD) {
 // the set of required rewritings.
 bool StructVariableInitializer::VisitVarDecl(VarDecl *VD) {
   // Check if we need to add an initializer.
-  bool IsVarExtern = VD->getStorageClass() == StorageClass::SC_Extern;
-  if (!IsVarExtern && !VD->hasInit() && hasCheckedMembers(VD)) {
+  // The first two conditions are the same as in Sema::ActOnUninitializedDecl.
+  if (VD->hasLocalStorage() && !isa<ParmVarDecl>(VD) && !VD->hasInit() && hasCheckedMembers(VD)) {
     // Create replacement declaration text with an initializer.
     std::string ToReplace =
         mkStringForDeclWithUnchangedType(VD, *Context, I) + " = {}";

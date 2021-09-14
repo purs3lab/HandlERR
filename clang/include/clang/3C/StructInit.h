@@ -34,7 +34,6 @@ public:
   explicit StructVariableInitializer(ASTContext *C, ProgramInfo &I, RSet &R)
       : Context(C), I(I), RewriteThese(R), RecordsWithCPointers() {}
 
-  bool VisitParmVarDecl(ParmVarDecl *PVD) { return true; }
   bool VisitVarDecl(VarDecl *VD);
 
 private:
