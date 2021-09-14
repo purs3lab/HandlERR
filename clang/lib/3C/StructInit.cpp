@@ -54,7 +54,7 @@ bool StructVariableInitializer::hasCheckedMembers(DeclaratorDecl *DD) {
 
 // Insert the declaration and correct replacement text for the declaration into
 // the set of required rewritings.
-void StructVariableInitializer::insertVarDecl(VarDecl *VD, DeclStmt *S) {
+bool StructVariableInitializer::VisitVarDecl(VarDecl *VD) {
   // Check if we need to add an initializer.
   bool IsVarExtern = VD->getStorageClass() == StorageClass::SC_Extern;
   if (!IsVarExtern && !VD->hasInit() && hasCheckedMembers(VD)) {
@@ -63,18 +63,6 @@ void StructVariableInitializer::insertVarDecl(VarDecl *VD, DeclStmt *S) {
         mkStringForDeclWithUnchangedType(VD, *Context, I) + " = {}";
     RewriteThese.insert(
         std::make_pair(VD, new MultiDeclMemberReplacement(VD, ToReplace)));
-  }
-}
-
-// Check to see if this variable require an initialization.
-bool StructVariableInitializer::VisitDeclStmt(DeclStmt *S) {
-  if (S->isSingleDecl()) {
-    if (VarDecl *VD = dyn_cast<VarDecl>(S->getSingleDecl()))
-      insertVarDecl(VD, S);
-  } else {
-    for (const auto &D : S->decls())
-      if (VarDecl *VD = dyn_cast<VarDecl>(D))
-        insertVarDecl(VD, S);
   }
   return true;
 }

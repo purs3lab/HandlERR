@@ -34,11 +34,11 @@ public:
   explicit StructVariableInitializer(ASTContext *C, ProgramInfo &I, RSet &R)
       : Context(C), I(I), RewriteThese(R), RecordsWithCPointers() {}
 
-  bool VisitDeclStmt(DeclStmt *S);
+  bool VisitParmVarDecl(ParmVarDecl *PVD) { return true; }
+  bool VisitVarDecl(VarDecl *VD);
 
 private:
   bool hasCheckedMembers(DeclaratorDecl *DD);
-  void insertVarDecl(VarDecl *VD, DeclStmt *S);
 
   ASTContext *Context;
   ProgramInfo &I;

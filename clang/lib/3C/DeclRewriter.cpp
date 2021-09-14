@@ -163,7 +163,7 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
     // the variable name, not the typedef or #define that creates the
     // name of the type.
     PersistentSourceLoc PLoc = V.first;
-    if (Decl *D = std::get<1>(PSLMap[PLoc])) {
+    if (Decl *D = PSLMap[PLoc]) {
       ConstraintVariable *CV = V.second;
       PVConstraint *PV = dyn_cast<PVConstraint>(CV);
       bool PVChanged =
