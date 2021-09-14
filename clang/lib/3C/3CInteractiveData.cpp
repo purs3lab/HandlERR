@@ -129,8 +129,24 @@ void ConstraintsInfo::printConstraintStats(llvm::raw_ostream &O,
 
   std::set<ConstraintVariable *> PtrsAffected = PtrSrcWMap[Cause];
   O << "\"PtrsAffected\":" << PtrsAffected.size() << ",";
-  O << "\"PtrsScore\":" << getPtrAffectedScore(PtrsAffected);
-  O << "}";
+  O << "\"PtrsScore\":" << getPtrAffectedScore(PtrsAffected) << ",";
+
+  O << "\"SubReasons\":" << "[";
+  bool AddComma = false;
+  for(const ReasonLoc &Rsn : PtrInfo.additionalNotes()) {
+    if (AddComma) O << ",";
+    O << "{";
+    O << "\"Rsn\":\"" << Rsn.Reason << "\", ";
+    O << "\"Location\":";
+    const PersistentSourceLoc &RPSL = Rsn.Location;
+    if (RPSL.valid())
+      O << llvm::json::Value(RPSL.toString());
+    else
+      O << "null";
+    AddComma = true;
+    O << "}";
+  }
+  O << "]}";
 }
 
 int ConstraintsInfo::getNumPtrsAffected(ConstraintKey CK) {
