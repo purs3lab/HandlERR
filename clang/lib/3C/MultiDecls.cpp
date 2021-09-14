@@ -14,9 +14,12 @@ MultiDeclMemberDecl *getAsMultiDeclMember(Decl *D) {
   // handle this
   // (https://github.com/correctcomputation/checkedc-clang/issues/659 part (a)).
 
-  // FIXME: K&R parameter declarations?
+  // While K&R parameter declarations can be in multi-decls in the input
+  // program, we don't use any of the regular multi-decl infrastructure for
+  // them; the rewriter blows them away and generates a prototype.
   if (isa<ParmVarDecl>(D))
     return nullptr;
+
   if (VarDecl *VD = dyn_cast<VarDecl>(D))
     return VD;
   if (FieldDecl *FD = dyn_cast<FieldDecl>(D))
