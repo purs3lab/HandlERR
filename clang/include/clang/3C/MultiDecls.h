@@ -85,6 +85,31 @@ using namespace clang;
 // inline TagDecls are known to be handled poorly, but that's a rare and poor
 // practice and it's not easy to handle them better.
 
+// REVIEW: Currently, we automatically generate a name for every unnamed
+// TagDecl defined in a multi-decl and use the name in ConstraintVariables, but
+// we only insert the name into the definition if the multi-decl gets rewritten
+// for some other reason. This works in the common case where the types of other
+// multi-decl members refer to the TagDecl. Are there other parts of 3C that
+// could insert the type name without the multi-decl being rewritten, such as
+// type argument addition and cast insertion? If so, the output would be
+// invalid, though it would already have been invalid before the multi-decl
+// overhaul (i.e., this would have been a pre-existing bug). Examples:
+//
+// - TypeVariableEntry has a check for `isTypeAnonymous`, but it misses double
+//   pointers.
+// - I wasn't able to demonstrate insertion of a cast involving an unnamed
+//   struct type, but it's not clear to me whether that code path has actually
+//   been thought through to ensure that the problem cannot occur.
+// - Typedef itype insertion (#690), given `typedef struct { int *x; } *PS`
+//   that remains wild, is happy to insert a _Ptr to the unnamed struct type.
+//
+// One approach to try to rule out all of these bugs at once is to preemptively
+// rewrite all multi-decls containing unnamed TagDecls. But those changes might
+// be undesirable or could even cause errors in the presence of macros, etc.
+// There are various ways we might be able to make this feature less disruptive.
+// But is it worth worrying about the problem at all? Are the bad cases rare in
+// realistic code?
+
 // Implementation note: The Clang AST does not represent multi-decls explicitly
 // (except in functions, where they are represented by DeclStmts). In other
 // contexts, we detect them based on the property that the beginning
