@@ -95,11 +95,18 @@ private:
 
 typedef std::map<Decl *, DeclReplacement *> RSet;
 
-// Generate a string for the declaration that includes the name, type, and
-// storage qualifier (if any) but not a trailing semicolon. Honors names
-// assigned to unnamed TagDecls by 3C. Used by DeclRewriter::rewriteMultiDecl
-// for variables that don't have a replacement and by StructVariableInitializer
-// (which appends an initializer).
+// TODO: Document and maybe give this a better name.
+std::string buildDeclVar(MultiDeclMemberDecl *MMD,
+                         PVConstraint *PVC,
+                         ASTContext &Context,
+                         ProgramInfo &Info);
+
+// TODO: Update documentation
+// Generate a string for the declaration that includes the name, type, storage
+// qualifier, and bounds string (as applicable) but not a trailing semicolon.
+// Honors names assigned to unnamed TagDecls by 3C. Used by
+// DeclRewriter::rewriteMultiDecl for variables that don't have a replacement
+// and by StructVariableInitializer (which appends an initializer).
 std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *D,
                                              ASTContext &Context,
                                              ProgramInfo &Info);

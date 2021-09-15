@@ -149,6 +149,7 @@ void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
                 Context.getTagDeclType(LastTagDef)) {
           AssignedTagTypeStrs.insert(std::make_pair(TagDefPSL, MemberName));
           TagDefNeedsName = false;
+          CurrentMultiDecl->BaseTypeRenamed = true;
           // Tell the rewriter that the tag definition should not be moved out of
           // the typedef.
           CurrentMultiDecl->TagDefToSplit = nullptr;
@@ -166,6 +167,7 @@ void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
           }
           AssignedTagTypeStrs.insert(std::make_pair(TagDefPSL, KindName + " " + NewName));
           TagDefNeedsName = false;
+          CurrentMultiDecl->BaseTypeRenamed = true;
           // Consider this name taken and ensure that other automatically
           // generated names do not collide with it.
           //

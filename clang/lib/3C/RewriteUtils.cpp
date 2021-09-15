@@ -21,6 +21,39 @@
 using namespace llvm;
 using namespace clang;
 
+std::string buildDeclVar(MultiDeclMemberDecl *MMD,
+                         PVConstraint *PVC,
+                         ASTContext &Context,
+                         ProgramInfo &Info) {
+  // Currently, it's cheap to keep recreating the ArrayBoundsRewriter. If that
+  // ceases to be true, we should pass it along as another argument.
+  ArrayBoundsRewriter ABRewriter{Info};
+  std::string NewDecl = getStorageQualifierString(MMD);
+  bool IsExternGlobalVar =
+      isa<VarDecl>(MMD) &&
+      cast<VarDecl>(MMD)->getFormalLinkage() == Linkage::ExternalLinkage;
+  if (_3COpts.ItypesForExtern &&
+      (isa<FieldDecl>(MMD) || IsExternGlobalVar)) {
+    // Give record fields and global variables itypes when using
+    // -itypes-for-extern. Note that we haven't properly implemented
+    // itypes for structures and globals. This just rewrites to an itype
+    // instead of a fully checked type when a checked type could have been
+    // used. This does provide most of the rewriting infrastructure that
+    // would be required to support these itypes if constraint generation
+    // is updated to handle structure/global itypes.
+    std::string Type, IType;
+    // VarDecl and FieldDecl subclass DeclaratorDecl, so the cast will
+    // always succeed.
+    DeclRewriter::buildItypeDecl(PVC, cast<DeclaratorDecl>(MMD), Type, IType,
+                                 Info, ABRewriter);
+    NewDecl += Type + IType;
+  } else {
+    NewDecl += PVC->mkString(Info.getConstraints()) +
+               ABRewriter.getBoundsString(PVC, MMD);
+  }
+  return NewDecl;
+}
+
 std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *MMD,
                                              ASTContext &Context,
                                              ProgramInfo &Info) {
@@ -33,24 +66,25 @@ std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *MMD,
              : Info.getVariable(MMD, &Context));
     assert(CVO.hasValue() &&
            "Missing ConstraintVariable for unchanged multi-decl member");
-    TypeWithName = CVO.getValue().mkString(Info.getConstraints());
-  } else {
-    // In this case, the type should just be the base type except for top-level
-    // qualifiers. (REVIEW: Can we verify that somehow?)
-    // PointerVariableConstraint::extractBaseType doesn't include qualifiers,
-    // but since we know the type is not a pointer, it should be safe to just
-    // add any qualifiers at the beginning of the string.
-    std::string QualifierPrefix = DType.getQualifiers().getAsString();
-    if (!QualifierPrefix.empty())
-      QualifierPrefix += " ";
-    // extractBaseType can handle TSI == nullptr. Don't duplicate that code
-    // here.
-    TypeWithName = QualifierPrefix +
-                   PointerVariableConstraint::extractBaseType(
-                       MMD, nullptr, DType, DType.getTypePtr(), Context, Info) +
-                   " " + std::string(MMD->getName());
+    // A function currently can't be a multi-decl member, so this should always
+    // be a PointerVariableConstraint.
+    PVConstraint *PVC = cast<PointerVariableConstraint>(&CVO.getValue());
+    return buildDeclVar(MMD, PVC, Context, Info);
   }
-  return getStorageQualifierString(MMD) + TypeWithName;
+  // In this case, the type should just be the base type except for top-level
+  // qualifiers. (REVIEW: Can we verify that somehow?)
+  // PointerVariableConstraint::extractBaseType doesn't include qualifiers,
+  // but since we know the type is not a pointer, it should be safe to just
+  // add any qualifiers at the beginning of the string.
+  std::string QualifierPrefix = DType.getQualifiers().getAsString();
+  if (!QualifierPrefix.empty())
+    QualifierPrefix += " ";
+  // extractBaseType can handle TSI == nullptr. Don't duplicate that code
+  // here.
+  return getStorageQualifierString(MMD) + QualifierPrefix +
+                 PointerVariableConstraint::extractBaseType(
+                     MMD, nullptr, DType, DType.getTypePtr(), Context, Info) +
+                 " " + std::string(MMD->getName());
 }
 
 // Test to see if we can rewrite a given SourceRange.

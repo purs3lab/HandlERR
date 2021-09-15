@@ -137,12 +137,20 @@ struct MultiDeclInfo {
   // from it during rewriting, if any, otherwise null. In a case like
   // `typedef struct { ... } T`, there is an inline tag definition but we don't
   // need to split it out, so this will be null.
-  TagDecl *TagDefToSplit;
+  TagDecl *TagDefToSplit = nullptr;
+
+  // TODO Document. TagDefToSplit can be nonnull and this can be false if the
+  // TagDecl was named, and vice versa can occur with a typedef.
+  bool BaseTypeRenamed = false;
 
   // The members of the multi-decl in their original order.
   std::vector<MultiDeclMemberDecl *> Members;
 
-  // TODO document
+  // Set by DeclRewriter::rewriteMultiDecl after it rewrites the entire
+  // multi-decl to ensure that it doesn't try to do so more than once if
+  // multiple members needed changes.
+  // REVIEW: A design argument could be made that this flag doesn't belong here
+  // and the rewriter should instead keep a visited set or something like that.
   bool AlreadyRewritten = false;
 };
 
