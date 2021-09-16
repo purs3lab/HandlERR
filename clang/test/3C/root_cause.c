@@ -1,12 +1,12 @@
-// RUN: 3c -use-malloc=my_malloc -base-dir=%S -alltypes -warn-all-root-cause %s -- -Xclang -verify -Wno-everything
+// RUN: 3c -use-malloc=my_malloc -base-dir=%S -alltypes -warn-all-root-cause %s -- -Xclang -verify=expected,no-undef-expected -Wno-everything
+// RUN: 3c -use-malloc=my_malloc -base-dir=%S -alltypes -infer-types-for-undefs -warn-all-root-cause %s -- -Xclang -verify -Wno-everything
 
 // This test is unusual in that it checks for the errors in the code
 
 // We define a prototype for malloc here instead of including <stdlib.h> 
 // as including stdlib will create numerous root-cause warnings we don't want to deal with
 
-// unwritable-expected-warning@+2 {{0 unchecked pointers: Source code in non-writable file}}
-// expected-warning@+1 {{Unchecked pointer in parameter or return of undefined function my_malloc}}
+// unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
 _Itype_for_any(T) void *my_malloc(unsigned long size) : itype(_Array_ptr<T>) byte_count(size);
 
 
@@ -66,7 +66,7 @@ void test1() {
 extern int *glob;
 
 // unwritable-expected-warning@+2 {{0 unchecked pointers: Source code in non-writable file}}
-// expected-warning@+1 {{1 unchecked pointer: Unchecked pointer in parameter or return of undefined function glob_f}}
+// no-undef-expected-warning@+1 {{1 unchecked pointer: Unchecked pointer in parameter or return of undefined function glob_f}}
 int *glob_f(void);
 
 // unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
@@ -106,5 +106,14 @@ void test_conflict() {
 // expected-note@#as_ptr {{Operand of address-of has PTR lower bound}}
 // expected-note@#as_nt {{Assigning from c to s}}
 
+// unwritable-expected-warning@+3 {{0 unchecked pointers: Source code in non-writable file}}
+// unwritable-expected-warning@+2 {{0 unchecked pointers: Source code in non-writable file}}
+// expected-warning@+1 {{Root cause for 1 unchecked pointer: Cast from int to int *}}
+void def_itype(int *a) { a = 1; }
 
+// unwritable-expected-warning@+1 {{0 unchecked pointers: Source code in non-writable file}}
+void undef_itype(int *a : itype(_Ptr<int>));
 
+// unwritable-expected-warning@+2 {{0 unchecked pointers: Source code in non-writable file}}
+// no-undef-expected-warning@+1 {{1 unchecked pointer: Unchecked pointer in parameter or return of undefined function undef}}
+void undef(int *a);

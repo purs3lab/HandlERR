@@ -190,6 +190,7 @@ public:
   std::string getName() const { return Name; }
 
   void setValidDecl() { IsForDecl = true; }
+  void unsetValidDecl() { IsForDecl = false; }
   bool isForValidDecl() const { return IsForDecl; }
 
   // By default, 3C allows itypes to be re-solved arbitrarily. But in several
@@ -607,6 +608,17 @@ public:
 
   PVConstraint *getInternal() const { return InternalConstraint; }
   PVConstraint *getExternal() const { return ExternalConstraint; }
+
+  PointerVariableConstraint *getValidDecl() const {
+    assert("Expected zero or one valid declaration constraint variables for "
+           "function parameter." && !(ExternalConstraint->isForValidDecl() &&
+                                      InternalConstraint->isForValidDecl()));
+    if (ExternalConstraint->isForValidDecl())
+      return ExternalConstraint;
+    if (InternalConstraint->isForValidDecl())
+      return InternalConstraint;
+    return nullptr;
+  }
 
   void setGenericIndex(int idx) {
     ExternalConstraint->setGenericIndex(idx);

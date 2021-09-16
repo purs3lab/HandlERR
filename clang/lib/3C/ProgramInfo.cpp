@@ -146,9 +146,12 @@ static void getVarsFromConstraint(ConstraintVariable *V, CAtoms &R,
       if (FVConstraint *FVC = PVC->getFV())
         getVarsFromConstraint(FVC, R, Visited);
     } else if (auto *FVC = dyn_cast_or_null<FVConstraint>(V)) {
-      getVarsFromConstraint(FVC->getInternalReturn(), R, Visited);
+      auto GetComponentVars = [&R, &Visited](const FVComponentVariable *F) {
+        getVarsFromConstraint(F->getValidDecl(), R, Visited);
+      };
+      GetComponentVars(FVC->getCombineReturn());
       for (unsigned I = 0; I < FVC->numParams(); I++)
-        getVarsFromConstraint(FVC->getInternalParam(I), R, Visited);
+        GetComponentVars(FVC->getCombineParam(I));
     }
   }
 }
@@ -178,12 +181,12 @@ void ProgramInfo::printAggregateStats(const std::set<std::string> &F,
                   std::back_inserter(AllAtoms));
         Tmp = C;
         if (FVConstraint *FV = dyn_cast<FVConstraint>(C)) {
-          Tmp = FV->getInternalReturn();
+          Tmp = FV->getCombineReturn()->getValidDecl();
         }
         // If this is a var atom?
-        if (Tmp->hasNtArr(CS.getVariables(), 0)) {
+        if (Tmp && Tmp->hasNtArr(CS.getVariables(), 0)) {
           NtArrPtrs.insert(Tmp);
-        } else if (Tmp->hasArr(CS.getVariables(), 0)) {
+        } else if (Tmp && Tmp->hasArr(CS.getVariables(), 0)) {
           ArrPtrs.insert(Tmp);
         }
       }
@@ -452,7 +455,6 @@ void ProgramInfo::linkFunction(FunctionVariableConstraint *FV) {
   // it is actually used).
   auto Reason = ReasonLoc(Rsn, PersistentSourceLoc());
   FV->equateWithItype(*this, Reason);
-
   // Used to apply constraints to parameters and returns for function without a
   // body. In the default configuration, the function is fully constrained so
   // that parameters and returns are considered unchecked. When 3C is run with
@@ -460,10 +462,35 @@ void ProgramInfo::linkFunction(FunctionVariableConstraint *FV) {
   // external variables to solve to checked types meaning the parameter will be
   // rewritten to an itype.
   auto LinkComponent = [this, Reason](const FVComponentVariable *FVC) {
-    FVC->getInternal()->constrainToWild(CS, Reason);
-    if (!_3COpts.InferTypesForUndefs &&
-        !FVC->getExternal()->srcHasItype() && !FVC->getExternal()->isGeneric())
+    if (!_3COpts.InferTypesForUndefs && !FVC->getExternal()->srcHasItype() &&
+        !FVC->getExternal()->isGeneric()) {
+      // Note that there exists a constraint internal >= external, so adding the
+      // constraint external >= WILD transitively constraints internal >= WILD.
+      // We could add this constraint explicitly with out changing the solution
+      // to the constraints, but this creates noise in the root-cause analysis.
       FVC->getExternal()->constrainToWild(CS, Reason);
+    } else {
+      // Contrary to above, there is no constraint external >= internal, so
+      // external is unconstrained, allowing its type to be freely inferred.
+      FVC->getInternal()->constrainToWild(CS, Reason);
+    }
+
+    // In addVariable, the internal constraint variable for function parameters
+    // was chosen chosen as the 'valid declaration' constraint variable for the
+    // function parameter. This means, for the purpose of our statistics and
+    // root-cause analysis, the parameter is consider checked only if it is
+    // internally checked. In other words, if it is fully checked (not an
+    // itype). Undefined functions (unless declared with a fully checked type)
+    // can only solve to unchecked types or itypes, so they would never be
+    // considered checked. If instead the external constraint variable is the
+    // valid declaration, an undefined function will be considered checked if it
+    // solves to and itype.
+    FVC->getExternal()->setValidDecl();
+    // The internal and external constraint variables can be the same pointer
+    // (e.g., for void pointers) in which case insetting valid decl would
+    // result in neither being considered valid.
+    if (FVC->getInternal() != FVC->getExternal())
+      FVC->getInternal()->unsetValidDecl();
   };
 
   if (!FV->hasBody()) {
@@ -643,6 +670,7 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       unifyIfTypedef(ParamTy, *AstContext, PVInternal, Safe_to_Wild);
       ensureNtCorrect(ParamTy, ParamPSL, PVInternal);
       ensureNtCorrect(ParamTy, ParamPSL, PVExternal);
+      PVExternal->unsetValidDecl();
       PVInternal->setValidDecl();
       PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(PVD, *AstContext);
       // Constraint variable is stored on the parent function, so we need to
@@ -658,9 +686,9 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       }
       // It is possible to have a param decl in a macro when the function is
       // not.
-      if (Variables.find(PSL) != Variables.end())
-        continue;
-      Variables[PSL] = PVInternal;
+      //if (Variables.find(PSL) != Variables.end())
+      //  continue;
+      //Variables[PSL] = PVInternal;
     }
 
   } else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
@@ -1057,7 +1085,7 @@ void ProgramInfo::insertIntoPtrSourceMap(PersistentSourceLoc PSL,
   if (canWrite(FilePath))
     CState.ValidSourceFiles.insert(FilePath);
 
-  if (auto *PV = dyn_cast<PVConstraint>(CV)) {
+  if (auto *PV = dyn_cast_or_null<PVConstraint>(CV)) {
     for (auto *A : PV->getCvars())
       if (auto *VA = dyn_cast<VarAtom>(A))
         // Don't overwrite a PSL already recorded for a given atom: see the
@@ -1065,20 +1093,22 @@ void ProgramInfo::insertIntoPtrSourceMap(PersistentSourceLoc PSL,
         CState.AtomSourceMap.insert(std::make_pair(VA->getLoc(), PSL));
     // If the PVConstraint is a function pointer, create mappings for parameter
     // and return variables.
-    if (auto *FV = PV->getFV()) {
-      insertIntoPtrSourceMap(PSL, FV->getInternalReturn());
-      for (unsigned int I = 0; I < FV->numParams(); I++)
-        insertIntoPtrSourceMap(PSL, FV->getInternalParam(I));
-    }
-  } else if (auto *FV = dyn_cast<FVConstraint>(CV)) {
-    insertIntoPtrSourceMap(PSL, FV->getInternalReturn());
+    if (auto *FV = PV->getFV())
+      insertIntoPtrSourceMap(PSL, FV);
+  } else if (auto *FV = dyn_cast_or_null<FVConstraint>(CV)) {
+    auto InsertComponent = [this, PSL](const FVComponentVariable *F) {
+      insertIntoPtrSourceMap(PSL, F->getValidDecl());
+    };
+    InsertComponent(FV->getCombineReturn());
+    for (unsigned int I = 0; I < FV->numParams(); I++)
+      InsertComponent(FV->getCombineParam(I));
   }
 }
 
 void ProgramInfo::insertCVAtoms(
     ConstraintVariable *CV,
     std::map<ConstraintKey, ConstraintVariable *> &AtomMap) {
-  if (auto *PVC = dyn_cast<PVConstraint>(CV)) {
+  if (auto *PVC = dyn_cast_or_null<PVConstraint>(CV)) {
     for (Atom *A : PVC->getCvars())
       if (auto *VA = dyn_cast<VarAtom>(A)) {
         // It is possible that VA->getLoc() already exists in the map if there
@@ -1089,12 +1119,13 @@ void ProgramInfo::insertCVAtoms(
       }
     if (FVConstraint *FVC = PVC->getFV())
       insertCVAtoms(FVC, AtomMap);
-  } else if (auto *FVC = dyn_cast<FVConstraint>(CV)) {
-    insertCVAtoms(FVC->getInternalReturn(), AtomMap);
+  } else if (auto *FVC = dyn_cast_or_null<FVConstraint>(CV)) {
+    auto InsertComponentAtoms = [this, &AtomMap](const FVComponentVariable *F) {
+      insertCVAtoms(F->getValidDecl(), AtomMap);
+    };
+    InsertComponentAtoms(FVC->getCombineReturn());
     for (unsigned I = 0; I < FVC->numParams(); I++)
-      insertCVAtoms(FVC->getInternalParam(I), AtomMap);
-  } else {
-    llvm_unreachable("Unknown kind of constraint variable.");
+      InsertComponentAtoms(FVC->getCombineParam(I));
   }
 }
 
