@@ -56,11 +56,14 @@ bool StructVariableInitializer::hasCheckedMembers(DeclaratorDecl *DD) {
 // the set of required rewritings.
 bool StructVariableInitializer::VisitVarDecl(VarDecl *VD) {
   // Check if we need to add an initializer.
+  // TODO: Centralize initialization logic for all types:
+  // https://github.com/correctcomputation/checkedc-clang/issues/645#issuecomment-876474200
+
   // The first two conditions are the same as in Sema::ActOnUninitializedDecl.
   if (VD->hasLocalStorage() && !isa<ParmVarDecl>(VD) && !VD->hasInit() && hasCheckedMembers(VD)) {
     // Create replacement declaration text with an initializer.
     std::string ToReplace =
-        mkStringForDeclWithUnchangedType(VD, *Context, I) + " = {}";
+        mkStringForDeclWithUnchangedType(VD, I) + " = {}";
     RewriteThese.insert(
         std::make_pair(VD, new MultiDeclMemberReplacement(VD, ToReplace)));
   }

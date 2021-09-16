@@ -208,15 +208,36 @@ llvm::Optional<std::string> MultiDeclsInfo::getTypeStrOverride(const Type *Ty, A
   return llvm::None;
 }
 
-MultiDeclInfo &MultiDeclsInfo::findContainingMultiDecl(MultiDeclMemberDecl *MMD, ASTContext &C) {
-  // Look for a MultiDeclInfo for the beginning location of D, then check that
-  // the MultiDeclInfo actually contains D. If we had no MultiDeclInfo at all
-  // for that location, this may create an empty MultiDeclInfo (before failing
-  // the assertion below if assertions are enabled), but that shouldn't matter
-  // because nothing iterates over the whole map.
-  MultiDeclInfo &MDI = TUInfos[&C][MMD->getBeginLoc()];
+MultiDeclInfo *MultiDeclsInfo::findContainingMultiDecl(MultiDeclMemberDecl *MMD) {
+  TUMultiDeclsInfo &TUInfo = TUInfos[&MMD->getASTContext()];
+  // Look for a MultiDeclInfo for the beginning location of MMD, then check that
+  // the MultiDeclInfo actually contains MMD.
+  auto It = TUInfo.find(MMD->getBeginLoc());
+  if (It == TUInfo.end())
+    return nullptr;
+  MultiDeclInfo &MDI = It->second;
   // Hope we don't have multi-decls with so many members that this becomes a
   // performance problem.
-  assert(std::find(MDI.Members.begin(), MDI.Members.end(), MMD) != MDI.Members.end());
-  return MDI;
+  if (std::find(MDI.Members.begin(), MDI.Members.end(), MMD) != MDI.Members.end())
+    return &MDI;
+  return nullptr;
+}
+
+bool MultiDeclsInfo::wasBaseTypeRenamed(Decl *D) {
+  // We assume that the base type was renamed if and only if D belongs to a
+  // multi-decl marked as having the base type renamed. It might be better to
+  // actually extract the base type from D and look it up in
+  // AssignedTagTypeStrs, but that's more work.
+  MultiDeclMemberDecl *MMD = getAsMultiDeclMember(D);
+  if (!MMD)
+    return false;
+  MultiDeclInfo *MDI = findContainingMultiDecl(MMD);
+  // REVIEW: We expect to have a MultiDeclInfo for every MultiDeclMemberDecl in
+  // the program. If MDI is null, do we want to assert or at least log an error
+  // of some kind? This might be a good opportunity to add a new "non-fatal
+  // assertion" mechanism to 3C so that any unexpected conditions cause our
+  // tests to fail but end users can downgrade the failures to warnings to
+  // unblock themselves (at the risk of incorrect output that has to be fixed
+  // manually).
+  return (MDI && MDI->BaseTypeRenamed);
 }

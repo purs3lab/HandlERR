@@ -95,20 +95,28 @@ private:
 
 typedef std::map<Decl *, DeclReplacement *> RSet;
 
-// TODO: Document and maybe give this a better name.
-std::string buildDeclVar(MultiDeclMemberDecl *MMD,
-                         PVConstraint *PVC,
-                         ASTContext &Context,
-                         ProgramInfo &Info);
+// Generate a string for the declaration based on the given PVConstraint.
+// Includes the storage qualifier, type, name, and bounds string (as
+// applicable), or generates an itype declaration if required due to
+// ItypesForExtern. Does not include a trailing semicolon or an initializer, so
+// it can be used in combination with getDeclSourceRangeWithAnnotations with
+// IncludeInitializer = false to preserve an existing initializer.
+std::string mkStringForPVDecl(MultiDeclMemberDecl *MMD,
+                              PVConstraint *PVC,
+                              ProgramInfo &Info);
 
-// TODO: Update documentation
-// Generate a string for the declaration that includes the name, type, storage
-// qualifier, and bounds string (as applicable) but not a trailing semicolon.
-// Honors names assigned to unnamed TagDecls by 3C. Used by
-// DeclRewriter::rewriteMultiDecl for variables that don't have a replacement
-// and by StructVariableInitializer (which appends an initializer).
+// Generate a string like mkStringForPVDecl, but for a declaration whose type is
+// known not to have changed (except possibly for a base type rename) and that
+// may not have a PVConstraint if the type is not a pointer or array type.
+//
+// For similar reasons as in the comment in DeclRewriter::buildItypeDecl, this
+// will get the string from Clang instead of mkString if the base type hasn't
+// been renamed (hence the need to assume the rest of the type has not changed).
+// Yet another possible approach would be to combine the new base type name with
+// the original source for the rest of the declaration, but that may run into
+// problems with macros and the like, so we might still need some fallback. For
+// now, we don't implement this "original source" approach.
 std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *D,
-                                             ASTContext &Context,
                                              ProgramInfo &Info);
 
 // Class that handles rewriting bounds information for all the

@@ -185,7 +185,8 @@ public:
   void findUsedTagNames(ASTContext &Context);
   void findMultiDecls(ASTContext &Context);
   llvm::Optional<std::string> getTypeStrOverride(const Type *Ty, ASTContext &C);
-  MultiDeclInfo &findContainingMultiDecl(MultiDeclMemberDecl *MMD, ASTContext &C);
+  MultiDeclInfo *findContainingMultiDecl(MultiDeclMemberDecl *MMD);
+  bool wasBaseTypeRenamed(Decl *D);
 };
 
 #endif // LLVM_CLANG_3C_MULTIDECLS_H

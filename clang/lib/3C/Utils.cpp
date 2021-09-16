@@ -602,3 +602,24 @@ SourceLocation getCheckedCAnnotationsEnd(const Decl *D) {
 
   return End;
 }
+
+SourceRange getDeclSourceRangeWithAnnotations(
+    const clang::Decl *D, bool IncludeInitializer) {
+  SourceManager &SM = D->getASTContext().getSourceManager();
+  SourceRange SR;
+  const VarDecl *VD;
+  // Only a VarDecl can have an initializer. VarDecl's implementation of the
+  // getSourceRange virtual method includes the initializer, but we can manually
+  // call DeclaratorDecl's implementation, which excludes the initializer.
+  if (!IncludeInitializer && (VD = dyn_cast<VarDecl>(D)) != nullptr)
+    SR = VD->DeclaratorDecl::getSourceRange();
+  else
+    SR = D->getSourceRange();
+  SourceLocation OldEnd = SR.getEnd();
+  SourceLocation AnnotationsEnd = getCheckedCAnnotationsEnd(D);
+  if (AnnotationsEnd.isValid() &&
+      (!OldEnd.isValid() ||
+       SM.isBeforeInTranslationUnit(OldEnd, AnnotationsEnd)))
+    SR.setEnd(AnnotationsEnd);
+  return SR;
+}

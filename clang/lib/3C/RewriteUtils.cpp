@@ -21,10 +21,9 @@
 using namespace llvm;
 using namespace clang;
 
-std::string buildDeclVar(MultiDeclMemberDecl *MMD,
-                         PVConstraint *PVC,
-                         ASTContext &Context,
-                         ProgramInfo &Info) {
+std::string mkStringForPVDecl(MultiDeclMemberDecl *MMD,
+                              PVConstraint *PVC,
+                              ProgramInfo &Info) {
   // Currently, it's cheap to keep recreating the ArrayBoundsRewriter. If that
   // ceases to be true, we should pass it along as another argument.
   ArrayBoundsRewriter ABRewriter{Info};
@@ -55,10 +54,34 @@ std::string buildDeclVar(MultiDeclMemberDecl *MMD,
 }
 
 std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *MMD,
-                                             ASTContext &Context,
                                              ProgramInfo &Info) {
+  bool BaseTypeRenamed = Info.TheMultiDeclsInfo.wasBaseTypeRenamed(MMD);
+  if (!BaseTypeRenamed) {
+    // As far as we know, we can let Clang generate the declaration string. To
+    // get it without any initializer, we temporarily mutate the Decl to remove
+    // the initializer: a hack, but there isn't an obvious better way.
+    auto *VD = dyn_cast<VarDecl>(MMD);
+    Expr *Init = nullptr;
+    if (VD && VD->hasInit()) {
+      Init = VD->getInit();
+      VD->setInit(nullptr);
+    }
+
+    std::string DeclStr = "";
+    raw_string_ostream DeclStream(DeclStr);
+    MMD->print(DeclStream);
+    assert("Original decl string empty." && !DeclStr.empty());
+
+    // Undo the mutation, if applicable.
+    if (VD && Init)
+      VD->setInit(Init);
+
+    return DeclStr;
+  }
+
+  // OK, we have to use mkString.
+  ASTContext &Context = MMD->getASTContext();
   QualType DType = getTypeOfMultiDeclMember(MMD);
-  std::string TypeWithName;
   if (isPtrOrArrayType(DType)) {
     CVarOption CVO =
         (isa<TypedefDecl>(MMD)
@@ -69,16 +92,32 @@ std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *MMD,
     // A function currently can't be a multi-decl member, so this should always
     // be a PointerVariableConstraint.
     PVConstraint *PVC = cast<PointerVariableConstraint>(&CVO.getValue());
-    return buildDeclVar(MMD, PVC, Context, Info);
+    // If we need an itype declaration due to ItypesForExtern, mkStringForPVDecl
+    // will handle that and will check whether it needs to use mkString for the
+    // unchecked side due to a base type rename.
+    return mkStringForPVDecl(MMD, PVC, Info);
   }
-  // In this case, the type should just be the base type except for top-level
-  // qualifiers. (REVIEW: Can we verify that somehow?)
-  // PointerVariableConstraint::extractBaseType doesn't include qualifiers,
-  // but since we know the type is not a pointer, it should be safe to just
-  // add any qualifiers at the beginning of the string.
+
+  // If the type is not a pointer or array, then it should just equal the base
+  // type except for top-level qualifiers (REVIEW: Can we verify that somehow?),
+  // and it can't have itypes or bounds.
+  // PointerVariableConstraint::extractBaseType doesn't include qualifiers, but
+  // since we know the type is not a pointer, just adding any qualifiers at the
+  // beginning of the string should be correct.
   std::string QualifierPrefix = DType.getQualifiers().getAsString();
   if (!QualifierPrefix.empty())
     QualifierPrefix += " ";
+  // REVIEW: It's awkward to use PointerVariableConstraint::extractBaseType
+  // here, though it seems to work so far.
+  // PointerVariableConstraint::extractBaseType takes a bunch of parameters that
+  // are poorly documented and seem specific to the way it is used by
+  // PointerVariableConstraint. Help me clean that up? Once
+  // PointerVariableConstraint::extractBaseType is more general, it might be
+  // more reasonable to move it to Utils.cpp as John suggested
+  // (https://github.com/correctcomputation/checkedc-clang/issues/652#issuecomment-882886270)
+  // if I can figure out what to do about the dependency on MultiDecls.h for the
+  // MultiDeclMemberDecl parameter type.
+  //
   // extractBaseType can handle TSI == nullptr. Don't duplicate that code
   // here.
   return getStorageQualifierString(MMD) + QualifierPrefix +
@@ -458,14 +497,7 @@ private:
 };
 
 SourceRange DeclReplacement::getSourceRange(SourceManager &SM) const {
-  SourceRange SR = getDecl()->getSourceRange();
-  SourceLocation OldEnd = SR.getEnd();
-  SourceLocation NewEnd  = getCheckedCAnnotationsEnd(getDecl());
-  if (NewEnd.isValid() &&
-      (!OldEnd.isValid() || SM.isBeforeInTranslationUnit(OldEnd, NewEnd)))
-    SR.setEnd(NewEnd);
-
-  return SR;
+  return getDeclSourceRangeWithAnnotations(getDecl(), /*IncludeInitializer=*/false);
 }
 
 SourceRange FunctionDeclReplacement::getSourceRange(SourceManager &SM) const {
