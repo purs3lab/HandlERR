@@ -57,7 +57,7 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
   // (https://github.com/correctcomputation/checkedc-clang/issues/705)?
   bool IsCheckedTypedef = Defn->isTypedef() && !IsUncheckedTypedef;
 
-  bool BaseTypeRenamed = Info.TheMultiDeclsInfo.wasBaseTypeRenamed(Decl);
+  bool BaseTypeRenamed = Decl && Info.TheMultiDeclsInfo.wasBaseTypeRenamed(Decl);
 
   // It should in principle be possible to always generate the unchecked portion
   // of the itype by going through mkString. However, mkString has bugs that
