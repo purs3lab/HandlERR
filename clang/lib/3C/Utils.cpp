@@ -615,11 +615,25 @@ SourceRange getDeclSourceRangeWithAnnotations(
     SR = VD->DeclaratorDecl::getSourceRange();
   else
     SR = D->getSourceRange();
-  SourceLocation OldEnd = SR.getEnd();
+  if (!SR.isValid())
+    return SR;
+  SourceLocation DeclEnd = SR.getEnd();
+
+  // Partial workaround for a compiler bug where if D has certain checked
+  // pointer types such as `_Ptr<int *(void)>` (seen in the partial_checked.c
+  // regression test), D->getSourceRange() returns only the _Ptr token (TODO:
+  // file an issue). Always extend the range at least through the name (given by
+  // D->getLocation()). That fixes the `_Ptr<int *(void)> x` case but not cases
+  // with additional syntax after the name, such as `_Ptr<int *(void)> x[10]`.
+  SourceLocation DeclLoc = D->getLocation();
+  if (SM.isBeforeInTranslationUnit(DeclEnd, DeclLoc))
+    DeclEnd = DeclLoc;
+
   SourceLocation AnnotationsEnd = getCheckedCAnnotationsEnd(D);
   if (AnnotationsEnd.isValid() &&
-      (!OldEnd.isValid() ||
-       SM.isBeforeInTranslationUnit(OldEnd, AnnotationsEnd)))
-    SR.setEnd(AnnotationsEnd);
+      SM.isBeforeInTranslationUnit(DeclEnd, AnnotationsEnd))
+    DeclEnd = AnnotationsEnd;
+
+  SR.setEnd(DeclEnd);
   return SR;
 }
