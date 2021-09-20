@@ -17,13 +17,13 @@
 #include "clang/3C/PersistentSourceLoc.h"
 
 // Source info and reason
-class Feedback {
+class RootCauseDiagnostic {
 public:
-  Feedback() = default;
-  explicit Feedback(ReasonLoc &Rsn) : Main(Rsn) {}
+  RootCauseDiagnostic() = default;
+  explicit RootCauseDiagnostic(ReasonLoc &Rsn) : Main(Rsn) {}
 
-  std::string &getReason() { return Main.Reason; }
-  void setReason(std::string &Rsn) { Main.Reason = Rsn; }
+  const std::string &getReason() { return Main.Reason; }
+  void setReason(const std::string &Rsn) { Main.Reason = Rsn; }
 
   const PersistentSourceLoc &getLocation() const { return Main.Location; }
 
@@ -52,7 +52,7 @@ public:
   void printRootCauseStats(raw_ostream &O, Constraints &CS);
   int getNumPtrsAffected(ConstraintKey CK);
 
-  std::map<ConstraintKey, Feedback> RootWildAtomsWithReason;
+  std::map<ConstraintKey, RootCauseDiagnostic> RootWildAtomsWithReason;
   CVars AllWildAtoms;
   CVars InSrcWildAtoms;
   CVars TotalNonDirectWildAtoms;

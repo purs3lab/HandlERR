@@ -1039,7 +1039,7 @@ bool ProgramInfo::computeInterimConstraintState(
         if (!PSL.valid() && APSL.valid())
           PSL = APSL;
         auto Rsn = ReasonLoc(EC->getReasonText(), PSL);
-        Feedback Info(Rsn);
+        RootCauseDiagnostic Info(Rsn);
         for (const auto& Reason : CurrC->additionalReasons()) {
           PersistentSourceLoc P = Reason.Location;
           if (!P.valid() && APSL.valid())

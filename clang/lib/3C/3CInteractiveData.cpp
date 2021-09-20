@@ -111,7 +111,7 @@ void ConstraintsInfo::printConstraintStats(llvm::raw_ostream &O,
                                            ConstraintKey Cause) {
   O << "{\"ConstraintKey\":" << Cause << ", ";
   O << "\"Name\":\"" << CS.getVar(Cause)->getStr() << "\", ";
-  Feedback PtrInfo = RootWildAtomsWithReason.at(Cause);
+  RootCauseDiagnostic PtrInfo = RootWildAtomsWithReason.at(Cause);
   O << "\"Reason\":\"" << PtrInfo.getReason() << "\", ";
   O << "\"InSrc\":" << (InSrcWildAtoms.find(Cause) != InSrcWildAtoms.end())
     << ", ";
