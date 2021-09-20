@@ -380,14 +380,20 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
           // does permit taking the address of an _Array_ptr when the array
           // pointer has no declared bounds. With this constraint added however,
           // 3C will not generate such code.
-          auto Rsn = ReasonLoc(REFERENCE_REASON,ExprPSL);
-          for (auto *CV : T.first)
-            if (auto *PCV = dyn_cast<PVConstraint>(CV))
+          for (auto *CV : T.first) {
+            if (auto *PCV = dyn_cast<PVConstraint>(CV)) {
               // On the other hand, CheckedC does let you take the address of
               // constant sized arrays.
-              if (!PCV->getArrPresent())
+              if (!PCV->getArrPresent()) {
+                auto Rsn = ReasonLoc(
+                    "Operand of address-of has PTR lower bound", ExprPSL);
                 PCV->constrainOuterTo(CS, CS.getPtr(), Rsn, true);
+              }
+            }
+          }
           // Add a VarAtom to UOExpr's PVConstraint, for &.
+          auto Rsn = ReasonLoc(
+              "Result of address-of has PTR lower bound",ExprPSL);
           Ret = std::make_pair(addAtomAll(T.first, CS.getPtr(),
                                           Rsn, CS), T.second);
         }

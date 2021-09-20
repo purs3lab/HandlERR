@@ -103,7 +103,7 @@ void test_conflict() {
   char **cptr = &c; // #as_ptr
 }
 // expected-warning@#decl {{2 unchecked pointers: Inferred conflicting types}}
-// expected-note@#as_ptr {{Use of & operator}}
+// expected-note@#as_ptr {{Operand of address-of has PTR lower bound}}
 // expected-note@#as_nt {{Assigning from c to s}}
 
 

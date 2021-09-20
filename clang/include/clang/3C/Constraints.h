@@ -41,7 +41,6 @@ class ConstraintsGraph;
 #define NT_ARRAY_REASON "Lowerbounded to an nt_array type"
 // SPECIAL_REASON("name_of_func")
 #define SPECIAL_REASON(spec) (std::string("Special case for ") + (spec))
-#define REFERENCE_REASON "Use of & operator"
 #define STRING_LITERAL_REASON "The type of a string literal"
 #define MACRO_REASON "Pointer in Macro declaration."
 
