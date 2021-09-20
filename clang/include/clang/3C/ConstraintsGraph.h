@@ -228,7 +228,9 @@ private:
 };
 
 // Specialize the graph for the checked and pointer type constraint graphs. This
-// graphs stores atoms at each node.
+// graphs stores atoms at each node, and constraints on each edge. These edges
+// are returned by the specialized `getNeighbors` function to provide constraint
+// data to clients.
 class ConstraintsGraph : public DataGraph<Atom *> {
 public:
   // Add an edge to the graph according to the Geq constraint. This is an edge
@@ -241,6 +243,8 @@ public:
 
   typedef DataEdge<Atom*> EdgeType;
 
+  // This version provides more info by returning graph edges
+  // rather than data items
   bool getNeighbors(Atom *A, std::vector<EdgeType*> &DataSet, bool Succ,
                     bool Append = false, bool IgnoreSoftEdges = false) {
     NodeType *N = this->findNode(A);
