@@ -60,7 +60,7 @@ void decayed_type(char s[10]) {
 }
 
 void paren_type(char *(s)) {
-//CHECK_NOALL: void paren_type(char *s : itype(_Ptr<char>)) {
+//CHECK_NOALL: void paren_type(char *(s) : itype(_Ptr<char>)) {
 //CHECK_ALL: void paren_type(_Nt_array_ptr<char> s) {
   force_nt_arr(s);
 }
