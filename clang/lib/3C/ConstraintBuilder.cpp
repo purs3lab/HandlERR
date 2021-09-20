@@ -95,7 +95,7 @@ public:
       bool IsNamedInLineStruct =
           IsInLineStruct && LastRecordDecl->getNameAsString() != "";
       if (IsInLineStruct && !IsNamedInLineStruct) {
-        if (!AllTypes) {
+        if (!_3COpts.AllTypes) {
           CVarOption CV = Info.getVariable(VD, Context);
           CB.constraintCVarToWild(CV, "Inline struct encountered.");
         } else {
@@ -166,7 +166,8 @@ public:
     // Is cast compatible with LHS type?
     QualType SrcT = C->getSubExpr()->getType();
     QualType DstT = C->getType();
-    if (!isCastSafe(DstT, SrcT) && !Info.hasPersistentConstraints(C, Context)) {
+    if (!CB.isCastofGeneric(C) && !isCastSafe(DstT, SrcT)
+      && !Info.hasPersistentConstraints(C, Context)) {
       auto CVs = CB.getExprConstraintVarsSet(C->getSubExpr());
       std::string Rsn =
           "Cast from " + SrcT.getAsString() + " to " + DstT.getAsString();
@@ -239,12 +240,11 @@ public:
           for (const auto &A : E->arguments()) {
             CSetBkeyPair ArgumentConstraints;
             if (I < TargetFV->numParams()) {
-              // Remove casts to void* on polymorphic types that are used
-              // consistently.
-              const int TyIdx =
-                  TargetFV->getExternalParam(I)->getGenericIndex();
-              if (ConsistentTypeParams.find(TyIdx) !=
-                  ConsistentTypeParams.end())
+              // When the function has a void* parameter, Clang will
+              // add an implicit cast to void* here. Generating constraints
+              // will add an extraneous wild constraint to void*. This
+              // unnecessarily complicates results and root causes.
+              if (TargetFV->getExternalParam(I)->isVoidPtr())
                 ArgumentConstraints =
                     CB.getExprConstraintVars(A->IgnoreImpCasts());
               else
@@ -269,7 +269,8 @@ public:
               constrainConsVarGeq(ParameterDC, ArgumentConstraints.first, CS,
                                   &PL, CA, false, &Info, false);
 
-              if (AllTypes && TFD != nullptr && I < TFD->getNumParams()) {
+              if (_3COpts.AllTypes && TFD != nullptr &&
+                  I < TFD->getNumParams()) {
                 auto *PVD = TFD->getParamDecl(I);
                 auto &CSBI = Info.getABoundsInfo().getCtxSensBoundsHandler();
                 // Here, we need to handle context-sensitive assignment.
@@ -279,7 +280,7 @@ public:
               }
             } else {
               // The argument passed to a function ith varargs; make it wild
-              if (HandleVARARGS) {
+              if (_3COpts.HandleVARARGS) {
                 CB.constraintAllCVarsToWild(ArgumentConstraints.first,
                                             "Passing argument to a function "
                                             "accepting var args.",
@@ -292,7 +293,7 @@ public:
                   // (https://github.com/correctcomputation/checkedc-clang/issues/549).
                   constrainVarsTo(ArgumentConstraints.first, CS.getNTArr());
                 }
-                if (Verbose) {
+                if (_3COpts.Verbose) {
                   std::string FuncName = TargetFV->getName();
                   errs() << "Ignoring function as it contains varargs:"
                          << FuncName << "\n";
@@ -514,7 +515,7 @@ public:
   bool VisitFunctionDecl(FunctionDecl *D) {
     FullSourceLoc FL = Context->getFullLoc(D->getBeginLoc());
 
-    if (Verbose)
+    if (_3COpts.Verbose)
       errs() << "Analyzing function " << D->getName() << "\n";
 
     if (FL.isValid()) { // TODO: When would this ever be false?
@@ -522,7 +523,7 @@ public:
         Stmt *Body = D->getBody();
         FunctionVisitor FV = FunctionVisitor(Context, Info, D);
         FV.TraverseStmt(Body);
-        if (AllTypes) {
+        if (_3COpts.AllTypes) {
           // Only do this, if all types is enabled.
           LengthVarInference LVI(Info, Context, D);
           LVI.Visit(Body);
@@ -530,7 +531,7 @@ public:
       }
     }
 
-    if (Verbose)
+    if (_3COpts.Verbose)
       errs() << "Done analyzing function\n";
 
     return true;
@@ -618,7 +619,7 @@ private:
 
 void VariableAdderConsumer::HandleTranslationUnit(ASTContext &C) {
   Info.enterCompilationUnit(C);
-  if (Verbose) {
+  if (_3COpts.Verbose) {
     SourceManager &SM = C.getSourceManager();
     FileID MainFileId = SM.getMainFileID();
     const FileEntry *FE = SM.getFileEntryForID(MainFileId);
@@ -635,7 +636,7 @@ void VariableAdderConsumer::HandleTranslationUnit(ASTContext &C) {
     VAV.TraverseDecl(D);
   }
 
-  if (Verbose)
+  if (_3COpts.Verbose)
     errs() << "Done analyzing\n";
 
   Info.exitCompilationUnit();
@@ -644,7 +645,7 @@ void VariableAdderConsumer::HandleTranslationUnit(ASTContext &C) {
 
 void ConstraintBuilderConsumer::HandleTranslationUnit(ASTContext &C) {
   Info.enterCompilationUnit(C);
-  if (Verbose) {
+  if (_3COpts.Verbose) {
     SourceManager &SM = C.getSourceManager();
     FileID MainFileId = SM.getMainFileID();
     const FileEntry *FE = SM.getFileEntryForID(MainFileId);
@@ -684,7 +685,7 @@ void ConstraintBuilderConsumer::HandleTranslationUnit(ASTContext &C) {
     SR.TraverseDecl(D);
   }
 
-  if (Verbose)
+  if (_3COpts.Verbose)
     errs() << "Done analyzing\n";
 
   PStats.endConstraintBuilderTime();

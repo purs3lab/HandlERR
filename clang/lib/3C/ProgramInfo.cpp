@@ -169,7 +169,8 @@ void ProgramInfo::printAggregateStats(const std::set<std::string> &F,
   for (auto &I : Variables) {
     ConstraintVariable *C = I.second;
     std::string FileName = I.first.getFileName();
-    if (F.count(FileName) || FileName.find(BaseDir) != std::string::npos) {
+    if (F.count(FileName) ||
+        FileName.find(_3COpts.BaseDir) != std::string::npos) {
       if (C->isForValidDecl()) {
         FoundVars.clear();
         getVarsFromConstraint(C, FoundVars, Visited);
@@ -236,8 +237,9 @@ void ProgramInfo::printAggregateStats(const std::set<std::string> &F,
 void ProgramInfo::printStats(const std::set<std::string> &F, raw_ostream &O,
                              bool OnlySummary, bool JsonFormat) {
   if (!OnlySummary && !JsonFormat) {
-    O << "Enable itype propagation:" << EnablePropThruIType << "\n";
-    O << "Sound handling of var args functions:" << HandleVARARGS << "\n";
+    O << "Enable itype propagation:" << _3COpts.EnablePropThruIType << "\n";
+    O << "Sound handling of var args functions:" << _3COpts.HandleVARARGS
+      << "\n";
   }
   std::map<std::string, std::tuple<int, int, int, int, int>> FilesToVars;
   CVarSet InSrcCVars, Visited;
@@ -247,7 +249,8 @@ void ProgramInfo::printStats(const std::set<std::string> &F, raw_ostream &O,
   // First, build the map and perform the aggregation.
   for (auto &I : Variables) {
     std::string FileName = I.first.getFileName();
-    if (F.count(FileName) || FileName.find(BaseDir) != std::string::npos) {
+    if (F.count(FileName) ||
+        FileName.find(_3COpts.BaseDir) != std::string::npos) {
       int VarC = 0;
       int PC = 0;
       int NtaC = 0;
@@ -352,7 +355,7 @@ void ProgramInfo::printStats(const std::set<std::string> &F, raw_ostream &O,
     O << "}},\n";
   }
 
-  if (AllTypes) {
+  if (_3COpts.AllTypes) {
     if (JsonFormat) {
       O << "\"BoundsStats\":";
     }
@@ -375,7 +378,7 @@ void ProgramInfo::printStats(const std::set<std::string> &F, raw_ostream &O,
 bool ProgramInfo::link() {
   // For every global symbol in all the global symbols that we have found
   // go through and apply rules for whether they are functions or variables.
-  if (Verbose)
+  if (_3COpts.Verbose)
     llvm::errs() << "Linking!\n";
 
   // Equate the constraints for all global variables.
@@ -387,7 +390,7 @@ bool ProgramInfo::link() {
       std::set<PVConstraint *>::iterator I = C.begin();
       std::set<PVConstraint *>::iterator J = C.begin();
       ++J;
-      if (Verbose)
+      if (_3COpts.Verbose)
         llvm::errs() << "Global variables:" << V.first << "\n";
       while (J != C.end()) {
         constrainConsVarGeq(*I, *J, CS, nullptr, Same_to_Same, true, this);
@@ -414,44 +417,8 @@ bool ProgramInfo::link() {
 
   // For every global function that is an unresolved external, constrain
   // its parameter types to be wild. Unless it has a bounds-safe annotation.
-  for (const auto &U : ExternalFunctionFVCons) {
-    std::string FuncName = U.first;
-    FVConstraint *G = U.second;
-
-    // If there was a checked type on a variable in the input program, it
-    // should stay that way. Otherwise, we shouldn't be adding a checked type
-    // to an extern function.
-    std::string Rsn = (G->hasBody() ? ""
-                                    : "Unchecked pointer in parameter or "
-                                      "return of external function " +
-                                          FuncName);
-
-    // Handle the cases where itype parameters should not be treated as their
-    // unchecked type.
-    // TODO: Ditto re getting a PSL (in the case in which Rsn is non-empty and
-    // it is actually used).
-    G->equateWithItype(*this, Rsn, nullptr);
-
-    // If we've seen this symbol, but never seen a body for it, constrain
-    // everything about it.
-    // Some global symbols we don't need to constrain to wild, like
-    // malloc and free. Check those here and skip if we find them.
-    if (!G->hasBody()) {
-      const FVComponentVariable *Ret = G->getCombineReturn();
-      Ret->getInternal()->constrainToWild(CS, Rsn);
-      if (!Ret->getExternal()->srcHasItype() &&
-          !Ret->getExternal()->getIsGeneric())
-        Ret->getExternal()->constrainToWild(CS, Rsn);
-
-      for (unsigned I = 0; I < G->numParams(); I++) {
-        const FVComponentVariable *Param = G->getCombineParam(I);
-        Param->getInternal()->constrainToWild(CS, Rsn);
-        if (!Param->getExternal()->srcHasItype() &&
-            !Param->getExternal()->getIsGeneric())
-          Param->getExternal()->constrainToWild(CS, Rsn);
-      }
-    }
-  }
+  for (const auto &U : ExternalFunctionFVCons)
+    linkFunction(U.second);
 
   // Repeat for static functions.
   //
@@ -459,33 +426,45 @@ bool ProgramInfo::link() {
   // error during compilation. They may still be useful as code is developed,
   // so we treat them as if they are external, and constrain parameters
   // to wild as appropriate.
-  for (const auto &U : StaticFunctionFVCons) {
-    for (const auto &V : U.second) {
-
-      std::string FileName = U.first;
-      std::string FuncName = V.first;
-      FVConstraint *G = V.second;
-
-      std::string Rsn = (G->hasBody() ? ""
-                                      : "Unchecked pointer in parameter or "
-                                        "return of static function " +
-                                            FuncName + " in " + FileName);
-
-      // TODO: Ditto re getting a PSL
-      G->equateWithItype(*this, Rsn, nullptr);
-
-      if (!G->hasBody()) {
-
-        if (!G->getExternalReturn()->getIsGeneric())
-          G->getExternalReturn()->constrainToWild(CS, Rsn);
-        for (unsigned I = 0; I < G->numParams(); I++)
-          if (!G->getExternalParam(I)->getIsGeneric())
-            G->getExternalParam(I)->constrainToWild(CS, Rsn);
-      }
-    }
-  }
+  for (const auto &U : StaticFunctionFVCons)
+    for (const auto &V : U.second)
+      linkFunction(V.second);
 
   return true;
+}
+
+void ProgramInfo::linkFunction(FunctionVariableConstraint *FV) {
+  // If there was a checked type on a variable in the input program, it
+  // should stay that way. Otherwise, we shouldn't be adding a checked type
+  // to an undefined function.
+  std::string Rsn = (FV->hasBody() ? "" : "Unchecked pointer in parameter or "
+                                          "return of undefined function " +
+                                          FV->getName());
+
+  // Handle the cases where itype parameters should not be treated as their
+  // unchecked type.
+  // TODO: Ditto re getting a PSL (in the case in which Rsn is non-empty and
+  // it is actually used).
+  FV->equateWithItype(*this, Rsn, nullptr);
+
+  // Used to apply constraints to parameters and returns for function without a
+  // body. In the default configuration, the function is fully constrained so
+  // that parameters and returns are considered unchecked. When 3C is run with
+  // --infer-types-for-undefs, only internal variables are constrained, allowing
+  // external variables to solve to checked types meaning the parameter will be
+  // rewritten to an itype.
+  auto LinkComponent = [this, Rsn](const FVComponentVariable *FVC) {
+    FVC->getInternal()->constrainToWild(CS, Rsn);
+    if (!_3COpts.InferTypesForUndefs &&
+        !FVC->getExternal()->srcHasItype() && !FVC->getExternal()->isGeneric())
+      FVC->getExternal()->constrainToWild(CS, Rsn);
+  };
+
+  if (!FV->hasBody()) {
+    LinkComponent(FV->getCombineReturn());
+    for (unsigned I = 0; I < FV->numParams(); I++)
+      LinkComponent(FV->getCombineParam(I));
+  }
 }
 
 // Populate Variables, VarDeclToStatement, RVariables, and DepthMap with
@@ -577,31 +556,6 @@ ProgramInfo::insertNewFVConstraint(FunctionDecl *FD, FVConstraint *NewC,
   return (*Map)[FuncName];
 }
 
-void ProgramInfo::specialCaseVarIntros(ValueDecl *D, ASTContext *Context) {
-  // Special-case for va_list, constrain to wild.
-  bool IsGeneric = false;
-  PVConstraint *PVC = nullptr;
-
-  CVarOption CVOpt = getVariable(D, Context);
-  if (CVOpt.hasValue()) {
-    ConstraintVariable &CV = CVOpt.getValue();
-    PVC = dyn_cast<PVConstraint>(&CV);
-  }
-
-  if (isa<ParmVarDecl>(D))
-    IsGeneric = PVC && PVC->getIsGeneric();
-  bool IsVarArg = isVarArgType(D->getType().getAsString());
-  bool IsVoidPtr = hasVoidType(D) && !IsGeneric;
-  if (IsVarArg || IsVoidPtr) {
-    // Set the reason for making this variable WILD.
-    PersistentSourceLoc PL = PersistentSourceLoc::mkPSL(D, *Context);
-    std::string Rsn = IsVoidPtr ? "Variable type void."
-                                : "Variable type is va_list.";
-    if (PVC != nullptr)
-      PVC->constrainToWild(CS, Rsn, &PL);
-  }
-}
-
 // For each pointer type in the declaration of D, add a variable to the
 // constraint system for that pointer type.
 void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
@@ -665,8 +619,8 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
     NewCV = F;
 
     auto RetTy = FD->getReturnType();
-    unifyIfTypedef(RetTy.getTypePtr(), *AstContext, FD, F->getExternalReturn());
-    unifyIfTypedef(RetTy.getTypePtr(), *AstContext, FD, F->getInternalReturn());
+    unifyIfTypedef(RetTy, *AstContext, F->getExternalReturn(), Wild_to_Safe);
+    unifyIfTypedef(RetTy, *AstContext, F->getInternalReturn(), Safe_to_Wild);
     ensureNtCorrect(RetTy, *AstContext, F->getExternalReturn());
     ensureNtCorrect(RetTy, *AstContext, F->getInternalReturn());
 
@@ -674,21 +628,20 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
     // the parameters.
     for (unsigned I = 0; I < FD->getNumParams(); I++) {
       ParmVarDecl *PVD = FD->getParamDecl(I);
-      const Type *Ty = PVD->getType().getTypePtr();
+      QualType ParamTy = PVD->getType();
       PVConstraint *PVInternal = F->getInternalParam(I);
       PVConstraint *PVExternal = F->getExternalParam(I);
-      unifyIfTypedef(Ty, *AstContext, PVD, PVInternal);
-      unifyIfTypedef(Ty, *AstContext, PVD, PVExternal);
-      ensureNtCorrect(PVD->getType(), *AstContext, PVInternal);
-      ensureNtCorrect(PVD->getType(), *AstContext, PVExternal);
+      unifyIfTypedef(ParamTy, *AstContext, PVExternal, Wild_to_Safe);
+      unifyIfTypedef(ParamTy, *AstContext, PVInternal, Safe_to_Wild);
+      ensureNtCorrect(ParamTy, *AstContext, PVInternal);
+      ensureNtCorrect(ParamTy, *AstContext, PVExternal);
       PVInternal->setValidDecl();
       PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(PVD, *AstContext);
       // Constraint variable is stored on the parent function, so we need to
       // constrain to WILD even if we don't end up storing this in the map.
       constrainWildIfMacro(PVExternal, PVD->getLocation());
-      specialCaseVarIntros(PVD, AstContext);
       // If this is "main", constrain its argv parameter to a nested arr
-      if (AllTypes && FuncName == "main" && FD->isGlobal() && I == 1) {
+      if (_3COpts.AllTypes && FuncName == "main" && FD->isGlobal() && I == 1) {
         PVInternal->constrainOuterTo(CS, CS.getArr());
         PVInternal->constrainIdxTo(CS, CS.getNTArr(), 1);
       }
@@ -701,13 +654,13 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
 
   } else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
     assert(!isa<ParmVarDecl>(VD));
-    const Type *Ty = VD->getTypeSourceInfo()->getTypeLoc().getTypePtr();
-    if (Ty->isPointerType() || Ty->isArrayType()) {
+    QualType QT = VD->getTypeSourceInfo()->getTypeLoc().getType();
+    if (QT->isPointerType() || QT->isArrayType()) {
       PVConstraint *P = new PVConstraint(D, *this, *AstContext);
       P->setValidDecl();
       NewCV = P;
       std::string VarName(VD->getName());
-      unifyIfTypedef(Ty, *AstContext, VD, P);
+      unifyIfTypedef(QT, *AstContext, P);
       ensureNtCorrect(VD->getType(), *AstContext, P);
       if (VD->hasGlobalStorage()) {
         // If we see a definition for this global variable, indicate so in
@@ -722,25 +675,23 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
         }
         GlobalVariableSymbols[VarName].insert(P);
       }
-      specialCaseVarIntros(D, AstContext);
     }
 
   } else if (FieldDecl *FlD = dyn_cast<FieldDecl>(D)) {
-    const Type *Ty = FlD->getTypeSourceInfo()->getTypeLoc().getTypePtr();
-    if (Ty->isPointerType() || Ty->isArrayType()) {
+    QualType QT = FlD->getTypeSourceInfo()->getTypeLoc().getType();
+    if (QT->isPointerType() || QT->isArrayType()) {
       PVConstraint *P = new PVConstraint(D, *this, *AstContext);
-      unifyIfTypedef(Ty, *AstContext, FlD, P);
+      unifyIfTypedef(QT, *AstContext, P);
       NewCV = P;
       NewCV->setValidDecl();
-      specialCaseVarIntros(D, AstContext);
     }
   } else
     llvm_unreachable("unknown decl type");
 
   assert("We shouldn't be adding a null CV to Variables map." && NewCV);
   if (!canWrite(PLoc.getFileName())) {
-    NewCV->equateWithItype(*this, "Declaration in non-writable file", &PLoc);
-    NewCV->constrainToWild(CS, "Declaration in non-writable file", &PLoc);
+    NewCV->equateWithItype(*this, UNWRITABLE_REASON, &PLoc);
+    NewCV->constrainToWild(CS, UNWRITABLE_REASON, &PLoc);
   }
   constrainWildIfMacro(NewCV, D->getLocation());
   Variables[PLoc] = NewCV;
@@ -748,21 +699,21 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
 
 void ProgramInfo::ensureNtCorrect(const QualType &QT, const ASTContext &C,
                                   PointerVariableConstraint *PV) {
-  if (AllTypes && !canBeNtArray(QT)) {
+  if (_3COpts.AllTypes && !canBeNtArray(QT)) {
     PV->constrainOuterTo(CS, CS.getArr(), true, true);
   }
 }
 
-void ProgramInfo::unifyIfTypedef(const Type *Ty, ASTContext &Context,
-                                 DeclaratorDecl *Decl, PVConstraint *P) {
-  if (const auto *TDT = dyn_cast<TypedefType>(Ty)) {
+void ProgramInfo::unifyIfTypedef(const QualType &QT, ASTContext &Context,
+                                 PVConstraint *P, ConsAction CA) {
+  if (const auto *TDT = dyn_cast<TypedefType>(QT.getTypePtr())) {
     auto *TDecl = TDT->getDecl();
     auto PSL = PersistentSourceLoc::mkPSL(TDecl, Context);
     auto O = lookupTypedef(PSL);
     if (O.hasValue()) {
       auto *Bounds = &O.getValue();
-      P->setTypedef(TDecl, TDecl->getNameAsString());
-      constrainConsVarGeq(P, Bounds, CS, &PSL, Same_to_Same, true, this);
+      P->setTypedef(Bounds, TDecl->getNameAsString());
+      constrainConsVarGeq(P, Bounds, CS, &PSL, CA, false, this);
     }
   }
 }
@@ -811,7 +762,7 @@ void ProgramInfo::storePersistentConstraints(Expr *E, const CSetBkeyPair &Vars,
   auto PSL = PersistentSourceLoc::mkPSL(E, *C);
   if (PSL.valid() && !canWrite(PSL.getFileName()))
     for (ConstraintVariable *CVar : Vars.first)
-      CVar->constrainToWild(CS, "Expression in non-writable file", &PSL);
+      CVar->constrainToWild(CS, UNWRITABLE_REASON, &PSL);
 
   IDAndTranslationUnit Key = getExprKey(E, C);
   ExprConstraintVars[Key] = Vars;
@@ -1148,16 +1099,18 @@ void ProgramInfo::computePtrLevelStats() {
 }
 
 void ProgramInfo::setTypeParamBinding(CallExpr *CE, unsigned int TypeVarIdx,
-                                      ConstraintVariable *CV, ASTContext *C) {
+                                      ConstraintVariable *CV,
+                                      ConstraintVariable *Ident,
+                                      ASTContext *C) {
 
   auto Key = getExprKey(CE, C);
   auto CallMap = TypeParamBindings[Key];
   if (CallMap.find(TypeVarIdx) == CallMap.end()) {
-    TypeParamBindings[Key][TypeVarIdx] = CV;
+    TypeParamBindings[Key][TypeVarIdx] = TypeParamConstraint(CV,Ident);
   } else {
     // If this CE/idx is at the same location, it's in a macro,
     // so mark it as inconsistent.
-    TypeParamBindings[Key][TypeVarIdx] = nullptr;
+    TypeParamBindings[Key][TypeVarIdx] = TypeParamConstraint(nullptr,nullptr);
   }
 }
 
@@ -1190,12 +1143,12 @@ void ProgramInfo::addTypedef(PersistentSourceLoc PSL, bool CanRewriteDef,
   else
     V = new PointerVariableConstraint(TD, *this, C);
 
-  auto *const Rsn = !CanRewriteDef
-                        ? "Unable to rewrite a typedef with multiple names"
-                        : "Declaration in non-writable file";
-  if (!(CanRewriteDef && canWrite(PSL.getFileName()))) {
-    V->constrainToWild(this->getConstraints(), Rsn, &PSL);
-  }
+  if (!CanRewriteDef)
+    V->constrainToWild(this->getConstraints(), "Unable to rewrite a typedef with multiple names", &PSL);
+
+  if (!canWrite(PSL.getFileName()))
+    V->constrainToWild(this->getConstraints(), UNWRITABLE_REASON, &PSL);
+
   constrainWildIfMacro(V, TD->getLocation(), &PSL);
   this->TypedefVars[PSL] = {*V};
 }

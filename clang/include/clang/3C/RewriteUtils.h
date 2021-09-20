@@ -28,9 +28,7 @@ public:
 
   std::string getReplacement() const { return Replacement; }
 
-  virtual SourceRange getSourceRange(SourceManager &SM) const {
-    return getDecl()->getSourceRange();
-  }
+  virtual SourceRange getSourceRange(SourceManager &SM) const;
 
   // Discriminator for LLVM-style RTTI (dyn_cast<> et al.).
   enum DRKind {
@@ -84,21 +82,23 @@ class FunctionDeclReplacement
                                   DeclReplacement::DRK_FunctionDecl> {
 public:
   explicit FunctionDeclReplacement(FunctionDecl *D, std::string R, bool Return,
-                                   bool Params)
-      : DeclReplacementTempl(D, nullptr, R), RewriteReturn(Return),
-        RewriteParams(Params) {
+                                   bool Params, bool Generic = false)
+      : DeclReplacementTempl(D, nullptr, R), RewriteGeneric(Generic),
+        RewriteReturn(Return), RewriteParams(Params) {
     assert("Doesn't make sense to rewrite nothing!" &&
-           (RewriteReturn || RewriteParams));
+           (RewriteGeneric || RewriteReturn || RewriteParams));
   }
 
   SourceRange getSourceRange(SourceManager &SM) const override;
 
 private:
   // This determines if the full declaration or the return will be replaced.
+  bool RewriteGeneric;
   bool RewriteReturn;
   bool RewriteParams;
 
   SourceLocation getDeclBegin(SourceManager &SM) const;
+  SourceLocation getReturnBegin(SourceManager &SM) const;
   SourceLocation getParamBegin(SourceManager &SM) const;
   SourceLocation getReturnEnd(SourceManager &SM) const;
   SourceLocation getDeclEnd(SourceManager &SM) const;

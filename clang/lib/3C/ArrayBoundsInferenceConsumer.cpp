@@ -861,7 +861,7 @@ void handleArrayVariablesBoundsDetection(ASTContext *C, ProgramInfo &I,
   // This is adding function names provided to --use-malloc to the set of
   // allocator functions. It assumes that the first argument is always the size,
   // which should be correct if the function have the same interface as malloc.
-  for (auto FuncName : AllocatorFunctions)
+  for (auto FuncName : _3COpts.AllocatorFunctions)
     AllocatorSizeAssoc[FuncName] = {0};
 
   GlobalABVisitor GlobABV(C, I);

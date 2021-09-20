@@ -57,15 +57,21 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
       Expr *ArgExpr = A;
       if (FD && PIdx < FD->getNumParams()) {
         const int TyVarIdx = FV->getExternalParam(PIdx)->getGenericIndex();
-        if (TypeVars.find(TyVarIdx) != TypeVars.end() &&
-            TypeVars[TyVarIdx] != nullptr)
-          TypeVar = TypeVars[TyVarIdx];
+        // Check if local type vars are available
+        if (TypeVars.find(TyVarIdx) != TypeVars.end()) {
+          TypeVar = TypeVars[TyVarIdx].getConstraint(
+                  Info.getConstraints().getVariables());
+        }
       }
       if (TypeVar != nullptr)
         ArgExpr = ArgExpr->IgnoreImpCasts();
 
       CVarSet ArgConstraints = CR.getExprConstraintVarsSet(ArgExpr);
       for (auto *ArgC : ArgConstraints) {
+        // If the function takes a void *, we already know about the wildness,
+        // so allow the implicit cast.
+        if (TypeVar == nullptr && FV->getExternalParam(PIdx)->isVoidPtr())
+          continue;
         CastNeeded CastKind = needCasting(
             ArgC, ArgC, FV->getInternalParam(PIdx), FV->getExternalParam(PIdx));
         if (CastKind != NO_CAST) {

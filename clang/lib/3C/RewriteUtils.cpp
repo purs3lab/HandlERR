@@ -96,7 +96,7 @@ void rewriteSourceRange(Rewriter &R, const CharSourceRange &Range,
   // crashing with an assert fail.
   if (!RewriteSuccess) {
     clang::DiagnosticsEngine &DE = R.getSourceMgr().getDiagnostics();
-    bool ReportError = ErrFail && !AllowRewriteFailures;
+    bool ReportError = ErrFail && !_3COpts.AllowRewriteFailures;
     reportCustomDiagnostic(
         DE,
         ReportError ? DiagnosticsEngine::Error : DiagnosticsEngine::Warning,
@@ -117,10 +117,10 @@ void rewriteSourceRange(Rewriter &R, const CharSourceRange &Range,
 }
 
 static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
-  if (Verbose)
+  if (_3COpts.Verbose)
     errs() << "Writing files out\n";
 
-  bool StdoutMode = (OutputPostfix == "-" && OutputDir.empty());
+  bool StdoutMode = (_3COpts.OutputPostfix == "-" && _3COpts.OutputDir.empty());
   SourceManager &SM = C.getSourceManager();
   // Iterate over each modified rewrite buffer.
   for (auto Buffer = R.buffer_begin(); Buffer != R.buffer_end(); ++Buffer) {
@@ -132,26 +132,26 @@ static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
 
       DiagnosticsEngine &DE = C.getDiagnostics();
       DiagnosticsEngine::Level UnwritableChangeDiagnosticLevel =
-          AllowUnwritableChanges ? DiagnosticsEngine::Warning
-                                 : DiagnosticsEngine::Error;
+        _3COpts.AllowUnwritableChanges ? DiagnosticsEngine::Warning
+                                       : DiagnosticsEngine::Error;
       auto PrintExtraUnwritableChangeInfo = [&]() {
         // With -dump-unwritable-changes and not -allow-unwritable-changes, we
         // want the -allow-unwritable-changes note before the dump.
-        if (!DumpUnwritableChanges) {
+        if (!_3COpts.DumpUnwritableChanges) {
           reportCustomDiagnostic(
               DE, DiagnosticsEngine::Note,
               "use the -dump-unwritable-changes option to see the new version "
               "of the file",
               SourceLocation());
         }
-        if (!AllowUnwritableChanges) {
+        if (!_3COpts.AllowUnwritableChanges) {
           reportCustomDiagnostic(
               DE, DiagnosticsEngine::Note,
               "you can use the -allow-unwritable-changes option to temporarily "
               "downgrade this error to a warning",
               SourceLocation());
         }
-        if (DumpUnwritableChanges) {
+        if (_3COpts.DumpUnwritableChanges) {
           errs() << "=== Beginning of new version of " << FE->getName()
                  << " ===\n";
           Buffer->second.write(errs());
@@ -240,7 +240,7 @@ static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
       // because stdout mode is handled above. OutputPostfix defaults to "-"
       // when it's not provided, so any other value means that we should use
       // OutputPostfix. Otherwise, we must be in OutputDir mode.
-      if (OutputPostfix != "-") {
+      if (_3COpts.OutputPostfix != "-") {
         // That path should be the same as the old one, with a
         // suffix added between the file name and the extension.
         // For example \foo\bar\a.c should become \foo\bar\a.checked.c
@@ -250,19 +250,20 @@ static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
         std::string FileName = sys::path::remove_leading_dotslash(PfName).str();
         std::string Ext = sys::path::extension(FileName).str();
         std::string Stem = sys::path::stem(FileName).str();
-        NFile = Stem + "." + OutputPostfix + Ext;
+        NFile = Stem + "." + _3COpts.OutputPostfix + Ext;
         if (!DirName.empty())
           NFile = DirName + sys::path::get_separator().str() + NFile;
       } else {
-        assert(!OutputDir.empty());
+        assert(!_3COpts.OutputDir.empty());
         // If this does not hold when OutputDir is set, it should have been a
         // fatal error in the _3CInterface constructor.
-        assert(filePathStartsWith(FeAbsS, BaseDir));
+        assert(filePathStartsWith(FeAbsS, _3COpts.BaseDir));
         // replace_path_prefix is not smart about separators, but this should be
         // OK because tryGetCanonicalFilePath should ensure that neither BaseDir
         // nor OutputDir has a trailing separator.
         SmallString<255> Tmp(FeAbsS);
-        llvm::sys::path::replace_path_prefix(Tmp, BaseDir, OutputDir);
+        llvm::sys::path::replace_path_prefix(Tmp, _3COpts.BaseDir,
+                                             _3COpts.OutputDir);
         NFile = std::string(Tmp.str());
         EC = llvm::sys::fs::create_directories(sys::path::parent_path(NFile));
         if (EC) {
@@ -278,7 +279,7 @@ static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
       raw_fd_ostream Out(NFile, EC, sys::fs::F_None);
 
       if (!EC) {
-        if (Verbose)
+        if (_3COpts.Verbose)
           errs() << "writing out " << NFile << "\n";
         Buffer->second.write(Out);
       } else {
@@ -365,10 +366,17 @@ public:
       : Context(C), Info(I), Writer(R) {}
 
   bool VisitCallExpr(CallExpr *CE) {
-    if (isa_and_nonnull<FunctionDecl>(CE->getCalleeDecl())) {
+    if (auto *FD = dyn_cast_or_null<FunctionDecl>(CE->getCalleeDecl())) {
       // If the function call already has type arguments, we'll trust that
       // they're correct and not add anything else.
       if (typeArgsProvided(CE))
+        return true;
+
+      // If the function is not generic, we have nothing to do.
+      // This could happen even if it has type param binding if we
+      // reset generics because of wildness
+      if (Info.getFuncConstraint(FD,Context)->getGenericParams() == 0 &&
+          !FD->isItypeGenericFunction())
         return true;
 
       if (Info.hasTypeParamBindings(CE, Context)) {
@@ -377,11 +385,12 @@ public:
         std::string TypeParamString;
         bool AllInconsistent = true;
         for (auto Entry : Info.getTypeParamBindings(CE, Context))
-          if (Entry.second != nullptr) {
+          if (Entry.second.isConsistent()) {
             AllInconsistent = false;
-            std::string TyStr = Entry.second->mkString(
-                Info.getConstraints(),
-                MKSTRING_OPTS(EmitName = false, EmitPointee = true));
+            std::string TyStr = Entry.second.getConstraint(
+                Info.getConstraints().getVariables()
+              )->mkString(Info.getConstraints(), MKSTRING_OPTS(
+                EmitName = false, EmitPointee = true));
             if (TyStr.back() == ' ')
               TyStr.pop_back();
             TypeParamString += TyStr + ",";
@@ -419,8 +428,20 @@ private:
   }
 };
 
+SourceRange DeclReplacement::getSourceRange(SourceManager &SM) const {
+  SourceRange SR = getDecl()->getSourceRange();
+  SourceLocation OldEnd = SR.getEnd();
+  SourceLocation NewEnd  = getCheckedCAnnotationsEnd(getDecl());
+  if (NewEnd.isValid() &&
+      (!OldEnd.isValid() || SM.isBeforeInTranslationUnit(OldEnd, NewEnd)))
+    SR.setEnd(NewEnd);
+
+  return SR;
+}
+
 SourceRange FunctionDeclReplacement::getSourceRange(SourceManager &SM) const {
-  SourceLocation Begin = RewriteReturn ? getDeclBegin(SM) : getParamBegin(SM);
+  SourceLocation Begin = RewriteGeneric ? getDeclBegin(SM) :
+                      (RewriteReturn ? getReturnBegin(SM) : getParamBegin(SM));
   SourceLocation End = RewriteParams ? getDeclEnd(SM) : getReturnEnd(SM);
   // Begin can be equal to End if the SourceRange only contains one token.
   assert("Invalid FunctionDeclReplacement SourceRange!" &&
@@ -431,6 +452,22 @@ SourceRange FunctionDeclReplacement::getSourceRange(SourceManager &SM) const {
 SourceLocation FunctionDeclReplacement::getDeclBegin(SourceManager &SM) const {
   SourceLocation Begin = Decl->getBeginLoc();
   return Begin;
+}
+
+SourceLocation FunctionDeclReplacement::getReturnBegin(SourceManager &SM) const {
+  // TODO: more accuracy
+  // This code gets the point after a modifier like "static"
+  // But currently, that leads to multiple "static"s
+  //  SourceRange ReturnSource = Decl->getReturnTypeSourceRange();
+  //  if (ReturnSource.isValid())
+  //    return ReturnSource.getBegin();
+
+  // Invalid return means we're in a macro or typedef, so just get the
+  // starting point. We may overwrite a _For_any(..), but those only
+  // exist in partially converted code, so we're relying on the user
+  // to have it correct anyway.
+
+  return getDeclBegin(SM);
 }
 
 SourceLocation FunctionDeclReplacement::getParamBegin(SourceManager &SM) const {
@@ -477,24 +514,12 @@ SourceLocation FunctionDeclReplacement::getDeclEnd(SourceManager &SM) const {
     }
   }
 
-  // If there's a bounds expression, this comes after the right paren of the
-  // function declaration parameter list.
-  if (auto *BoundsE = Decl->getBoundsExpr()) {
-    SourceLocation BoundsEnd = BoundsE->getEndLoc();
-    if (BoundsEnd.isValid() &&
-        (!End.isValid() || SM.isBeforeInTranslationUnit(End, BoundsEnd)))
-      End = BoundsEnd;
-  }
-
-  // If there's an itype, this also comes after the right paren. In the case
-  // that there is both a bounds expression and an itype, we need check
-  // which is later in the file and use that as the declaration end.
-  if (auto *InteropE = Decl->getInteropTypeExpr()) {
-    SourceLocation InteropEnd = InteropE->getEndLoc();
-    if (InteropEnd.isValid() &&
-        (!End.isValid() || SM.isBeforeInTranslationUnit(End, InteropEnd)))
-      End = InteropEnd;
-  }
+  // If there's a bounds or interop type expression, this will come after the
+  // right paren of the function declaration parameter list.
+  SourceLocation AnnotationsEnd = getCheckedCAnnotationsEnd(Decl);
+  if (AnnotationsEnd.isValid() &&
+      (!End.isValid() || SM.isBeforeInTranslationUnit(End, AnnotationsEnd)))
+    End = AnnotationsEnd;
 
   // SourceLocations are weird and turn up invalid for reasons I don't
   // understand. Fallback to extracting r paren location from source
@@ -569,7 +594,7 @@ void RewriteConsumer::emitRootCauseDiagnostics(ASTContext &Context) {
         // or are in the main file of the TU. Alternatively, don't filter causes
         // if -warn-all-root-cause is passed.
         int PtrCount = I.getNumPtrsAffected(WReason.first);
-        if (WarnAllRootCause || SM.isInMainFile(SL) || PtrCount > 1) {
+        if (_3COpts.WarnAllRootCause || SM.isInMainFile(SL) || PtrCount > 1) {
           // SL is invalid when the File is not in the current translation unit.
           if (SL.isValid()) {
             EmittedDiagnostics.insert(PSL);
@@ -586,7 +611,7 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
 
   Info.getPerfStats().startRewritingTime();
 
-  if (WarnRootCause)
+  if (_3COpts.WarnRootCause)
     emitRootCauseDiagnostics(Context);
 
   // Rewrite Variable declarations
@@ -596,7 +621,8 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   // Take care of some other rewriting tasks
   std::set<llvm::FoldingSetNodeID> Seen;
   std::map<llvm::FoldingSetNodeID, AnnotationNeeded> NodeMap;
-  CheckedRegionFinder CRF(&Context, R, Info, Seen, NodeMap, WarnRootCause);
+  CheckedRegionFinder CRF(&Context, R, Info, Seen, NodeMap,
+                          _3COpts.WarnRootCause);
   CheckedRegionAdder CRA(&Context, R, NodeMap, Info);
   CastLocatorVisitor CLV(&Context);
   CastPlacementVisitor ECPV(&Context, Info, R, CLV.getExprsWithCast());
@@ -604,7 +630,7 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   TypeArgumentAdder TPA(&Context, Info, R);
   TranslationUnitDecl *TUD = Context.getTranslationUnitDecl();
   for (const auto &D : TUD->decls()) {
-    if (AddCheckedRegions) {
+    if (_3COpts.AddCheckedRegions) {
       // Adding checked regions enabled?
       // TODO: Should checked region finding happen somewhere else? This is
       //       supposed to be rewriting.

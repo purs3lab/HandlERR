@@ -52,6 +52,9 @@ struct MkStringOpts {
 };
 #define MKSTRING_OPTS(...) PACK_OPTS(MkStringOpts, __VA_ARGS__)
 
+// Name for function return, for debugging
+#define RETVAR "$ret"
+
 // Base class for ConstraintVariables. A ConstraintVariable can either be a
 // PointerVariableConstraint or a FunctionVariableConstraint. The difference
 // is that FunctionVariableConstraints have constraints on the return value
@@ -66,9 +69,23 @@ private:
   ConstraintVariableKind Kind;
 
 protected:
+  // A string representation for the type of this variable. Note that for
+  // complex types (e.g., function pointer, constant sized arrays), you cannot
+  // concatenate the type string with an identifier and expect to obtain a valid
+  // variable declaration.
   std::string OriginalType;
-  // Underlying name of the C variable this ConstraintVariable represents.
+  // Underlying name of the C variable this ConstraintVariable represents. This
+  // is not always a valid C identifier. It will be empty if no name was given
+  // (e.g., some parameter declarations). It will be the predefined string
+  // "$ret" when the ConstraintVariable represents a function return. It may
+  // take other values if the ConstraintVariable does not represent a C
+  // variable (e.g., explict casts and compound literals) .
   std::string Name;
+  // The combination of the type and name of the represented C variable. The
+  // combination is handled by clang library routines, so complex types
+  // like function pointers and constant size are handled correctly. See
+  // comments on Name for when name should be a valid identifier.
+  std::string OriginalTypeWithName;
   // Set of constraint variables that have been constrained due to a
   // bounds-safe interface (itype). They are remembered as being constrained
   // so that later on we do not introduce a spurious constraint
@@ -85,9 +102,15 @@ protected:
   bool IsForDecl;
 
   // Only subclasses should call this
-  ConstraintVariable(ConstraintVariableKind K, std::string T, std::string N)
-      : Kind(K), OriginalType(T), Name(N), HasEqArgumentConstraints(false),
-        ValidBoundsKey(false), IsForDecl(false) {}
+  ConstraintVariable(ConstraintVariableKind K, std::string T, std::string N,
+                     std::string TN)
+    : Kind(K), OriginalType(T), Name(N), OriginalTypeWithName(TN),
+      HasEqArgumentConstraints(false), ValidBoundsKey(false),
+      IsForDecl(false) {}
+
+  ConstraintVariable(ConstraintVariableKind K, QualType QT, std::string N)
+    : ConstraintVariable(K, qtyToStr(QT), N,
+                         qtyToStr(QT, N == RETVAR ? "" : N)) {}
 
 public:
   // Create a "for-rewriting" representation of this ConstraintVariable.
@@ -166,6 +189,7 @@ public:
   // Get the original type string that can be directly
   // used for rewriting.
   std::string getRewritableOriginalTy() const;
+  std::string getOriginalTypeWithName() const;
   std::string getName() const { return Name; }
 
   void setValidDecl() { IsForDecl = true; }
@@ -354,7 +378,9 @@ private:
   // Generic types can be used with fewer restrictions, so this field is used
   // stop assignments with generic variables from forcing constraint variables
   // to be wild.
-  int GenericIndex;
+  // Source is generated from the source code, Inferred is set internally
+  int SourceGenericIndex;
+  int InferredGenericIndex;
 
   // Empty array pointers are represented the same as standard pointers. This
   // lets pointers be passed to functions expecting a zero width array. This
@@ -363,7 +389,7 @@ private:
   bool IsZeroWidthArray;
 
   bool IsTypedef = false;
-  TypedefNameDecl *TDT;
+  ConstraintVariable *TypedefVar;
   std::string TypedefString;
   // Does the type internally contain a typedef, and if so: at what level and
   // what is it's name?
@@ -376,9 +402,10 @@ private:
   // other fields are initialized to default values. This is used to construct
   // variables for non-pointer expressions.
   PointerVariableConstraint(std::string Name) :
-    ConstraintVariable(PointerVariable, "", Name), FV(nullptr),
+    ConstraintVariable(PointerVariable, "", Name, ""), FV(nullptr),
     SrcHasItype(false), PartOfFuncPrototype(false), Parent(nullptr),
-    GenericIndex(-1), IsZeroWidthArray(false), IsTypedef(false), TDT(nullptr),
+    SourceGenericIndex(-1), InferredGenericIndex(-1),
+    IsZeroWidthArray(false), IsTypedef(false),
     TypedefLevelInfo({}), IsVoidPtr(false) {}
 
 public:
@@ -389,8 +416,9 @@ public:
   // Check if any of the pointers is either a sized or unsized arr.
   bool hasSomeSizedArr() const;
 
-  bool isTypedef(void);
-  void setTypedef(TypedefNameDecl *T, std::string S);
+  bool isTypedef(void) const;
+  const ConstraintVariable *getTypedefVar() const;
+  void setTypedef(ConstraintVariable *TDVar, std::string S);
 
   // Return true if this constraint had an itype in the original source code.
   bool srcHasItype() const override { return SrcHasItype; }
@@ -404,9 +432,12 @@ public:
   // Get bounds annotation.
   std::string getBoundsStr() const { return BoundsAnnotationStr; }
 
-  bool getIsGeneric() const { return GenericIndex >= 0; }
-  int getGenericIndex() const { return GenericIndex; }
-
+  bool isGeneric() const { return InferredGenericIndex >= 0; }
+  int getGenericIndex() const { return InferredGenericIndex; }
+  void setGenericIndex(int idx) { InferredGenericIndex = idx; }
+  bool isGenericChanged() const {
+    return SourceGenericIndex != InferredGenericIndex;
+  }
   // Was this variable a checked pointer in the input program?
   // This is important for two reasons: (1) externs that are checked should be
   // kept that way during solving, (2) nothing that was originally checked
@@ -449,6 +480,10 @@ public:
   // ForceGenericIndex: CheckedC supports generic types (_Itype_for_any) which
   //                    need less restrictive constraints. Set >= 0 to indicate
   //                    that this variable should be considered generic.
+  // PotentialGeneric: Whether this may become generic after analysis. Disables
+  //                   constraint to wild for non-generics. If you use this
+  //                   you'll have to add that constraint later if it is
+  //                   not generic.
   // TSI: TypeSourceInfo object gives access to information about the source
   //      code representation of the type. Allows for more precise rewriting by
   //      preserving the exact syntax used to write types that aren't rewritten
@@ -458,6 +493,7 @@ public:
                             const clang::ASTContext &C,
                             std::string *InFunc = nullptr,
                             int ForceGenericIndex = -1,
+                            bool PotentialGeneric = false,
                             bool VarAtomForChecked = false,
                             TypeSourceInfo *TSI = nullptr,
                             const clang::QualType &ItypeT = QualType());
@@ -518,8 +554,6 @@ public:
 };
 
 typedef PointerVariableConstraint PVConstraint;
-// Name for function return, for debugging
-#define RETVAR "$ret"
 
 // This class contains a pair of PVConstraints that represent an internal and
 // external view of a variable for use as the parameter and return constraints
@@ -550,7 +584,7 @@ public:
   FVComponentVariable(const clang::QualType &QT, const clang::QualType &ITypeT,
                       clang::DeclaratorDecl *D, std::string N, ProgramInfo &I,
                       const clang::ASTContext &C, std::string *InFunc,
-                      bool HasItype);
+                      bool PotentialGeneric, bool HasItype);
 
   void mergeDeclaration(FVComponentVariable *From, ProgramInfo &I,
                         std::string &ReasonFailed);
@@ -566,6 +600,11 @@ public:
 
   PVConstraint *getInternal() const { return InternalConstraint; }
   PVConstraint *getExternal() const { return ExternalConstraint; }
+
+  void setGenericIndex(int idx) {
+    ExternalConstraint->setGenericIndex(idx);
+    InternalConstraint->setGenericIndex(idx);
+  }
 
   void equateWithItype(ProgramInfo &CS, const std::string &ReasonUnchangeable,
                        PersistentSourceLoc *PSL) const;
@@ -595,7 +634,7 @@ private:
   // Flag to indicate whether this is a function pointer or not.
   bool IsFunctionPtr;
 
-  // Count of type parameters from `_Itype_for_any(...)`.
+  // Count of type parameters (originally from `_Itype_for_any(...)`).
   int TypeParams;
 
   void equateFVConstraintVars(ConstraintVariable *CV, ProgramInfo &Info) const;
@@ -605,9 +644,10 @@ public:
                              const clang::ASTContext &C);
   FunctionVariableConstraint(clang::TypedefDecl *D, ProgramInfo &I,
                              const clang::ASTContext &C);
-  FunctionVariableConstraint(const clang::Type *Ty, clang::DeclaratorDecl *D,
-                             std::string N, ProgramInfo &I,
-                             const clang::ASTContext &C,
+
+  FunctionVariableConstraint(const clang::QualType Ty,
+                             clang::DeclaratorDecl *D, std::string N,
+                             ProgramInfo &I, const clang::ASTContext &C,
                              TypeSourceInfo *TSI = nullptr);
 
   PVConstraint *getExternalReturn() const {
@@ -652,8 +692,23 @@ public:
   bool srcHasItype() const override;
   bool srcHasBounds() const override;
 
+  // The number of type variables
+  int getGenericParams() const {
+    return TypeParams;
+  }
+  // remove added generics
+  // use when we constrain a potential generic param to wild
+  void resetGenericParams() {
+    TypeParams = 0;
+  }
+
+  // The type parameter index of the return
   int getGenericIndex() const {
     return ReturnVar.ExternalConstraint->getGenericIndex();
+  }
+  // Change the type parameter index of the return
+  void setGenericIndex(int idx) {
+    ReturnVar.ExternalConstraint->setGenericIndex(idx);
   }
 
   bool solutionEqualTo(Constraints &CS, const ConstraintVariable *CV,
