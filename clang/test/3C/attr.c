@@ -53,7 +53,7 @@ void h(__attribute__((noescape)) int *x) {
 }
 
 int *i(__attribute__((noescape)) void *x) {
-//CHECK: _Ptr<int> i(__attribute__((noescape)) void *x) {
+//CHECK: _For_any(T) _Ptr<int> i(__attribute__((noescape)) _Ptr<T> x) {
   return 0;
 }
 
