@@ -106,8 +106,9 @@ static ConstAtom *analyzeAllocExpr(CallExpr *CE, Constraints &CS,
 
   ConstAtom *Ret = CS.getPtr();
   Expr *E;
-  if (std::find(AllocatorFunctions.begin(), AllocatorFunctions.end(),
-                FuncName) != AllocatorFunctions.end() ||
+  if (std::find(_3COpts.AllocatorFunctions.begin(),
+                _3COpts.AllocatorFunctions.end(),
+                FuncName) != _3COpts.AllocatorFunctions.end() ||
       FuncName.compare("malloc") == 0)
     E = CE->getArg(0);
   else {
@@ -149,6 +150,28 @@ inline CSetBkeyPair pairWithEmptyBkey(const CVarSet &Vars) {
   BKeySet EmptyBSet;
   EmptyBSet.clear();
   return std::make_pair(Vars, EmptyBSet);
+}
+
+// Get the return type of the function from the TypeVars, that is, from
+// the local instantiation of a generic function. Or the regular return
+// constraint if it's not generic
+ConstraintVariable *localReturnConstraint(
+    FVConstraint *FV,
+    ProgramInfo::CallTypeParamBindingsT TypeVars,
+    Constraints &CS,
+    ProgramInfo &Info) {
+  int TyVarIdx = FV->getExternalReturn()->getGenericIndex();
+  // Check if local type vars are available
+  if (TypeVars.find(TyVarIdx) != TypeVars.end() &&
+      TypeVars[TyVarIdx].isConsistent()) {
+    ConstraintVariable *CV = TypeVars[TyVarIdx].getConstraint(
+            Info.getConstraints().getVariables());
+    if (FV->getExternalReturn()->hasBoundsKey())
+      CV->setBoundsKey(FV->getExternalReturn()->getBoundsKey());
+    return CV;
+  } else {
+    return FV->getExternalReturn();
+  }
 }
 
 // Returns a pair of set of ConstraintVariables and set of BoundsKey
@@ -236,7 +259,7 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
       // If the cast is NULL, it will otherwise seem invalid, but we want to
       // handle it as usual so the type in the cast can be rewritten.
       if (!isNULLExpression(ECE, *Context) && TypE->isPointerType() &&
-          !isCastSafe(TypE, TmpE->getType())) {
+          !isCastSafe(TypE, TmpE->getType()) && !isCastofGeneric(ECE)) {
         CVarSet Vars = getExprConstraintVarsSet(TmpE);
         Ret = pairWithEmptyBkey(getInvalidCastPVCons(ECE));
         constrainConsVarGeq(Vars, Ret.first, CS, nullptr, Safe_to_Wild, false,
@@ -359,7 +382,7 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
             if (auto *PCV = dyn_cast<PVConstraint>(CV))
               // On the other hand, CheckedC does let you take the address of
               // constant sized arrays.
-              if (!PCV->getArrPresent())
+              if (!PCV->isConstantArr())
                 PCV->constrainOuterTo(CS, CS.getPtr(), true);
           // Add a VarAtom to UOExpr's PVConstraint, for &.
           Ret = std::make_pair(addAtomAll(T.first, CS.getPtr(), CS), T.second);
@@ -403,6 +426,10 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
       CVarSet ReturnCVs;
       BKeySet ReturnBSet = EmptyBSet;
 
+      ProgramInfo::CallTypeParamBindingsT TypeVars;
+      if (Info.hasTypeParamBindings(CE, Context))
+        TypeVars = Info.getTypeParamBindings(CE, Context);
+
       // Here, we need to look up the target of the call and return the
       // constraints for the return value of that function.
       QualType ExprType = E->getType();
@@ -418,10 +445,10 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
 
         for (ConstraintVariable *C : Tmp.first) {
           if (FVConstraint *FV = dyn_cast<FVConstraint>(C)) {
-            ReturnCVs.insert(FV->getExternalReturn());
+            ReturnCVs.insert(localReturnConstraint(FV,TypeVars,CS,Info));
           } else if (PVConstraint *PV = dyn_cast<PVConstraint>(C)) {
             if (FVConstraint *FV = PV->getFV())
-              ReturnCVs.insert(FV->getExternalReturn());
+              ReturnCVs.insert(localReturnConstraint(FV,TypeVars,CS,Info));
           }
         }
       } else if (DeclaratorDecl *FD = dyn_cast<DeclaratorDecl>(D)) {
@@ -429,11 +456,16 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
         if (isFunctionAllocator(std::string(FD->getName()))) {
           bool DidInsert = false;
           IsAllocator = true;
-          if (CE->getNumArgs() > 0) {
+          if (TypeVars.find(0) != TypeVars.end() &&
+              TypeVars[0].isConsistent()) {
+            ConstraintVariable *CV = TypeVars[0].getConstraint(
+                       Info.getConstraints().getVariables());
+            ReturnCVs.insert(CV);
+            DidInsert = true;
+          } else if (CE->getNumArgs() > 0) {
             QualType ArgTy;
             std::string FuncName = FD->getNameAsString();
-            ConstAtom *A;
-            A = analyzeAllocExpr(CE, CS, ArgTy, FuncName, Context);
+            ConstAtom *A = analyzeAllocExpr(CE, CS, ArgTy, FuncName, Context);
             if (A) {
               std::string N(FD->getName());
               N = "&" + N;
@@ -465,17 +497,18 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
           assert(CV.hasValue() && "Function without constraint variable.");
           /* Direct function call */
           if (FVConstraint *FVC = dyn_cast<FVConstraint>(&CV.getValue()))
-            ReturnCVs.insert(FVC->getExternalReturn());
+            ReturnCVs.insert(localReturnConstraint(FVC,TypeVars,CS,Info));
           /* Call via function pointer */
           else {
             PVConstraint *Tmp = dyn_cast<PVConstraint>(&CV.getValue());
             assert(Tmp != nullptr);
             if (FVConstraint *FVC = Tmp->getFV())
-              ReturnCVs.insert(FVC->getExternalReturn());
+              ReturnCVs.insert(localReturnConstraint(FVC,TypeVars,CS,Info));
             else {
               // No FVConstraint -- make WILD.
-              auto *TmpFV = new FVConstraint();
-              ReturnCVs.insert(TmpFV);
+              std::string Rsn = "Can't get return variable of function call.";
+              PersistentSourceLoc PL = PersistentSourceLoc::mkPSL(CE, *Context);
+              ReturnCVs.insert(PVConstraint::getWildPVConstraint(CS, Rsn, &PL));
             }
           }
         }
@@ -614,7 +647,7 @@ CSetBkeyPair ConstraintResolver::getExprConstraintVars(Expr *E) {
       P->constrainToWild(Info.getConstraints(), Rsn, &PL);
       Ret = pairWithEmptyBkey({P});
     } else {
-      if (Verbose) {
+      if (_3COpts.Verbose) {
         llvm::errs() << "WARNING! Initialization expression ignored: ";
         E->dump(llvm::errs(), *Context);
         llvm::errs() << "\n";
@@ -661,7 +694,7 @@ void ConstraintResolver::constrainLocalAssign(Stmt *TSt, Expr *LHS, Expr *RHS,
 
   // Only if all types are enabled and these are not pointers, then track
   // the assignment.
-  if (AllTypes) {
+  if (_3COpts.AllTypes) {
     if ((!containsValidCons(L.first) && !containsValidCons(R.first)) ||
         !HandleBoundsKey) {
       ABI.handleAssignment(LHS, L.first, L.second, RHS, R.first, R.second,
@@ -686,7 +719,7 @@ void ConstraintResolver::constrainLocalAssign(Stmt *TSt, DeclaratorDecl *D,
   if (V.hasValue())
     constrainConsVarGeq(&V.getValue(), RHSCons.first, Info.getConstraints(),
                         PLPtr, CAction, false, &Info, HandleBoundsKey);
-  if (AllTypes && !IgnoreBnds) {
+  if (_3COpts.AllTypes && !IgnoreBnds) {
     if (!HandleBoundsKey || (!(V.hasValue() && isValidCons(&V.getValue())) &&
                              !containsValidCons(RHSCons.first))) {
       auto &ABI = Info.getABoundsInfo();
@@ -738,6 +771,38 @@ CVarSet ConstraintResolver::getCalleeConstraintVars(CallExpr *CE) {
     FVCons = getExprConstraintVarsSet(CalledExpr);
   }
   return FVCons;
+}
+
+// This serves as an exception to the unsafety of casting from void*.
+// In most cases, CheckedC can handle generic casts, so we can ignore them.
+// CheckedC can't handle allocators without checked headers, so we add them
+// to this exception for when we're dealing with small examples.
+bool ConstraintResolver::isCastofGeneric(CastExpr *C) {
+  Expr *SE = C->getSubExpr();
+  if (CHKCBindTemporaryExpr *CE = dyn_cast<CHKCBindTemporaryExpr>(SE))
+    SE = CE->getSubExpr();
+  if (auto *CE = dyn_cast_or_null<CallExpr>(SE)) {
+    // Check for built-in allocators, in case the standard headers are not used.
+    // This is a required exception, because allocators return void*, and casts
+    // from it are unsafe. We assume the cast is appropriate. With checked
+    // headers clang can figure out if it is safe.
+    if (auto *DD = dyn_cast_or_null<DeclaratorDecl>(CE->getCalleeDecl())) {
+      std::string Name = DD->getNameAsString();
+      if (isFunctionAllocator(Name))
+        return true;
+    }
+    // Check for a generic function call.
+    CVarSet CVS = getCalleeConstraintVars(CE);
+    // If there are multiple constraints in the expression we
+    // can't guarantee safety, so only return true if the
+    // cast is directly on a function call.
+    if (CVS.size() == 1) {
+      if (auto *FVC = dyn_cast<FVConstraint>(*CVS.begin())) {
+        return FVC->getGenericParams() > 0;
+      }
+    }
+  }
+  return false;
 }
 
 // Construct a PVConstraint for an expression that can safely be used when

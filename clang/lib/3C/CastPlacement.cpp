@@ -57,15 +57,21 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
       Expr *ArgExpr = A;
       if (FD && PIdx < FD->getNumParams()) {
         const int TyVarIdx = FV->getExternalParam(PIdx)->getGenericIndex();
-        if (TypeVars.find(TyVarIdx) != TypeVars.end() &&
-            TypeVars[TyVarIdx] != nullptr)
-          TypeVar = TypeVars[TyVarIdx];
+        // Check if local type vars are available
+        if (TypeVars.find(TyVarIdx) != TypeVars.end()) {
+          TypeVar = TypeVars[TyVarIdx].getConstraint(
+                  Info.getConstraints().getVariables());
+        }
       }
       if (TypeVar != nullptr)
         ArgExpr = ArgExpr->IgnoreImpCasts();
 
       CVarSet ArgConstraints = CR.getExprConstraintVarsSet(ArgExpr);
       for (auto *ArgC : ArgConstraints) {
+        // If the function takes a void *, we already know about the wildness,
+        // so allow the implicit cast.
+        if (TypeVar == nullptr && FV->getExternalParam(PIdx)->isVoidPtr())
+          continue;
         CastNeeded CastKind = needCasting(
             ArgC, ArgC, FV->getInternalParam(PIdx), FV->getExternalParam(PIdx));
         if (CastKind != NO_CAST) {
@@ -215,12 +221,12 @@ void CastPlacementVisitor::surroundByCast(ConstraintVariable *Dst,
     // unwritable files in common use cases. Until they are fixed, report a
     // warning rather than letting the main "unwritable change" error trigger
     // later.
-    clang::DiagnosticsEngine &DE = Writer.getSourceMgr().getDiagnostics();
-    unsigned ErrorId = DE.getCustomDiagID(
+    reportCustomDiagnostic(
+        Writer.getSourceMgr().getDiagnostics(),
         DiagnosticsEngine::Warning,
         "3C internal error: tried to insert a cast into an unwritable file "
-        "(https://github.com/correctcomputation/checkedc-clang/issues/454)");
-    DE.Report(E->getBeginLoc(), ErrorId);
+        "(https://github.com/correctcomputation/checkedc-clang/issues/454)",
+        E->getBeginLoc());
     return;
   }
 
@@ -277,14 +283,13 @@ void CastPlacementVisitor::reportCastInsertionFailure(
   // FIXME: This is a warning rather than an error so that a new benchmark
   //        failure is not introduced in Lua.
   //        github.com/correctcomputation/checkedc-clang/issues/439
-  clang::DiagnosticsEngine &DE = Context->getDiagnostics();
-  unsigned ErrorId = DE.getCustomDiagID(
-      DiagnosticsEngine::Warning, "Unable to surround expression with cast.\n"
-                                  "Intended cast: \"%0\"");
-  auto ErrorBuilder = DE.Report(E->getExprLoc(), ErrorId);
-  ErrorBuilder.AddSourceRange(
-      Context->getSourceManager().getExpansionRange(E->getSourceRange()));
-  ErrorBuilder.AddString(CastStr);
+  reportCustomDiagnostic(Context->getDiagnostics(),
+                         DiagnosticsEngine::Warning,
+                         "Unable to surround expression with cast.\n"
+                         "Intended cast: \"%0\"",
+                         E->getExprLoc())
+      << Context->getSourceManager().getExpansionRange(E->getSourceRange())
+      << CastStr;
 }
 
 void CastPlacementVisitor::updateRewriteStats(CastNeeded CastKind) {

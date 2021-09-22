@@ -216,8 +216,9 @@ bool functionHasVarArgs(clang::FunctionDecl *FD) {
 }
 
 bool isFunctionAllocator(std::string FuncName) {
-  return std::find(AllocatorFunctions.begin(), AllocatorFunctions.end(),
-                   FuncName) != AllocatorFunctions.end() ||
+  return std::find(_3COpts.AllocatorFunctions.begin(),
+                   _3COpts.AllocatorFunctions.end(),
+                   FuncName) != _3COpts.AllocatorFunctions.end() ||
          llvm::StringSwitch<bool>(FuncName)
              .Cases("malloc", "calloc", "realloc", true)
              .Default(false);
@@ -242,9 +243,12 @@ bool isNullableType(const clang::QualType &QT) {
 }
 
 bool canBeNtArray(const clang::QualType &QT) {
-  if (const auto &Ptr = dyn_cast<clang::PointerType>(QT))
+  // First get the canonical type so that the following checks will not have to
+  // account for ParenType, DecayedType, or other variants used by clang.
+  QualType Canon = QT.getCanonicalType();
+  if (const auto &Ptr = dyn_cast<clang::PointerType>(Canon))
     return isNullableType(Ptr->getPointeeType());
-  if (const auto &Arr = dyn_cast<clang::ArrayType>(QT))
+  if (const auto &Arr = dyn_cast<clang::ArrayType>(Canon))
     return isNullableType(Arr->getElementType());
   return false;
 }
@@ -338,8 +342,7 @@ bool hasVoidType(clang::ValueDecl *D) { return isTypeHasVoid(D->getType()); }
 //  return D->isPointerType() == S->isPointerType();
 //}
 
-static bool castCheck(clang::QualType DstType, clang::QualType SrcType,
-                      bool AllowVoidCast) {
+static bool castCheck(clang::QualType DstType, clang::QualType SrcType) {
 
   // Check if both types are same.
   if (SrcType == DstType)
@@ -355,9 +358,8 @@ static bool castCheck(clang::QualType DstType, clang::QualType SrcType,
 
   // Both are pointers? check their pointee
   if (SrcPtrTypePtr && DstPtrTypePtr) {
-    return (AllowVoidCast && SrcPtrTypePtr->isVoidPointerType()) ||
-           castCheck(DstPtrTypePtr->getPointeeType(),
-                     SrcPtrTypePtr->getPointeeType(), AllowVoidCast);
+    return castCheck(DstPtrTypePtr->getPointeeType(),
+                SrcPtrTypePtr->getPointeeType());
   }
 
   if (SrcPtrTypePtr || DstPtrTypePtr)
@@ -370,12 +372,11 @@ static bool castCheck(clang::QualType DstType, clang::QualType SrcType,
       return false;
 
     for (unsigned I = 0; I < SrcFnType->getNumParams(); I++)
-      if (!castCheck(SrcFnType->getParamType(I), DstFnType->getParamType(I),
-                     false))
+      if (!castCheck(SrcFnType->getParamType(I),
+                     DstFnType->getParamType(I)))
         return false;
 
-    return castCheck(SrcFnType->getReturnType(), DstFnType->getReturnType(),
-                     false);
+    return castCheck(SrcFnType->getReturnType(), DstFnType->getReturnType());
   }
 
   // If both are not scalar types? Then the types must be exactly same.
@@ -399,7 +400,7 @@ bool isCastSafe(clang::QualType DstType, clang::QualType SrcType) {
       dyn_cast<clang::PointerType>(DstTypePtr);
   if (!DstPtrTypePtr) // Safe to cast to a non-pointer.
     return true;
-  return castCheck(DstType, SrcType, true);
+  return castCheck(DstType, SrcType);
 }
 
 bool canWrite(const std::string &FilePath) {
@@ -408,7 +409,7 @@ bool canWrite(const std::string &FilePath) {
     return true;
   // Get the absolute path of the file and check that
   // the file path starts with the base directory.
-  return filePathStartsWith(FilePath, BaseDir);
+  return filePathStartsWith(FilePath, _3COpts.BaseDir);
 }
 
 bool isInSysHeader(clang::Decl *D) {
@@ -422,11 +423,15 @@ bool isInSysHeader(clang::Decl *D) {
 
 std::string getSourceText(const clang::SourceRange &SR,
                           const clang::ASTContext &C) {
+  return getSourceText(CharSourceRange::getTokenRange(SR), C);
+}
+
+std::string getSourceText(const clang::CharSourceRange &SR,
+                          const clang::ASTContext &C) {
   assert(SR.isValid() && "Invalid Source Range requested.");
   auto &SM = C.getSourceManager();
   auto LO = C.getLangOpts();
-  llvm::StringRef Srctxt =
-      Lexer::getSourceText(CharSourceRange::getTokenRange(SR), SM, LO);
+  llvm::StringRef Srctxt = Lexer::getSourceText(SR, SM, LO);
   return Srctxt.str();
 }
 
@@ -601,4 +606,29 @@ int64_t getStmtIdWorkaround(const Stmt *St, const ASTContext &Context) {
   // identifyKnownAlignedObject fix the alignment of negative IDs by subtracting
   // (alignof(Stmt) - 1) before dividing.
   return Context.getAllocator().identifyKnownObject(St);
+}
+
+// Get the SourceLocation for the end of any Checked C bounds or interop type
+// annotations on a declaration. Returns an invalid source location if no
+// Checked C annotations are present.
+SourceLocation getCheckedCAnnotationsEnd(const Decl *D) {
+  SourceManager &SM = D->getASTContext().getSourceManager();
+  SourceLocation End;
+
+  // Update the current end SourceLocation to the new SourceLocation if the new
+  // location is valid and comes after the current end location.
+  auto UpdateEnd = [&SM, &End](SourceLocation SL) {
+    if (SL.isValid() &&
+        (!End.isValid() || SM.isBeforeInTranslationUnit(End, SL)))
+      End = SL;
+  };
+
+  if (auto *DD = dyn_cast<DeclaratorDecl>(D)) {
+    if (auto *InteropE = DD->getInteropTypeExpr())
+      UpdateEnd(InteropE->getEndLoc());
+    if (auto *BoundsE = DD->getBoundsExpr())
+      UpdateEnd(BoundsE->getEndLoc());
+  }
+
+  return End;
 }

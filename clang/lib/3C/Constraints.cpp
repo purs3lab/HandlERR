@@ -64,7 +64,7 @@ bool Constraints::removeConstraint(Constraint *C) {
 // Check if we can add this constraint. This provides a global switch to
 // control what constraints we can add to our system.
 void Constraints::editConstraintHook(Constraint *C) {
-  if (!AllTypes) {
+  if (!_3COpts.AllTypes) {
     // Invalidate any pointer-type constraints.
     if (Geq *E = dyn_cast<Geq>(C)) {
       if (!E->constraintIsChecked()) {
@@ -96,8 +96,10 @@ void Constraints::editConstraintHook(Constraint *C) {
 bool Constraints::addConstraint(Constraint *C) {
   editConstraintHook(C);
 
+  auto Search = TheConstraints.find(C);
+
   // Check if C is already in the set of constraints.
-  if (TheConstraints.find(C) == TheConstraints.end()) {
+  if (Search == TheConstraints.end()) {
     TheConstraints.insert(C);
 
     if (Geq *G = dyn_cast<Geq>(C)) {
@@ -119,6 +121,17 @@ bool Constraints::addConstraint(Constraint *C) {
     } else
       llvm_unreachable("unsupported constraint");
     return true;
+  }
+
+  // If the constraint being added is due to unwritability,
+  // propagate this reason to the existing constraint.
+  // This way we always prioritize the unwritability as the reason
+  // for wildness.
+  // This is needed as 3C will currently only report one cause of wildness
+  // (See https://github.com/correctcomputation/checkedc-clang/issues/664)
+  if (C->isUnwritable()) {
+    auto *StoredConstraint = *Search;
+    StoredConstraint->setReason(C->getReason());
   }
 
   return false;
@@ -223,7 +236,7 @@ doSolve(ConstraintsGraph &CG,
           // new WILD-ness.
           Conflicts.insert(VA);
           // Failure case.
-          if (Verbose) {
+          if (_3COpts.Verbose) {
             errs() << "Unsolvable constraints: ";
             VA->print(errs());
             errs() << "=";
@@ -339,7 +352,7 @@ bool Constraints::graphBasedSolve() {
   bool Res = doSolve(SolChkCG, Env, this, true, nullptr, Conflicts);
 
   // Now solve PtrType constraints
-  if (Res && AllTypes) {
+  if (Res && _3COpts.AllTypes) {
     Env.doCheckedSolve(false);
     bool RegularSolve = !(OnlyGreatestSol || OnlyLeastSol);
 
@@ -541,12 +554,12 @@ ConstAtom *Constraints::getAssignment(Atom *A) {
   return Environment.getAssignment(A);
 }
 
-ConstraintsGraph &Constraints::getChkCG() {
+const ConstraintsGraph &Constraints::getChkCG() const {
   assert(ChkCG != nullptr && "Checked Constraint graph cannot be nullptr");
   return *ChkCG;
 }
 
-ConstraintsGraph &Constraints::getPtrTypCG() {
+const ConstraintsGraph &Constraints::getPtrTypCG() const {
   assert(PtrTypCG != nullptr && "Pointer type Constraint graph "
                                 "cannot be nullptr");
   return *PtrTypCG;
