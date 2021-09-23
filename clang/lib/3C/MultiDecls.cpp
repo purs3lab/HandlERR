@@ -10,6 +10,10 @@
 #include "clang/3C/Utils.h"
 
 MultiDeclMemberDecl *getAsMultiDeclMember(Decl *D) {
+  // REVIEW: Is this the best place for this check?
+  if (D->getLocation().isInvalid())
+    return nullptr;
+
   // A FunctionDecl can be part of a multi-decl in C, but 3C currently doesn't
   // handle this
   // (https://github.com/correctcomputation/checkedc-clang/issues/659 part (a)).
