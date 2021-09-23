@@ -85,30 +85,31 @@ using namespace clang;
 // inline TagDecls are known to be handled poorly, but that's a rare and poor
 // practice and it's not easy to handle them better.
 
-// REVIEW: Currently, we automatically generate a name for every unnamed
-// TagDecl defined in a multi-decl and use the name in ConstraintVariables, but
-// we only insert the name into the definition if the multi-decl gets rewritten
-// for some other reason. This works in the common case where the types of other
-// multi-decl members refer to the TagDecl. Are there other parts of 3C that
-// could insert the type name without the multi-decl being rewritten, such as
-// type argument addition and cast insertion? If so, the output would be
-// invalid, though it would already have been invalid before the multi-decl
-// overhaul (i.e., this would have been a pre-existing bug). Examples:
+// Currently, we automatically generate a name for every unnamed TagDecl defined
+// in a multi-decl and use the name in ConstraintVariables, but we only insert
+// the name into the definition if the multi-decl gets rewritten for some other
+// reason. This solves the common case of allowing the types of all the
+// multi-decl members to refer to the TagDecl, but it doesn't address cases in
+// which 3C might need to insert a reference to the unnamed TagDecl elsewhere
+// even if the multi-decl isn't being rewritten. In these cases, 3C typically
+// uses the generated name even though it is not defined, causing a compile
+// error that the user has to correct manually. The problematic cases include:
 //
-// - TypeVariableEntry has a check for `isTypeAnonymous`, but it misses double
-//   pointers.
-// - I wasn't able to demonstrate insertion of a cast involving an unnamed
-//   struct type, but it's not clear to me whether that code path has actually
-//   been thought through to ensure that the problem cannot occur.
-// - Typedef itype insertion (#690), given `typedef struct { int *x; } *PS`
-//   that remains wild, is happy to insert a _Ptr to the unnamed struct type.
+// - Type argument insertion. TypeVariableEntry has a check for
+//   `isTypeAnonymous`, but it has at least one bug (it misses double pointers).
 //
-// One approach to try to rule out all of these bugs at once is to preemptively
-// rewrite all multi-decls containing unnamed TagDecls. But those changes might
-// be undesirable or could even cause errors in the presence of macros, etc.
-// There are various ways we might be able to make this feature less disruptive.
-// But is it worth worrying about the problem at all? Are the bad cases rare in
-// realistic code?
+// - Cast insertion, potentially. I was unable to find an example, but that
+//   doesn't mean it will never happen, especially with future changes to the
+//   code.
+//
+// - Typedef itype insertion.
+//
+// One approach to try to rule out all of these bugs at once would be to
+// preemptively rewrite all multi-decls containing unnamed TagDecls, but those
+// changes might be undesirable or could even cause errors in the presence of
+// macros, etc. Or we could try to add the necessary code so that insertion of a
+// reference to an unnamed TagDecl would trigger insertion of the name into the
+// definition. For now, we don't deal with the problem.
 
 // Implementation note: The Clang AST does not represent multi-decls explicitly
 // (except in functions, where they are represented by DeclStmts). In other
@@ -125,6 +126,7 @@ using namespace clang;
 // it's worth.)
 typedef NamedDecl MultiDeclMemberDecl;
 
+// Returns D if it can be a multi-decl member, otherwise null.
 MultiDeclMemberDecl *getAsMultiDeclMember(Decl *D);
 
 // Helpers to cope with the different APIs to do corresponding things with a
