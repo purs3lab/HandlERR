@@ -26,7 +26,7 @@ static struct foo {
   //CHECK_NOALL: static struct foo {
   //CHECK_ALL: struct foo {
   const char *name;
-  // TODO: Why is this affected by alltypes if it's a _Ptr?
+  // See https://github.com/correctcomputation/checkedc-clang/issues/470.
   //CHECK_NOALL: const char *name;
   //CHECK_ALL:   _Ptr<const char> name;
   int *p_valuable;
