@@ -524,7 +524,7 @@ bool _3CInterface::addVariables() {
 
   // Find multi-decls and assign names to unnamed inline TagDecls now so that
   // the assigned type names are available when we construct ConstraintVariables
-  // for the multi-decl members.
+  // for the multi-decl members in the "Add Variables" step below.
   // REVIEW: Move to a separate _3CInterface pass?
   for (auto &TU : ASTs)
     GlobalProgramInfo.TheMultiDeclsInfo.findUsedTagNames(TU->getASTContext());
