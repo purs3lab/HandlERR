@@ -32,7 +32,10 @@ std::string mkStringForPVDecl(MultiDeclMemberDecl *MMD,
       isa<VarDecl>(MMD) &&
       cast<VarDecl>(MMD)->getFormalLinkage() == Linkage::ExternalLinkage;
   if (_3COpts.ItypesForExtern &&
-      (isa<FieldDecl>(MMD) || IsExternGlobalVar)) {
+      (isa<FieldDecl>(MMD) || IsExternGlobalVar) &&
+      // isSolutionChecked can return false here when splitting out an unchanged
+      // multi-decl member.
+      PVC->isSolutionChecked(Info.getConstraints().getVariables())) {
     // Give record fields and global variables itypes when using
     // -itypes-for-extern. Note that we haven't properly implemented
     // itypes for structures and globals. This just rewrites to an itype
