@@ -360,15 +360,23 @@ void DeclRewriter::rewriteMultiDecl(MultiDeclInfo &MDI, RSet &ToRewrite) {
     SourceRange ReplaceSR = getDeclSourceRangeWithAnnotations(DL, /*IncludeInitializer=*/false);
 
     // Look for a declaration replacement object for the current declaration.
-    DeclReplacement *Replacement = nullptr;
+    MultiDeclMemberReplacement *Replacement = nullptr;
     auto TRIt = ToRewrite.find(DL);
     if (TRIt != ToRewrite.end()) {
-      Replacement = TRIt->second;
-      // This should be true for DeclReplacement's implementation of
-      // getSourceRange. If the DeclReplacement somehow requested a different
-      // range, that could cause at least one problem with the code below
-      // (doDeclRewrite might insert an initializer in the wrong place), so
-      // raise an assertion.
+      Replacement = cast<MultiDeclMemberReplacement>(TRIt->second);
+      // We can't expect multi-decl rewriting to work properly on a source range
+      // different from ReplaceSR above; for example, doDeclRewrite might insert
+      // an initializer in the wrong place. This assertion should pass as long
+      // as the implementation of DeclReplacement::getSourceRange matches
+      // ReplaceSR above. If someone changes DeclReplacement::getSourceRange,
+      // thinking that they can replace a different source range that way, we
+      // want to fail fast.
+      //
+      // REVIEW: This is awkward and makes me wonder if we should just remove
+      // DeclReplacement::getSourceRange since 3C currently only calls
+      // getSourceRange on an object already known to be a
+      // FunctionDeclReplacement. But after drafting this, I wasn't convinced
+      // that it was better than the status quo.
       assert(Replacement->getSourceRange(SM) == ReplaceSR);
     }
 
@@ -404,8 +412,8 @@ void DeclRewriter::rewriteMultiDecl(MultiDeclInfo &MDI, RSet &ToRewrite) {
     // are separate statements separated by a semicolon and a newline.
     bool IsLast = (MIt + 1 == MDI.Members.end());
     if (!IsLast) {
-      // Here we want to advance past the entire multi-decl member, including
-      // any existing initializer.
+      // This differs from ReplaceSR in that we want to advance past the entire
+      // multi-decl member, _including_ any existing initializer.
       SourceRange SkipSR = getDeclSourceRangeWithAnnotations(DL, /*IncludeInitializer=*/true);
       SourceRange Comma = getNextComma(SkipSR.getEnd());
       rewriteSourceRange(R, Comma, ";\n");

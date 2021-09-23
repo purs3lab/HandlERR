@@ -142,6 +142,17 @@ void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
         // then we refer to the TagDecl via that typedef. (The typedef must be the
         // first member so that it is defined in time for other members to refer
         // to it.)
+        //
+        // An argument could be made for using the typedef name in the types of
+        // other multi-decl members even if the TagDecl has a name:
+        // `typedef struct T_struct { ... } T, *PT;` would convert to
+        // `typedef struct T_struct { ... } T; typedef _Ptr<T> PT;` instead of
+        // `struct T_struct { ... }; typedef struct T_struct T;
+        // typedef _Ptr<struct T_struct> PT;`. But it would be tricky to ensure
+        // that any existing references to `struct T_struct` aren't accidentally
+        // replaced with `T`, so absent a decision that this feature is
+        // important enough to justify either solving or ignoring this problem,
+        // we don't try to implement the feature.
         TypedefDecl *TyD;
         QualType Underlying;
         if (CurrentMultiDecl->Members.size() == 1 &&
