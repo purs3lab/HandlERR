@@ -141,8 +141,10 @@ struct MultiDeclInfo {
   // need to split it out, so this will be null.
   TagDecl *TagDefToSplit = nullptr;
 
-  // TODO Document. TagDefToSplit can be nonnull and this can be false if the
-  // TagDecl was named, and vice versa can occur with a typedef.
+  // True if the base type was an unnamed TagDecl defined inline for which we
+  // are using a new name. Note that TagDefToSplit can be nonnull and
+  // BaseTypeRenamed can be false if the inline TagDecl was named, and the
+  // reverse can occur in the `typedef struct { ... } T` case.
   bool BaseTypeRenamed = false;
 
   // The members of the multi-decl in their original order.
