@@ -154,6 +154,47 @@ void test5() {
 //   multi-decl members
 //   (https://github.com/correctcomputation/checkedc-clang/issues/652)?
 
+// The next two tests have corresponding tests with -itypes-for-extern in
+// itypes_for_extern.c.
+// REVIEW: Should we put all these tests in one file? We would need a ton of
+// different CHECK prefixes. I don't know whether that would end up being easier
+// or harder to understand.
+
+// A multi-decl with a mix of pointers and arrays, including an "unchecked
+// pointer to constant size array" member that would trigger a known bug in
+// mkString (item 5 of
+// https://github.com/correctcomputation/checkedc-clang/issues/703),
+// demonstrating that unchanged multi-decl members whose base type wasn't
+// renamed use Decl::print (which doesn't have this bug).
+//
+// `m_force_rewrite` gets converted and forces the
+// multi-decl to be broken up even though nothing else changes when -alltypes is
+// off.
+int *m_force_rewrite, m_const_arr0[10], *m_const_arr1[10],
+    (*m_const_arr2)[10] = 1;
+//CHECK:       _Ptr<int> m_force_rewrite = ((void *)0);
+//CHECK_ALL:   int m_const_arr0 _Checked[10];
+//CHECK_NOALL: int m_const_arr0[10];
+//CHECK_ALL:   _Ptr<int> m_const_arr1 _Checked[10] = {((void *)0)};
+//CHECK_NOALL: int *m_const_arr1[10];
+//CHECK:       int (*m_const_arr2)[10] = 1;
+
+// A similar multi-decl with an unnamed inline struct, which forces the use of
+// mkString. We can't include (*s_const_arr2)[10] because it would trigger the
+// previously mentioned mkString bug and produce output that doesn't compile.
+// `s` serves just to give the struct a shorter generated name.
+struct { int *x; } s, *s_force_rewrite, s_const_arr0[10], *s_const_arr1[10];
+//CHECK:       struct s_struct_1 { _Ptr<int> x; };
+//CHECK:       struct s_struct_1 s;
+//CHECK:       _Ptr<struct s_struct_1> s_force_rewrite = ((void *)0);
+//CHECK_ALL:   struct s_struct_1 s_const_arr0 _Checked[10];
+//CHECK_NOALL: struct s_struct_1 s_const_arr0[10];
+//CHECK_ALL:   _Ptr<struct s_struct_1> s_const_arr1 _Checked[10] = {((void *)0)};
+// The reason this isn't `_Ptr<struct s_struct_1>` is probably the "outer wild
+// -> inner wild" constraint
+// (https://github.com/correctcomputation/checkedc-clang/issues/656).
+//CHECK_NOALL: struct s_struct_1 * s_const_arr1[10];
+
 // Simple tests of typedef multi-decls from
 // https://github.com/correctcomputation/checkedc-clang/issues/651.
 // inline_anon_structs.c has a few additional tests of typedef multi-decls

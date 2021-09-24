@@ -113,21 +113,26 @@ int (*const_arr2)[10];
 //CHECK_ALL: int (*const_arr2)[10] : itype(_Ptr<int _Checked[10]>) = ((void *)0);
 //CHECK_NOALL: int (*const_arr2)[10] : itype(_Ptr<int[10]>) = ((void *)0);
 
-// Test with an automatically named inline struct, which forces the use of
-// mkString rather than Decl::print for the unchecked side of the itype. Ensure
-// that `s` can be converted even with -alltypes off so that the multi-decl gets
-// broken up.
-struct { int *x; } *s, s_const_arr0[10], *s_const_arr1[10];
+// Two tests similar to the above but involving multi-decls. These have
+// corresponding tests without -itypes-for-extern in multivardecls.c; see the
+// comments there.
+
+int m_const_arr0[10], *m_const_arr1[10], (*m_const_arr2)[10];
+//CHECK_ALL:   int m_const_arr0[10] : itype(int _Checked[10]);
+//CHECK_NOALL: int m_const_arr0[10];
+//CHECK_ALL:   int *m_const_arr1[10] : itype(_Ptr<int> _Checked[10]) = {((void *)0)};
+//CHECK_NOALL: int *m_const_arr1[10];
+//CHECK_ALL:   int (*m_const_arr2)[10] : itype(_Ptr<int _Checked[10]>) = ((void *)0);
+//CHECK_NOALL: int (*m_const_arr2)[10] : itype(_Ptr<int[10]>) = ((void *)0);
+
+struct { int *x; } s, *s_force_rewrite, s_const_arr0[10], *s_const_arr1[10];
 //CHECK:       struct s_struct_1 { int *x : itype(_Ptr<int>); };
-//CHECK:       struct s_struct_1 *s : itype(_Ptr<struct s_struct_1>) = ((void *)0);
+//CHECK:       struct s_struct_1 s;
+//CHECK:       struct s_struct_1 *s_force_rewrite : itype(_Ptr<struct s_struct_1>) = ((void *)0);
 //CHECK_ALL:   struct s_struct_1 s_const_arr0[10] : itype(struct s_struct_1 _Checked[10]);
 //CHECK_NOALL: struct s_struct_1 s_const_arr0[10];
 //CHECK_ALL:   struct s_struct_1 * s_const_arr1[10] : itype(_Ptr<struct s_struct_1> _Checked[10]) = {((void *)0)};
 //CHECK_NOALL: struct s_struct_1 * s_const_arr1[10];
-
-// We cannot include (*s_const_arr2)[10] because it triggers a bug in mkString
-// (item 5 of https://github.com/correctcomputation/checkedc-clang/issues/703)
-// that produces output that won't compile.
 
 // Itypes for constants sized arrays when there is a declaration with and
 // without a parameter list take slightly different paths that need to be
