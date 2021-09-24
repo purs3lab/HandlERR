@@ -95,9 +95,18 @@ std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *MMD,
     // A function currently can't be a multi-decl member, so this should always
     // be a PointerVariableConstraint.
     PVConstraint *PVC = cast<PointerVariableConstraint>(&CVO.getValue());
-    // If we need an itype declaration due to ItypesForExtern, mkStringForPVDecl
-    // will handle that and will check whether it needs to use mkString for the
-    // unchecked side due to a base type rename.
+    // Currently, we benefit from the ItypesForExtern handling in
+    // mkStringForPVDecl in one very unusual case: an unchanged multi-decl
+    // member with a renamed TagDecl and an existing implicit itype coming from
+    // a bounds annotation will keep the itype and not be changed to a fully
+    // checked type. DeclRewriter::buildItypeDecl will detect the base type
+    // rename and generate the unchecked side using mkString instead of
+    // Decl::print in order to pick up the new name.
+    //
+    // As long as 3C lacks real support for itypes on variables, this is
+    // probably the behavior we want with -itypes-for-extern. If we don't care
+    // about this case, we could alternatively inline the few lines of
+    // mkStringForPVDecl that would still be relevant.
     return mkStringForPVDecl(MMD, PVC, Info);
   }
 

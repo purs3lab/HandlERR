@@ -288,6 +288,18 @@ void constrain_dh(void) {
 //CHECK_NOALL-NEXT: static struct A global_a_arr[2];
 //CHECK_ALL-NEXT:   static struct A global_a_arr _Checked[2];
 
+// This case is not intentionally supported but works "by accident" because 3C
+// deletes everything between the start location of the first member and the
+// start of the TagDecl (here, `_Ptr<`) and replaces everything between the end
+// location of the TagDecl and the end of the first member (here,
+// `> *chkptr_struct_var`) with the new text of the first member. It may well be
+// the right decision to break this case in the future, but it would be nice to
+// be aware that we're doing so, and we might want to keep a test that this case
+// merely produces wrong output and doesn't crash the rewriter.
+_Ptr<struct chkptr_struct { int *x; }> *chkptr_struct_var;
+//CHECK:      struct chkptr_struct { _Ptr<int> x; };
+//CHECK-NEXT: _Ptr<_Ptr<struct chkptr_struct>> chkptr_struct_var = ((void *)0);
+
 // Tests of the special case where we use the first member of a typedef
 // multi-decl as the name of the inline TagDecl.
 

@@ -117,15 +117,19 @@ int (*const_arr2)[10];
 // corresponding tests without -itypes-for-extern in multivardecls.c; see the
 // comments there.
 
-int m_const_arr0[10], *m_const_arr1[10], (*m_const_arr2)[10];
+int m_const_arr0[10], *m_const_arr1[10], (*m_const_arr2)[10],
+    *m_implicit_itype : count(2), **m_change_with_bounds : count(2);
 //CHECK_ALL:   int m_const_arr0[10] : itype(int _Checked[10]);
 //CHECK_NOALL: int m_const_arr0[10];
 //CHECK_ALL:   int *m_const_arr1[10] : itype(_Ptr<int> _Checked[10]) = {((void *)0)};
 //CHECK_NOALL: int *m_const_arr1[10];
 //CHECK_ALL:   int (*m_const_arr2)[10] : itype(_Ptr<int _Checked[10]>) = ((void *)0);
 //CHECK_NOALL: int (*m_const_arr2)[10] : itype(_Ptr<int[10]>) = ((void *)0);
+//CHECK:       int *m_implicit_itype : count(2);
+//CHECK:       int **m_change_with_bounds : itype(_Array_ptr<_Ptr<int>>) count(2) = ((void *)0);
 
-struct { int *x; } s, *s_force_rewrite, s_const_arr0[10], *s_const_arr1[10];
+struct { int *x; } s, *s_force_rewrite, s_const_arr0[10], *s_const_arr1[10],
+    *s_implicit_itype : count(2), **s_change_with_bounds : count(2);
 //CHECK:       struct s_struct_1 { int *x : itype(_Ptr<int>); };
 //CHECK:       struct s_struct_1 s;
 //CHECK:       struct s_struct_1 *s_force_rewrite : itype(_Ptr<struct s_struct_1>) = ((void *)0);
@@ -133,6 +137,13 @@ struct { int *x; } s, *s_force_rewrite, s_const_arr0[10], *s_const_arr1[10];
 //CHECK_NOALL: struct s_struct_1 s_const_arr0[10];
 //CHECK_ALL:   struct s_struct_1 * s_const_arr1[10] : itype(_Ptr<struct s_struct_1> _Checked[10]) = {((void *)0)};
 //CHECK_NOALL: struct s_struct_1 * s_const_arr1[10];
+// As in the corresponding test in multivardecls.c, the type of s_implicit_type
+// is loaded as _Array_ptr<struct s_struct_1>, but it is downgraded back to an
+// itype by -itypes-for-extern. As long as 3C lacks real support for itypes on
+// variables, this is probably the behavior we want with -itypes-for-extern in
+// this very unusual case.
+//CHECK:       struct s_struct_1 *s_implicit_itype : itype(_Array_ptr<struct s_struct_1>) count(2);
+//CHECK:       struct s_struct_1 **s_change_with_bounds : itype(_Array_ptr<_Ptr<struct s_struct_1>>) count(2) = ((void *)0);
 
 // Itypes for constants sized arrays when there is a declaration with and
 // without a parameter list take slightly different paths that need to be
@@ -147,7 +158,8 @@ void const_arr_fn(int a[10]) {}
 
 // Rewriting an existing itype or bounds expression on a global variable. Doing
 // this correctly requires replacing text until the end of the Checked C
-// annotation expression.
+// annotation expression. The m_* and s_* tests above test some similar cases in
+// combination with multi-decls.
 int *a : itype(_Ptr<int>);
 int **b : itype(_Ptr<int *>);
 int *c : count(2);
@@ -162,13 +174,3 @@ int **g : count(2) itype(_Array_ptr<int *>) = 0;
 //CHECK: int **e : itype(_Array_ptr<_Ptr<int>>) count(2) = ((void *)0);
 //CHECK: int **f : itype(_Array_ptr<_Ptr<int>>) count(2) = ((void *)0);
 //CHECK: int **g : itype(_Array_ptr<_Ptr<int>>) count(2) = 0;
-
-// The same, but with multi-decls with a mix of changed and unchanged members.
-
-int *c1 : count(2), **d1 : count(2);
-//CHECK: int *c1 : count(2);
-//CHECK: int **d1 : itype(_Array_ptr<_Ptr<int>>) count(2) = ((void *)0);
-
-int **d2 : count(2), *c2 : count(2);
-//CHECK: int **d2 : itype(_Array_ptr<_Ptr<int>>) count(2) = ((void *)0);
-//CHECK: int *c2 : count(2);
