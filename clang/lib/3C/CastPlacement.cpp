@@ -178,20 +178,12 @@ CastPlacementVisitor::getCastString(ConstraintVariable *Dst,
       ConstAtom *CA =
           Info.getConstraints().getAssignment(DstPVC->getCvars().at(0));
 
-      // Writing an _Assume_bounds_cast to an array type requires inserting
-      // the bounds for destination array. These can come from the source
-      // code or the infered bounds. If neither source is available, use empty
-      // bounds.
+      // TODO: Writing an _Assume_bounds_cast to an array type requires
+      // inserting the bounds for destination array. But the names used in src
+      // and dest may be different, so we need more sophisticated code to
+      // convert to local variable names. Use empty bounds for now.
       if (isa<ArrAtom>(CA) || isa<NTArrAtom>(CA)) {
-        std::string Bounds = "";
-        if (DstPVC->srcHasBounds())
-          Bounds = DstPVC->getBoundsStr();
-        else if (DstPVC->hasBoundsKey())
-          Bounds = ABRewriter.getBoundsString(DstPVC, nullptr, true);
-        if (Bounds.empty())
-          Bounds = "byte_count(0)";
-
-        Suffix = ", " + Bounds + ")";
+        Suffix = ", byte_count(0))";
       }
     }
     // The destination's type may be generic, which would have an out-of-scope

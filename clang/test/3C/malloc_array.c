@@ -20,7 +20,7 @@ void bar(void) {
   //CHECK: y = (int *)5;
   int *z = foo(y);
   //CHECK_NOALL: _Ptr<int> z = foo(y);
-  //CHECK_ALL: _Ptr<int> z = foo(_Assume_bounds_cast<_Array_ptr<int>>(y,  count(2 + 1)));
+  //CHECK_ALL: _Ptr<int> z = foo(_Assume_bounds_cast<_Array_ptr<int>>(y, byte_count(0)));
 }
 
 void force(int *x) {}
