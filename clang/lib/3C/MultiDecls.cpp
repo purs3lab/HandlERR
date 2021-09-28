@@ -57,7 +57,6 @@ void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
   // Variables related to the current multi-decl.
   MultiDeclInfo *CurrentMultiDecl = nullptr;
   SourceLocation CurrentBeginLoc;
-  PersistentSourceLoc TagDefPSL;
 
   for (Decl *D : DC->decls()) {
     TagDecl *TagD = dyn_cast<TagDecl>(D);
