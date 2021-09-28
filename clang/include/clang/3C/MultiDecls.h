@@ -17,8 +17,8 @@
 
 #include "clang/3C/PersistentSourceLoc.h"
 #include "clang/AST/Decl.h"
-#include "clang/AST/Type.h"
 #include "clang/AST/RecursiveASTVisitor.h"
+#include "clang/AST/Type.h"
 #include "llvm/ADT/Optional.h"
 
 using namespace clang;
