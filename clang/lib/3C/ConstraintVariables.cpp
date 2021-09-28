@@ -511,7 +511,7 @@ PointerVariableConstraint::PointerVariableConstraint(
                           TSInfo);
 
   // Get a string representing the type without pointer and array indirection.
-  BaseType = extractBaseType(D, TSInfo, QT, Ty, C, I);
+  BaseType = extractBaseType(D, TSInfo, QT, Ty, C);
 
   // check if the type is some depth of pointers to void
   // TODO: is this what the field should mean? do we want to include other
@@ -595,13 +595,7 @@ std::string PointerVariableConstraint::extractBaseType(MultiDeclMemberDecl *D,
                                                        TypeSourceInfo *TSI,
                                                        QualType QT,
                                                        const Type *Ty,
-                                                       const ASTContext &C,
-                                                       ProgramInfo &Info) {
-  // REVIEW: Can we get rid of the const_cast?
-  if (llvm::Optional<std::string> TypeStrOverride =
-      Info.TheMultiDeclsInfo.getTypeStrOverride(Ty, const_cast<ASTContext &>(C)))
-    return *TypeStrOverride;
-
+                                                       const ASTContext &C) {
   std::string BaseTypeStr = tryExtractBaseType(D, TSI, QT, Ty, C);
   // Fall back to rebuilding the base type based on type passed to constructor
   if (BaseTypeStr.empty())

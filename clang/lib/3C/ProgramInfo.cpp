@@ -684,11 +684,6 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       unifyIfTypedef(QT, *AstContext, P);
       NewCV = P;
       NewCV->setValidDecl();
-      if (FlD->getParent()->isUnion()) {
-        // REVIEW: Should we also call NewCV->equateWithItype here? The previous
-        // code in InlineStructDetector didn't call it.
-        NewCV->constrainToWild(CS, "Union field encountered", &PLoc);
-      }
     }
   } else
     llvm_unreachable("unknown decl type");
@@ -1140,13 +1135,16 @@ bool ProgramInfo::seenTypedef(PersistentSourceLoc PSL) {
   return TypedefVars.count(PSL) != 0;
 }
 
-void ProgramInfo::addTypedef(PersistentSourceLoc PSL,
+void ProgramInfo::addTypedef(PersistentSourceLoc PSL, bool CanRewriteDef,
                              TypedefDecl *TD, ASTContext &C) {
   ConstraintVariable *V = nullptr;
   if (isa<clang::FunctionType>(TD->getUnderlyingType()))
     V = new FunctionVariableConstraint(TD, *this, C);
   else
     V = new PointerVariableConstraint(TD, *this, C);
+
+  if (!CanRewriteDef)
+    V->constrainToWild(this->getConstraints(), "Unable to rewrite a typedef with multiple names", &PSL);
 
   if (!canWrite(PSL.getFileName()))
     V->constrainToWild(this->getConstraints(), UNWRITABLE_REASON, &PSL);

@@ -40,14 +40,12 @@ public:
                  ArrayBoundsRewriter &ABR);
 
 private:
+  static RecordDecl *LastRecordDecl;
+  static std::map<Decl *, Decl *> VDToRDMap;
+  static std::set<Decl *> InlineVarDecls;
   Rewriter &R;
   ProgramInfo &Info;
   ASTContext &A;
-
-  // List of TagDecls that were split from multi-decls and should be moved out
-  // of an enclosing RecordDecl to avoid a compiler warning. Filled during
-  // multi-decl rewriting and processed by denestTagDecls.
-  std::vector<TagDecl *> TagDeclsToDenest;
 
   // Visit each Decl in ToRewrite and apply the appropriate pointer type
   // to that Decl. ToRewrite is the set of all declarations to rewrite.
@@ -60,7 +58,7 @@ private:
   void doDeclRewrite(SourceRange &SR, DeclReplacement *N);
   void rewriteFunctionDecl(FunctionDeclReplacement *N);
   SourceRange getNextComma(SourceLocation L);
-  void denestTagDecls();
+  static void detectInlineStruct(Decl *D, SourceManager &SM);
 };
 
 // Visits function declarations and adds entries with their new rewritten

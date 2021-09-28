@@ -95,16 +95,6 @@ private:
 
 typedef std::map<Decl *, DeclReplacement *> RSet;
 
-// Generate a string for the declaration based on the given PVConstraint.
-// Includes the storage qualifier, type, name, and bounds string (as
-// applicable), or generates an itype declaration if required due to
-// ItypesForExtern. Does not include a trailing semicolon or an initializer, so
-// it can be used in combination with getDeclSourceRangeWithAnnotations with
-// IncludeInitializer = false to preserve an existing initializer.
-std::string mkStringForPVDecl(MultiDeclMemberDecl *MMD,
-                              PVConstraint *PVC,
-                              ProgramInfo &Info);
-
 // Generate a string like mkStringForPVDecl, but for a declaration whose type is
 // known not to have changed (except possibly for a base type rename) and that
 // may not have a PVConstraint if the type is not a pointer or array type.

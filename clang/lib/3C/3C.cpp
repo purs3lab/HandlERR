@@ -527,8 +527,6 @@ bool _3CInterface::addVariables() {
   // for the multi-decl members in the "Add Variables" step below.
   // REVIEW: Move to a separate _3CInterface pass?
   for (auto &TU : ASTs)
-    GlobalProgramInfo.TheMultiDeclsInfo.findUsedTagNames(TU->getASTContext());
-  for (auto &TU : ASTs)
     GlobalProgramInfo.TheMultiDeclsInfo.findMultiDecls(TU->getASTContext());
 
   // 1. Add Variables.

@@ -141,12 +141,6 @@ struct MultiDeclInfo {
   // need to split it out, so this will be null.
   TagDecl *TagDefToSplit = nullptr;
 
-  // True if the base type was an unnamed TagDecl defined inline for which we
-  // are using a new name. Note that TagDefToSplit can be nonnull and
-  // BaseTypeRenamed can be false if the inline TagDecl was named, and the
-  // reverse can occur in the `typedef struct { ... } T` case.
-  bool BaseTypeRenamed = false;
-
   // The members of the multi-decl in their original order.
   std::vector<MultiDeclMemberDecl *> Members;
 
@@ -165,32 +159,14 @@ typedef std::map<SourceLocation, MultiDeclInfo> TUMultiDeclsInfo;
 
 class MultiDeclsInfo {
 private:
-  // Set of TagDecl names already used at least once in the program, so we can
-  // avoid colliding with them.
-  std::set<std::string> UsedTagNames;
-  
-  // Map from PSL of an originally unnamed TagDecl to the string that should be
-  // used to refer to its type, so we can ensure that names are assigned
-  // consistently when 3C naively rewrites the same header file multiple times
-  // as part of different translation units (see
-  // https://github.com/correctcomputation/checkedc-clang/issues/374#issuecomment-804283984).
-  // Note that unlike UsedTagNames, this includes the tag kind keyword (such as
-  // `struct`), except when we use an existing typedef (which doesn't require a
-  // tag keyword).
-  std::map<PersistentSourceLoc, std::string> AssignedTagTypeStrs;
-
   std::map<ASTContext *, TUMultiDeclsInfo> TUInfos;
 
   // Recursive helpers.
-  void findUsedTagNames(DeclContext *DC);
   void findMultiDecls(DeclContext *DC, ASTContext &Context);
 
 public:
-  void findUsedTagNames(ASTContext &Context);
   void findMultiDecls(ASTContext &Context);
-  llvm::Optional<std::string> getTypeStrOverride(const Type *Ty, ASTContext &C);
   MultiDeclInfo *findContainingMultiDecl(MultiDeclMemberDecl *MMD);
-  bool wasBaseTypeRenamed(Decl *D);
 };
 
 #endif // LLVM_CLANG_3C_MULTIDECLS_H

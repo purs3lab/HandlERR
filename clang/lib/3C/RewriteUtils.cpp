@@ -21,45 +21,9 @@
 using namespace llvm;
 using namespace clang;
 
-std::string mkStringForPVDecl(MultiDeclMemberDecl *MMD,
-                              PVConstraint *PVC,
-                              ProgramInfo &Info) {
-  // Currently, it's cheap to keep recreating the ArrayBoundsRewriter. If that
-  // ceases to be true, we should pass it along as another argument.
-  ArrayBoundsRewriter ABRewriter{Info};
-  std::string NewDecl = getStorageQualifierString(MMD);
-  bool IsExternGlobalVar =
-      isa<VarDecl>(MMD) &&
-      cast<VarDecl>(MMD)->getFormalLinkage() == Linkage::ExternalLinkage;
-  if (_3COpts.ItypesForExtern &&
-      (isa<FieldDecl>(MMD) || IsExternGlobalVar) &&
-      // isSolutionChecked can return false here when splitting out an unchanged
-      // multi-decl member.
-      PVC->isSolutionChecked(Info.getConstraints().getVariables())) {
-    // Give record fields and global variables itypes when using
-    // -itypes-for-extern. Note that we haven't properly implemented
-    // itypes for structures and globals. This just rewrites to an itype
-    // instead of a fully checked type when a checked type could have been
-    // used. This does provide most of the rewriting infrastructure that
-    // would be required to support these itypes if constraint generation
-    // is updated to handle structure/global itypes.
-    std::string Type, IType;
-    // VarDecl and FieldDecl subclass DeclaratorDecl, so the cast will
-    // always succeed.
-    DeclRewriter::buildItypeDecl(PVC, cast<DeclaratorDecl>(MMD), Type, IType,
-                                 Info, ABRewriter);
-    NewDecl += Type + IType;
-  } else {
-    NewDecl += PVC->mkString(Info.getConstraints()) +
-               ABRewriter.getBoundsString(PVC, MMD);
-  }
-  return NewDecl;
-}
-
 std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *MMD,
                                              ProgramInfo &Info) {
-  bool BaseTypeRenamed = Info.TheMultiDeclsInfo.wasBaseTypeRenamed(MMD);
-  if (!BaseTypeRenamed) {
+  /*if (!BaseTypeRenamed)*/ {
     // As far as we know, we can let Clang generate the declaration string. To
     // get it without any initializer, we temporarily mutate the Decl to remove
     // the initializer: a hack, but there isn't an obvious better way.
@@ -81,61 +45,6 @@ std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *MMD,
 
     return DeclStr;
   }
-
-  // OK, we have to use mkString.
-  ASTContext &Context = MMD->getASTContext();
-  QualType DType = getTypeOfMultiDeclMember(MMD);
-  if (isPtrOrArrayType(DType)) {
-    CVarOption CVO =
-        (isa<TypedefDecl>(MMD)
-             ? Info.lookupTypedef(PersistentSourceLoc::mkPSL(MMD, Context))
-             : Info.getVariable(MMD, &Context));
-    assert(CVO.hasValue() &&
-           "Missing ConstraintVariable for unchanged multi-decl member");
-    // A function currently can't be a multi-decl member, so this should always
-    // be a PointerVariableConstraint.
-    PVConstraint *PVC = cast<PointerVariableConstraint>(&CVO.getValue());
-    // Currently, we benefit from the ItypesForExtern handling in
-    // mkStringForPVDecl in one very unusual case: an unchanged multi-decl
-    // member with a renamed TagDecl and an existing implicit itype coming from
-    // a bounds annotation will keep the itype and not be changed to a fully
-    // checked type. DeclRewriter::buildItypeDecl will detect the base type
-    // rename and generate the unchecked side using mkString instead of
-    // Decl::print in order to pick up the new name.
-    //
-    // As long as 3C lacks real support for itypes on variables, this is
-    // probably the behavior we want with -itypes-for-extern. If we don't care
-    // about this case, we could alternatively inline the few lines of
-    // mkStringForPVDecl that would still be relevant.
-    return mkStringForPVDecl(MMD, PVC, Info);
-  }
-
-  // If the type is not a pointer or array, then it should just equal the base
-  // type except for top-level qualifiers (REVIEW: Can we verify that somehow?),
-  // and it can't have itypes or bounds.
-  // PointerVariableConstraint::extractBaseType doesn't include qualifiers, but
-  // since we know the type is not a pointer, just adding any qualifiers at the
-  // beginning of the string should be correct.
-  std::string QualifierPrefix = DType.getQualifiers().getAsString();
-  if (!QualifierPrefix.empty())
-    QualifierPrefix += " ";
-  // REVIEW: It's awkward to use PointerVariableConstraint::extractBaseType
-  // here, though it seems to work so far.
-  // PointerVariableConstraint::extractBaseType takes a bunch of parameters that
-  // are poorly documented and seem specific to the way it is used by
-  // PointerVariableConstraint. Help me clean that up? Once
-  // PointerVariableConstraint::extractBaseType is more general, it might be
-  // more reasonable to move it to Utils.cpp as John suggested
-  // (https://github.com/correctcomputation/checkedc-clang/issues/652#issuecomment-882886270)
-  // if I can figure out what to do about the dependency on MultiDecls.h for the
-  // MultiDeclMemberDecl parameter type.
-  //
-  // extractBaseType can handle TSI == nullptr. Don't duplicate that code
-  // here.
-  return getStorageQualifierString(MMD) + QualifierPrefix +
-                 PointerVariableConstraint::extractBaseType(
-                     MMD, nullptr, DType, DType.getTypePtr(), Context, Info) +
-                 " " + std::string(MMD->getName());
 }
 
 // Test to see if we can rewrite a given SourceRange.
