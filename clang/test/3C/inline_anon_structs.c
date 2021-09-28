@@ -140,3 +140,25 @@ void foo2(int *x) {
     int *il
   } * g, *h, *i;
 }
+
+// Tests of new functionality from
+// https://github.com/correctcomputation/checkedc-clang/pull/657.
+// TODO: Do we want to put this in a separate file?
+
+// Test that 3C doesn't mangle the code by attempting to split a forward
+// declaration of a struct out of a multi-decl as if it were a definition
+// (https://github.com/correctcomputation/checkedc-clang/issues/644).
+struct fwd *p;
+//CHECK: _Ptr<struct fwd> p = ((void *)0);
+
+// This case is not intentionally supported but works "by accident" because 3C
+// deletes everything between the start location of the first member and the
+// start of the TagDecl (here, `_Ptr<`) and replaces everything between the end
+// location of the TagDecl and the end of the first member (here,
+// `> *chkptr_struct_var`) with the new text of the first member. It may well be
+// the right decision to break this case in the future, but it would be nice to
+// be aware that we're doing so, and we might want to keep a test that this case
+// merely produces wrong output and doesn't crash the rewriter.
+_Ptr<struct chkptr_struct { int *x; }> *chkptr_struct_var;
+//CHECK:      struct chkptr_struct { _Ptr<int> x; };
+//CHECK-NEXT: _Ptr<_Ptr<struct chkptr_struct>> chkptr_struct_var = ((void *)0);

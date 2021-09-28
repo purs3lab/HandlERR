@@ -110,6 +110,21 @@ int (*const_arr2)[10];
 //CHECK_ALL: int (*const_arr2)[10] : itype(_Ptr<int _Checked[10]>) = ((void *)0);
 //CHECK_NOALL: int (*const_arr2)[10] : itype(_Ptr<int[10]>) = ((void *)0);
 
+// Two tests similar to the above but involving multi-decls. These have
+// corresponding tests without -itypes-for-extern in multivardecls.c; see the
+// comments there.
+
+int m_const_arr0[10], *m_const_arr1[10], (*m_const_arr2)[10],
+    *m_implicit_itype : count(2), **m_change_with_bounds : count(2);
+//CHECK_ALL:   int m_const_arr0[10] : itype(int _Checked[10]);
+//CHECK_NOALL: int m_const_arr0[10];
+//CHECK_ALL:   int *m_const_arr1[10] : itype(_Ptr<int> _Checked[10]) = {((void *)0)};
+//CHECK_NOALL: int *m_const_arr1[10];
+//CHECK_ALL:   int (*m_const_arr2)[10] : itype(_Ptr<int _Checked[10]>) = ((void *)0);
+//CHECK_NOALL: int (*m_const_arr2)[10] : itype(_Ptr<int[10]>) = ((void *)0);
+//CHECK:       int *m_implicit_itype : count(2);
+//CHECK:       int **m_change_with_bounds : itype(_Array_ptr<_Ptr<int>>) count(2) = ((void *)0);
+
 // Itypes for constants sized arrays when there is a declaration with and
 // without a parameter list take slightly different paths that need to be
 // tested. If there is no parameter list, then the unchecked component of the
@@ -123,7 +138,8 @@ void const_arr_fn(int a[10]) {}
 
 // Rewriting an existing itype or bounds expression on a global variable. Doing
 // this correctly requires replacing text until the end of the Checked C
-// annotation expression.
+// annotation expression. The m_* and s_* tests above test some similar cases in
+// combination with multi-decls.
 int *a : itype(_Ptr<int>);
 int **b : itype(_Ptr<int *>);
 int *c : count(2);
