@@ -172,6 +172,7 @@ CastPlacementVisitor::getCastString(ConstraintVariable *Dst,
   case CAST_TO_WILD:
     return std::make_pair("((" + Dst->getRewritableOriginalTy() + ")", ")");
   case CAST_TO_CHECKED: {
+    std::string Type;
     std::string Suffix = ")";
     if (const auto *DstPVC = dyn_cast<PVConstraint>(Dst)) {
       assert("Checked cast not to a pointer" && !DstPVC->getCvars().empty());
@@ -182,15 +183,18 @@ CastPlacementVisitor::getCastString(ConstraintVariable *Dst,
       // inserting the bounds for destination array. But the names used in src
       // and dest may be different, so we need more sophisticated code to
       // convert to local variable names. Use empty bounds for now.
-      if (isa<ArrAtom>(CA) || isa<NTArrAtom>(CA)) {
+      if (isa<ArrAtom>(CA)) {
+        Type = "_Array_ptr<";
+        Suffix = ", byte_count(0))";
+      } else if (isa<NTArrAtom>(CA)) {
+        Type = "_Nt_array_ptr<";
         Suffix = ", byte_count(0))";
       }
     }
     // The destination's type may be generic, which would have an out-of-scope
     // type var, so use the already analysed local type var instead
-    std::string Type;
     if (TypeVar != nullptr) {
-      Type = "_Ptr<" +
+      Type +=
           TypeVar->mkString(Info.getConstraints(),
                             MKSTRING_OPTS(EmitName = false, EmitPointee = true)) +
           ">";
