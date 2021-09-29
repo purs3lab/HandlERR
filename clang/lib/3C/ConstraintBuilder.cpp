@@ -32,8 +32,6 @@ public:
 
   // T x = e
   bool VisitDeclStmt(DeclStmt *S) {
-    // Introduce variables as needed.
-
     // Process inits even for non-pointers because structs and union values
     // can contain pointers
     for (const auto &D : S->decls()) {
