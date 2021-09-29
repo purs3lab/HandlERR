@@ -189,6 +189,8 @@ CastPlacementVisitor::getCastString(ConstraintVariable *Dst,
       } else if (isa<NTArrAtom>(CA)) {
         Type = "_Nt_array_ptr<";
         Suffix = ", byte_count(0))";
+      } else {
+        Type = "_Ptr<";
       }
     }
     // The destination's type may be generic, which would have an out-of-scope
