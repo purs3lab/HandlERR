@@ -11,7 +11,7 @@ cd "$(dirname "$0")/../../../../.."
 # section of clang/docs/checkedc/3C/clang-tidy.md.
 # TODO: Enhance this script to account for any of those caveats?
 
-monorepo_root_regex_quoted="$(sed -E 's,[^A-Za-z0-9],\\&,' <<<"$PWD")"
+monorepo_root_regex_quoted="$(sed -E 's,[^A-Za-z0-9],\\&,g' <<<"$PWD")"
 # TODO: Support nonstandard build directory locations.
 clang-tools-extra/clang-tidy/tool/run-clang-tidy.py \
   -p build \
