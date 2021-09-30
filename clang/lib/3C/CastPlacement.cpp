@@ -172,8 +172,7 @@ CastPlacementVisitor::getCastString(ConstraintVariable *Dst,
   case CAST_TO_WILD:
     return std::make_pair("((" + Dst->getRewritableOriginalTy() + ")", ")");
   case CAST_TO_CHECKED: {
-    std::string Type;
-    std::string Suffix = ")";
+    std::string Type, Suffix;
     if (const auto *DstPVC = dyn_cast<PVConstraint>(Dst)) {
       assert("Checked cast not to a pointer" && !DstPVC->getCvars().empty());
       ConstAtom *CA =
@@ -191,6 +190,7 @@ CastPlacementVisitor::getCastString(ConstraintVariable *Dst,
         Suffix = ", byte_count(0))";
       } else {
         Type = "_Ptr<";
+        Suffix = ")";
       }
     }
     // The destination's type may be generic, which would have an out-of-scope
