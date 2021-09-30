@@ -142,11 +142,13 @@ int *sus(int *x, int *y) {
   //CHECK: x = (int *)5;
   int *z = calloc(5, sizeof(int));
   //CHECK_NOALL: int *z = calloc<int>(5, sizeof(int));
-  //CHECK_ALL: _Array_ptr<int> z = calloc<int>(5, sizeof(int));
+  //CHECK_ALL: _Array_ptr<int> __3c_tmp_z : count(5) = calloc<int>(5, sizeof(int));
+  //CHECK_ALL: _Array_ptr<int> z : bounds(__3c_tmp_z, __3c_tmp_z + 5) = __3c_tmp_z;
   int i, fac;
   int *p;
   //CHECK_NOALL: int *p;
-  //CHECK_ALL: _Array_ptr<int> p = ((void *)0);
+  //CHECK_ALL: _Array_ptr<int> __3c_tmp_p : count(5) = ((void *)0);
+  //CHECK_ALL: _Array_ptr<int> p : bounds(__3c_tmp_p, __3c_tmp_p + 5) = __3c_tmp_p;
   for (i = 0, p = z, fac = 1; i < 5; ++i, p++, fac *= i) {
     //CHECK_NOALL: for (i = 0, p = z, fac = 1; i < 5; ++i, p++, fac *= i) {
     //CHECK_ALL: for (i = 0, p = z, fac = 1; i < 5; ++i, p++, fac *= i) _Checked {

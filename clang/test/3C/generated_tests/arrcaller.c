@@ -111,7 +111,8 @@ int *sus(int *x, int *y) {
   int i, fac;
   int *p;
   //CHECK_NOALL: int *p;
-  //CHECK_ALL: _Array_ptr<int> p = ((void *)0);
+  //CHECK_ALL: _Array_ptr<int> __3c_tmp_p : count(5) = ((void *)0);
+  //CHECK_ALL: _Array_ptr<int> p : bounds(__3c_tmp_p, __3c_tmp_p + 5) = __3c_tmp_p;
   for (i = 0, p = z, fac = 1; i < 5; ++i, p++, fac *= i) {
     //CHECK_NOALL: for (i = 0, p = z, fac = 1; i < 5; ++i, p++, fac *= i) {
     //CHECK_ALL: for (i = 0, p = z, fac = 1; i < 5; ++i, p++, fac *= i) _Checked {
@@ -142,7 +143,8 @@ int *bar() {
   //CHECK: _Ptr<int> y = malloc<int>(sizeof(int));
   int *z = sus(x, y);
   //CHECK_NOALL: int *z = sus(x, y);
-  //CHECK_ALL: _Array_ptr<int> z = sus(x, y);
+  //CHECK_ALL: _Array_ptr<int> __3c_tmp_z : count(5) = sus(x, y);
+  //CHECK_ALL: _Array_ptr<int> z : bounds(__3c_tmp_z, __3c_tmp_z + 5) = __3c_tmp_z;
   z += 2;
   return z;
 }
