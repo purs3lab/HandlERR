@@ -150,7 +150,7 @@ int *sus(int *x, int *y) {
   //CHECK_ALL: _Array_ptr<int> p : bounds(__3c_tmp_p, __3c_tmp_p + 5) = __3c_tmp_p;
   for (i = 0, p = z, fac = 1; i < 5; ++i, p++, fac *= i) {
     //CHECK_NOALL: for (i = 0, p = z, fac = 1; i < 5; ++i, p++, fac *= i) {
-    //CHECK_ALL: for (i = 0, p = z, fac = 1; i < 5; ++i, p++, fac *= i) _Checked {
+    //CHECK_ALL: for (i = 0, __3c_tmp_p = z, p = __3c_tmp_p, fac = 1; i < 5; ++i, p++, fac *= i) _Checked {
     *p = fac;
   }
   z += 2;
