@@ -49,7 +49,7 @@ TypeSourceInfo *getTypeSourceInfoOfMultiDeclMember(MultiDeclMemberDecl *MMD) {
   llvm_unreachable("Unexpected declaration type");
 }
 
-void MultiDeclsInfo::findUsedTagNames(DeclContext *DC) {
+void ProgramMultiDeclsInfo::findUsedTagNames(DeclContext *DC) {
   // We do our own traversal via `decls` rather than using RecursiveASTVisitor.
   // This has the advantage of visiting TagDecls in function parameters, which
   // RecursiveASTVisitor doesn't do by default, though such TagDecls are
@@ -71,7 +71,7 @@ void MultiDeclsInfo::findUsedTagNames(DeclContext *DC) {
   }
 }
 
-void MultiDeclsInfo::findUsedTagNames(ASTContext &Context) {
+void ProgramMultiDeclsInfo::findUsedTagNames(ASTContext &Context) {
   findUsedTagNames(Context.getTranslationUnitDecl());
 }
 
@@ -86,7 +86,7 @@ static const Type *unelaborateType(const Type *Ty) {
   return Ty;
 }
 
-void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
+void ProgramMultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
   // This will automatically create a new, empty map for the TU if needed.
   TUMultiDeclsInfo &TUInfo = TUInfos[&Context];
   TagDecl *LastTagDef = nullptr;
@@ -110,6 +110,8 @@ void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
         // We are starting a new multi-decl.
         CurrentBeginLoc = MMD->getBeginLoc();
         CurrentMultiDecl = &TUInfo[CurrentBeginLoc];
+        assert(CurrentMultiDecl->Members.empty() &&
+               "Multi-decl members are not consecutive in traversal order");
         TagDefNeedsName = false;
         
         // Check for an inline tag definition.
@@ -129,6 +131,13 @@ void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
               TagDefNeedsName = true;
           }
         }
+      } else {
+        // Adding another member to an existing multi-decl.
+        assert(Context.getSourceManager().isBeforeInTranslationUnit(
+                   CurrentMultiDecl->Members.back()->getEndLoc(),
+                   MMD->getEndLoc()) &&
+               "Multi-decl traversal order inconsistent "
+               "with source location order");
       }
 
       CurrentMultiDecl->Members.push_back(MMD);
@@ -203,11 +212,12 @@ void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
   }
 }
 
-void MultiDeclsInfo::findMultiDecls(ASTContext &Context) {
+void ProgramMultiDeclsInfo::findMultiDecls(ASTContext &Context) {
   findMultiDecls(Context.getTranslationUnitDecl(), Context);
 }
 
-llvm::Optional<std::string> MultiDeclsInfo::getTypeStrOverride(const Type *Ty, ASTContext &C) {
+llvm::Optional<std::string>
+ProgramMultiDeclsInfo::getTypeStrOverride(const Type *Ty, const ASTContext &C) {
   Ty = unelaborateType(Ty);
   if (const TagType *TTy = dyn_cast<TagType>(Ty)) {
     TagDecl *TD = TTy->getDecl();
@@ -223,7 +233,8 @@ llvm::Optional<std::string> MultiDeclsInfo::getTypeStrOverride(const Type *Ty, A
   return llvm::None;
 }
 
-MultiDeclInfo *MultiDeclsInfo::findContainingMultiDecl(MultiDeclMemberDecl *MMD) {
+MultiDeclInfo *
+ProgramMultiDeclsInfo::findContainingMultiDecl(MultiDeclMemberDecl *MMD) {
   TUMultiDeclsInfo &TUInfo = TUInfos[&MMD->getASTContext()];
   // Look for a MultiDeclInfo for the beginning location of MMD, then check that
   // the MultiDeclInfo actually contains MMD.
@@ -238,7 +249,7 @@ MultiDeclInfo *MultiDeclsInfo::findContainingMultiDecl(MultiDeclMemberDecl *MMD)
   return nullptr;
 }
 
-bool MultiDeclsInfo::wasBaseTypeRenamed(Decl *D) {
+bool ProgramMultiDeclsInfo::wasBaseTypeRenamed(Decl *D) {
   // We assume that the base type was renamed if and only if D belongs to a
   // multi-decl marked as having the base type renamed. It might be better to
   // actually extract the base type from D and look it up in

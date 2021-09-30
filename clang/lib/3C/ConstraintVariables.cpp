@@ -601,9 +601,8 @@ std::string PointerVariableConstraint::extractBaseType(MultiDeclMemberDecl *D,
                                                        const Type *Ty,
                                                        const ASTContext &C,
                                                        ProgramInfo &Info) {
-  // REVIEW: Can we get rid of the const_cast?
   if (llvm::Optional<std::string> TypeStrOverride =
-      Info.TheMultiDeclsInfo.getTypeStrOverride(Ty, const_cast<ASTContext &>(C)))
+      Info.TheMultiDeclsInfo.getTypeStrOverride(Ty, C))
     return *TypeStrOverride;
 
   std::string BaseTypeStr = tryExtractBaseType(D, TSI, QT, Ty, C);

@@ -218,6 +218,12 @@ void DeclRewriter::rewrite(RSet &ToRewrite) {
     if (auto *MR = dyn_cast<MultiDeclMemberReplacement>(N)) {
       MultiDeclInfo *MDI = Info.TheMultiDeclsInfo.findContainingMultiDecl(MR->getDecl());
       assert("Missing MultiDeclInfo for multi-decl member" && MDI);
+      // A multi-decl can only be rewritten as a unit. If at least one member
+      // needs rewriting, then the first MultiDeclMemberReplacement in iteration
+      // order of ToRewrite (which need not have anything to do with member
+      // order of the multi-decl) triggers rewriting of the entire multi-decl,
+      // and rewriteMultiDecl checks ToRewrite for a MultiDeclMemberReplacement
+      // for each member of the multi-decl and applies it if found.
       if (!MDI->AlreadyRewritten)
         rewriteMultiDecl(*MDI, ToRewrite);
     } else if (auto *FR = dyn_cast<FunctionDeclReplacement>(N)) {
@@ -284,14 +290,20 @@ void DeclRewriter::denestTagDecls() {
 }
 
 void DeclRewriter::rewriteMultiDecl(MultiDeclInfo &MDI, RSet &ToRewrite) {
-  // Rewriting is more difficult when there are multiple variables declared in a
-  // single statement. When this happens, we need to find all the declaration
-  // replacement for this statement and apply them at the same time.
-
-  // For each decl in the original, build up a new string. If the
-  // original decl was re-written, write that out instead. Existing
-  // initializers are preserved, any declarations that an initializer to
-  // be valid checked-c are given one.
+  // Rewrite a "multi-decl" consisting of one or more variables, fields, or
+  // typedefs declared in a comma-separated list based on a single type "on the
+  // left". See the comment at the top of clang/include/clang/3C/MultiDecls.h
+  // for a detailed description of the design that is implemented here. As
+  // mentioned in MultiDecls.h, this code is used even for "multi-decls" that
+  // have only a single member to avoid having to maintain a separate code path
+  // for them.
+  //
+  // Due to the overlap between members, a multi-decl can only be rewritten as a
+  // unit, visiting the members in source code order from left to right. For
+  // each member, we check whether it has a replacement in ToRewrite. If so, we
+  // use it; if not, we generate a declaration equivalent to the original.
+  // Existing initializers are preserved, and declarations that need an
+  // initializer to be valid Checked C are given one.
 
   SourceManager &SM = A.getSourceManager();
   bool IsFirst = true;
@@ -382,8 +394,7 @@ void DeclRewriter::rewriteMultiDecl(MultiDeclInfo &MDI, RSet &ToRewrite) {
 
     if (IsFirst) {
       // Rewriting the first declaration is easy. Nothing should change if its
-      // type does not to be rewritten. When rewriting is required, it is
-      // essentially the same as the single declaration case.
+      // type does not to be rewritten.
       IsFirst = false;
       if (Replacement) {
         doDeclRewrite(ReplaceSR, Replacement);

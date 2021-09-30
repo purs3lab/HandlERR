@@ -697,9 +697,9 @@ void ProgramInfo::addVariable(clang::DeclaratorDecl *D,
       NewCV = P;
       NewCV->setValidDecl();
       if (FlD->getParent()->isUnion()) {
-        // REVIEW: Should we also call NewCV->equateWithItype here? The previous
-        // code in InlineStructDetector didn't call it.
-        NewCV->constrainToWild(CS, ReasonLoc("Union field encountered", PLoc));
+        auto Rsn = ReasonLoc(UNION_FIELD_REASON, PLoc);
+        NewCV->equateWithItype(*this, Rsn);
+        NewCV->constrainToWild(CS, Rsn);
       }
     }
   } else

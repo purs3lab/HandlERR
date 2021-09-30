@@ -111,31 +111,16 @@ std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *MMD,
   }
 
   // If the type is not a pointer or array, then it should just equal the base
-  // type except for top-level qualifiers (REVIEW: Can we verify that somehow?),
-  // and it can't have itypes or bounds.
-  // PointerVariableConstraint::extractBaseType doesn't include qualifiers, but
-  // since we know the type is not a pointer, just adding any qualifiers at the
-  // beginning of the string should be correct.
+  // type except for top-level qualifiers, and it can't have itypes or bounds.
+  llvm::Optional<std::string> BaseTypeNewNameOpt =
+      Info.TheMultiDeclsInfo.getTypeStrOverride(DType.getTypePtr(), Context);
+  assert(BaseTypeNewNameOpt &&
+         "BaseTypeRenamed is true but we couldn't get the new name");
   std::string QualifierPrefix = DType.getQualifiers().getAsString();
   if (!QualifierPrefix.empty())
     QualifierPrefix += " ";
-  // REVIEW: It's awkward to use PointerVariableConstraint::extractBaseType
-  // here, though it seems to work so far.
-  // PointerVariableConstraint::extractBaseType takes a bunch of parameters that
-  // are poorly documented and seem specific to the way it is used by
-  // PointerVariableConstraint. Help me clean that up? Once
-  // PointerVariableConstraint::extractBaseType is more general, it might be
-  // more reasonable to move it to Utils.cpp as John suggested
-  // (https://github.com/correctcomputation/checkedc-clang/issues/652#issuecomment-882886270)
-  // if I can figure out what to do about the dependency on MultiDecls.h for the
-  // MultiDeclMemberDecl parameter type.
-  //
-  // extractBaseType can handle TSI == nullptr. Don't duplicate that code
-  // here.
   return getStorageQualifierString(MMD) + QualifierPrefix +
-                 PointerVariableConstraint::extractBaseType(
-                     MMD, nullptr, DType, DType.getTypePtr(), Context, Info) +
-                 " " + std::string(MMD->getName());
+         *BaseTypeNewNameOpt + " " + std::string(MMD->getName());
 }
 
 // Test to see if we can rewrite a given SourceRange.

@@ -163,7 +163,7 @@ struct MultiDeclInfo {
 // later if there is a keyword such as `static` or `typedef` in between.
 typedef std::map<SourceLocation, MultiDeclInfo> TUMultiDeclsInfo;
 
-class MultiDeclsInfo {
+class ProgramMultiDeclsInfo {
 private:
   // Set of TagDecl names already used at least once in the program, so we can
   // avoid colliding with them.
@@ -188,7 +188,8 @@ private:
 public:
   void findUsedTagNames(ASTContext &Context);
   void findMultiDecls(ASTContext &Context);
-  llvm::Optional<std::string> getTypeStrOverride(const Type *Ty, ASTContext &C);
+  llvm::Optional<std::string> getTypeStrOverride(const Type *Ty,
+                                                 const ASTContext &C);
   MultiDeclInfo *findContainingMultiDecl(MultiDeclMemberDecl *MMD);
   bool wasBaseTypeRenamed(Decl *D);
 };
