@@ -92,3 +92,31 @@ int *faz() {
 
   return a;
 }
+
+// Assignments to the variable should update the original and the copy, as long
+// as the value being assigned doesn't depend on the pointer.
+void fiz() {
+  int *p = malloc(10 * sizeof(int));
+  //CHECK_ALL: _Array_ptr<int> __3c_tmp_p : count(10) = malloc<int>(10 * sizeof(int));
+  //CHECK_ALL: _Array_ptr<int> p : bounds(__3c_tmp_p, __3c_tmp_p + 10) = __3c_tmp_p;
+  p++;
+
+  // This assignment isn't touched because `p` is on the RHS.
+  // FIXME: This isn't recognized as pointer arithmetic by the array bounds
+  //        code. It should be treated the same as `p++`. Maybe the code should
+  //        be changed to mark a variable as assigned from pointer arithmetic
+  //        if it's on the LHS of an assignment where it also appears on the
+  //        RHS (like the check I implemented for this assignment updating).
+  p = p + 1;
+  //CHECK_ALL: p = p + 1;
+
+  // Null out `p`, so we need to null the original and the duplicate.
+  p = 0;
+  //CHECK_ALL: __3c_tmp_p = 0, p = __3c_tmp_p;
+
+  // A slightly more complex update to a different pointer value.
+  int *q = malloc(10 * sizeof(int));
+  p = q;
+  //CHECK_ALL: _Array_ptr<int> q : count(10) = malloc<int>(10 * sizeof(int));
+  //CHECK_ALL: __3c_tmp_p = q, p = __3c_tmp_p;
+}
