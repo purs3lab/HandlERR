@@ -30,7 +30,7 @@ public:
 
   bool VisitDecl(clang::Decl *D);
 
-  SourceToDeclMapType getResults() {
+  const SourceToDeclMapType &getResults() {
     return PSLtoSDT;
   }
 

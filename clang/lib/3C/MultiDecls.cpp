@@ -49,7 +49,7 @@ TypeSourceInfo *getTypeSourceInfoOfMultiDeclMember(MultiDeclMemberDecl *MMD) {
   llvm_unreachable("Unexpected declaration type");
 }
 
-void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
+void ProgramMultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
   // This will automatically create a new, empty map for the TU if needed.
   TUMultiDeclsInfo &TUInfo = TUInfos[&Context];
   TagDecl *LastTagDef = nullptr;
@@ -71,6 +71,8 @@ void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
         // We are starting a new multi-decl.
         CurrentBeginLoc = MMD->getBeginLoc();
         CurrentMultiDecl = &TUInfo[CurrentBeginLoc];
+        assert(CurrentMultiDecl->Members.empty() &&
+               "Multi-decl members are not consecutive in traversal order");
         
         // Check for an inline tag definition.
         // Wanted: CurrentBeginLoc <= LastTagDef->getBeginLoc().
@@ -80,6 +82,13 @@ void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
                 LastTagDef->getBeginLoc(), CurrentBeginLoc)) {
           CurrentMultiDecl->TagDefToSplit = LastTagDef;
         }
+      } else {
+        // Adding another member to an existing multi-decl.
+        assert(Context.getSourceManager().isBeforeInTranslationUnit(
+                   CurrentMultiDecl->Members.back()->getEndLoc(),
+                   MMD->getEndLoc()) &&
+               "Multi-decl traversal order inconsistent "
+               "with source location order");
       }
 
       CurrentMultiDecl->Members.push_back(MMD);
@@ -90,11 +99,12 @@ void MultiDeclsInfo::findMultiDecls(DeclContext *DC, ASTContext &Context) {
   }
 }
 
-void MultiDeclsInfo::findMultiDecls(ASTContext &Context) {
+void ProgramMultiDeclsInfo::findMultiDecls(ASTContext &Context) {
   findMultiDecls(Context.getTranslationUnitDecl(), Context);
 }
 
-MultiDeclInfo *MultiDeclsInfo::findContainingMultiDecl(MultiDeclMemberDecl *MMD) {
+MultiDeclInfo *
+ProgramMultiDeclsInfo::findContainingMultiDecl(MultiDeclMemberDecl *MMD) {
   TUMultiDeclsInfo &TUInfo = TUInfos[&MMD->getASTContext()];
   // Look for a MultiDeclInfo for the beginning location of MMD, then check that
   // the MultiDeclInfo actually contains MMD.

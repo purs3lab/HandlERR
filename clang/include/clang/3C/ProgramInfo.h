@@ -180,7 +180,7 @@ public:
   void registerTranslationUnits(
       const std::vector<std::unique_ptr<clang::ASTUnit>> &ASTs);
 
-  MultiDeclsInfo TheMultiDeclsInfo;
+  ProgramMultiDeclsInfo TheMultiDeclsInfo;
 
 private:
   // List of constraint variables for declarations, indexed by their location in

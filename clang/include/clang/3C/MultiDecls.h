@@ -157,7 +157,7 @@ struct MultiDeclInfo {
 // later if there is a keyword such as `static` or `typedef` in between.
 typedef std::map<SourceLocation, MultiDeclInfo> TUMultiDeclsInfo;
 
-class MultiDeclsInfo {
+class ProgramMultiDeclsInfo {
 private:
   std::map<ASTContext *, TUMultiDeclsInfo> TUInfos;
 
