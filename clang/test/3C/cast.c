@@ -60,3 +60,19 @@ void work (void) {
   free_ptr<int>(node);
   //CHECK: free_ptr<int>(_Assume_bounds_cast<_Ptr<int>>(node));
 }
+
+// cast from wild to checked needs to cast to the new destination type
+_Itype_for_any(T) void has_itype(void *a : itype(_Array_ptr<T>) byte_count(l), unsigned int l);
+void infers_generic(void *a, unsigned int l) {
+  //CHECK_ALL: _Itype_for_any(T) void infers_generic(_Array_ptr<T> a : byte_count(l), unsigned int l) {
+  has_itype(a, l);
+}
+void test_cast_to_inferred() {
+  int *p = 1;
+  int l;
+
+  has_itype(p, l);
+  //CHECK: has_itype<int>(p, l);
+  infers_generic(p, l);
+  //CHECK_ALL: infers_generic<int>(_Assume_bounds_cast<_Array_ptr<int>>(p,  bounds(unknown)), l);
+}
