@@ -428,6 +428,41 @@ private:
   }
 };
 
+class AssignmentUpdater : public RecursiveASTVisitor<AssignmentUpdater> {
+public:
+  explicit AssignmentUpdater(ASTContext *C, ProgramInfo &I, Rewriter &R)
+    : Context(C), Info(I), CR(I, C), R(R) {}
+
+  bool VisitBinaryOperator(BinaryOperator *O) {
+    if (O->getOpcode() == clang::BO_Assign) {
+      CVarSet LHSCVs = CR.getExprConstraintVarsSet(O->getLHS());
+      // FIXME: Probably not always singleton
+      ConstraintVariable *CV = getOnly(LHSCVs);
+      // FIXME: only do this rewrite if the identifier for CV does not appear on
+      //        the RHS.
+      CVarSet RHSCVs = CR.getExprConstraintVarsSet(O->getRHS());
+      bool VarOnRHS = RHSCVs.find(CV) != RHSCVs.end();
+      if (!VarOnRHS &&
+          CV->hasBoundsKey() &&
+          Info.getABoundsInfo().needsRangeBound(CV->getBoundsKey())) {
+        // FIXME: This is very likely wrong sometimes.
+        rewriteSourceRange(R, O->getLHS()->getSourceRange(),
+                           "__3c_tmp_" + CV->getName());
+        R.InsertTextAfterToken(O->getEndLoc(),
+                               ", " + CV->getName() + " = " + "__3c_tmp_" +
+                               CV->getName());
+      }
+    }
+    return true;
+  }
+
+private:
+  ASTContext *Context;
+  ProgramInfo &Info;
+  ConstraintResolver CR;
+  Rewriter &R;
+};
+
 SourceRange DeclReplacement::getSourceRange(SourceManager &SM) const {
   SourceRange SR = getDecl()->getSourceRange();
   SourceLocation OldEnd = SR.getEnd();
@@ -652,6 +687,7 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   CastPlacementVisitor ECPV(&Context, Info, R, CLV.getExprsWithCast());
   TypeExprRewriter TER(&Context, Info, R);
   TypeArgumentAdder TPA(&Context, Info, R);
+  AssignmentUpdater AU(&Context, Info, R);
   TranslationUnitDecl *TUD = Context.getTranslationUnitDecl();
   for (const auto &D : TUD->decls()) {
     if (_3COpts.AddCheckedRegions) {
@@ -670,6 +706,8 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
     CLV.TraverseDecl(D);
     ECPV.TraverseDecl(D);
     TPA.TraverseDecl(D);
+    //TODO: I don't believe the position of AU in the order should matter.
+    AU.TraverseDecl(D);
   }
 
   // Output files.
@@ -680,3 +718,4 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   Info.exitCompilationUnit();
   return;
 }
+
