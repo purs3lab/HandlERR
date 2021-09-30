@@ -39,6 +39,7 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
   // TODO: Is this sufficient to get the bounds key? More complex logic is used
   //       elsewhere.
   bool NeedsRangeBound =
+    Defn->hasBoundsKey() &&
     Info.getABoundsInfo().needsRangeBound(Defn->getBoundsKey());
 
   std::string DeclName = Decl ? Decl->getNameAsString() : "";
@@ -262,16 +263,27 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
 
           // TODO: Same question about getBoundsKey as above. Also, copy-pasted
           //       code.
-          if (Info.getABoundsInfo().needsRangeBound(PV->getBoundsKey())) {
+          bool NeedsRangeBounds =
+            PV->hasBoundsKey() &&
+            Info.getABoundsInfo().needsRangeBound(PV->getBoundsKey());
+          if (NeedsRangeBounds) {
             std::string NewName = "__3c_tmp_" + PV->getName();
             NewTy += PV->mkString(Info.getConstraints(),
                                   MKSTRING_OPTS(UseName = NewName)) +
                      ABRewriter.getBoundsString(PV, D);
-            SupplementaryDecls.push_back(PV->mkString(Info.getConstraints()) +
-                                       ABRewriter.getBoundsString(PV, D, false,
-                                                                  true,
-                                                                  NewName) +
-                                       " = " + NewName + ";");
+            std::string SDecl = PV->mkString(Info.getConstraints()) +
+                                ABRewriter.getBoundsString(PV, D, false, true,
+                                                           NewName);
+            if (auto *VD = dyn_cast<VarDecl>(D)) {
+              if (VD->hasLocalStorage()) {
+                SDecl += " = " + NewName;
+              } else if (VD->hasInit()) {
+                SDecl += " = " + getSourceText(VD->getInit()->getSourceRange(),
+                                               Context);
+              }
+            }
+            SDecl += ";";
+            SupplementaryDecls.push_back(SDecl);
           } else {
             NewTy += PV->mkString(Info.getConstraints()) +
                      ABRewriter.getBoundsString(PV, D);
@@ -546,9 +558,20 @@ void DeclRewriter::doDeclRewrite(SourceRange SR, DeclReplacement *N) {
 
   rewriteSourceRange(R, SR, Replacement);
 
-  SourceLocation L = Lexer::findNextToken(
+  // Lexer::findNextToken can fail (why?). Rather than adding extra error
+  // handling here, pass an invalid location to emitSupplementryDeclaration so
+  // that it can emit an error.
+  // TODO: Is worth emitting a separate error here? We would be able to log the
+  //       the location passed to the failed findNextToken call. If adding an
+  //       error here, consider that it should only be emitted if rewriting
+  //       would actually need to happen. For test macro_rewrite_error.c, the
+  //       findNextToken call fails, but the invalid source location is never
+  //       used by emitSupplementaryDeclarations, so there is no error.
+  Optional<Token> NextToken = Lexer::findNextToken(
     N->getSourceRange(A.getSourceManager()).getEnd(), A.getSourceManager(),
-    A.getLangOpts())->getLocation();
+    A.getLangOpts());
+  SourceLocation L = NextToken.hasValue() ? NextToken.getValue().getLocation()
+                                          : SourceLocation();
   emitSupplementaryDeclarations(N->SupplementaryDecls, L);
 }
 
@@ -576,11 +599,13 @@ void DeclRewriter::emitSupplementaryDeclarations(
   for (std::string D : SDecls)
     AllDecls += "\n" + D;
 
-  // FIXME: Use rewriteSourceRange so our custom error messages are emitted.
   bool RewriteSucess = !R.InsertTextAfterToken(Loc, AllDecls);
-  assert("Rewrite failed when inserting duplicated declarations. "
-         "Fix this code path to use the same error reporting as "
-         "rewriteSourceRange." && RewriteSucess);
+  if (!RewriteSucess) {
+    // FIXME: Use rewriteSourceRange so that it handle emitting error messages.
+    llvm::errs()
+      << "Rewriting failed while emitting supplementary declaration.\n";
+    Loc.print(llvm::errs(), R.getSourceMgr());
+  }
 }
 
 // A function to detect the presence of inline struct declarations
@@ -896,7 +921,10 @@ void FunctionDeclBuilder::buildCheckedDecl(
     std::string &IType, std::string UseName, bool &RewriteParm,
     bool &RewriteRet, std::vector<std::string> &SDecls) {
 
+  // TODO: What does it mean for a defn to not have a bounds key? Presumably it
+  //       can't have bounds, and therefore can't need range bounds.
   bool NeedsRangeBound =
+    Defn->hasBoundsKey() &&
     Info.getABoundsInfo().needsRangeBound(Defn->getBoundsKey());
 
   std::string DeclName = UseName;
