@@ -181,13 +181,13 @@ CastPlacementVisitor::getCastString(ConstraintVariable *Dst,
       // TODO: Writing an _Assume_bounds_cast to an array type requires
       // inserting the bounds for destination array. But the names used in src
       // and dest may be different, so we need more sophisticated code to
-      // convert to local variable names. Use empty bounds for now.
+      // convert to local variable names. Use unknown bounds for now.
       if (isa<ArrAtom>(CA)) {
         Type = "_Array_ptr<";
-        Suffix = ", byte_count(0))";
+        Suffix = ", bounds(unknown))";
       } else if (isa<NTArrAtom>(CA)) {
         Type = "_Nt_array_ptr<";
-        Suffix = ", byte_count(0))";
+        Suffix = ", bounds(unknown))";
       } else {
         Type = "_Ptr<";
         Suffix = ")";
