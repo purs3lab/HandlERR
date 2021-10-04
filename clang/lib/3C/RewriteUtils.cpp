@@ -431,33 +431,32 @@ private:
 class AssignmentUpdater : public RecursiveASTVisitor<AssignmentUpdater> {
 public:
   explicit AssignmentUpdater(ASTContext *C, ProgramInfo &I, Rewriter &R)
-    : Context(C), Info(I), CR(I, C), R(R) {}
+    : Info(I), CR(I, C), R(R) {}
 
   bool VisitBinaryOperator(BinaryOperator *O) {
     if (O->getOpcode() == clang::BO_Assign) {
-      CVarSet LHSCVs = CR.getExprConstraintVarsSet(O->getLHS());
-      // FIXME: Probably not always singleton
-      ConstraintVariable *CV = getOnly(LHSCVs);
-      // FIXME: only do this rewrite if the identifier for CV does not appear on
-      //        the RHS.
-      CVarSet RHSCVs = CR.getExprConstraintVarsSet(O->getRHS());
-      bool VarOnRHS = RHSCVs.find(CV) != RHSCVs.end();
-      if (!VarOnRHS &&
-          CV->hasBoundsKey() &&
-          Info.getABoundsInfo().needsRangeBound(CV->getBoundsKey())) {
-        // FIXME: This is very likely wrong sometimes.
-        rewriteSourceRange(R, O->getLHS()->getSourceRange(),
-                           "__3c_tmp_" + CV->getName());
-        R.InsertTextAfterToken(O->getEndLoc(),
-                               ", " + CV->getName() + " = " + "__3c_tmp_" +
-                               CV->getName());
+      if (!isAssignmentPointerArithmetic(O->getLHS(), O->getRHS())) {
+        // TODO: I don't like calling getExprConstraintVars in the rewriting
+        //       because this has been a persistent source of errors in the cast
+        //       placement code.
+        CVarSet LHSCVs = CR.getExprConstraintVarsSet(O->getLHS());
+        // FIXME: This isn't always a singleton: `int **a, **b; *(0 ? a : b) = 0;`
+        //        As long as inner pointers can't have bounds, we should be able
+        //        to differ a proper solution.
+        ConstraintVariable *CV = getOnly(LHSCVs);
+        if (CV->hasBoundsKey() &&
+            Info.getABoundsInfo().needsRangeBound(CV->getBoundsKey())) {
+          std::string TmpVarName = "__3c_tmp_" + CV->getName();
+          rewriteSourceRange(R, O->getLHS()->getSourceRange(), TmpVarName);
+          R.InsertTextAfterToken(O->getEndLoc(),
+                                 ", " + CV->getName() + " = " + TmpVarName);
+        }
       }
     }
     return true;
   }
 
 private:
-  ASTContext *Context;
   ProgramInfo &Info;
   ConstraintResolver CR;
   Rewriter &R;
@@ -706,7 +705,6 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
     CLV.TraverseDecl(D);
     ECPV.TraverseDecl(D);
     TPA.TraverseDecl(D);
-    //TODO: I don't believe the position of AU in the order should matter.
     AU.TraverseDecl(D);
   }
 

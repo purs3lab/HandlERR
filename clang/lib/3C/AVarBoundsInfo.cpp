@@ -992,66 +992,11 @@ bool AVarBoundsInfo::addAssignment(BoundsKey L, BoundsKey R) {
   return true;
 }
 
-// Visitor to collect all the variables and structure member access that are
-// used during the life-time of the visitor.
-class CollectDeclsVisitor : public RecursiveASTVisitor<CollectDeclsVisitor> {
-public:
-  explicit CollectDeclsVisitor(ASTContext *Ctx)
-    : ObservedDecls(), StructAccess(), C(Ctx) {}
-
-  virtual ~CollectDeclsVisitor() {}
-
-  bool VisitDeclRefExpr(DeclRefExpr *DRE) {
-    if (auto *VD = dyn_cast_or_null<VarDecl>(DRE->getDecl()))
-      ObservedDecls.insert(VD);
-    return true;
-  }
-
-  // For a->b; We need to get `a->b`
-  bool VisitMemberExpr(MemberExpr *ME) {
-    std::string MAccess = getSourceText(ME->getSourceRange(), *C);
-    if (!MAccess.empty()) {
-      StructAccess.insert(MAccess);
-    }
-    return false;
-  }
-
-  const std::set<VarDecl *> &getObservedDecls() { return ObservedDecls; }
-  const std::set<std::string> &getStructAccess() { return StructAccess; }
-
-private:
-  // Contains all VarDecls seen by this visitor
-  std::set<VarDecl *> ObservedDecls;
-
-  // Contains the source representation of all record access (MemberExpression)
-  // seen by this visitor.
-  std::set<std::string> StructAccess;
-
-  ASTContext *C;
-};
-
-bool AVarBoundsInfo::handlePointerAssignment(clang::Stmt *St, clang::Expr *L,
-                                             clang::Expr *R, ASTContext *C,
+bool AVarBoundsInfo::handlePointerAssignment(clang::Expr *L, clang::Expr *R,
+                                             ASTContext *C,
                                              ConstraintResolver *CR) {
-  CollectDeclsVisitor LVarVis(C);
-  LVarVis.TraverseStmt(L->getExprStmt());
-
-  CollectDeclsVisitor RVarVis(C);
-  RVarVis.TraverseStmt(R->getExprStmt());
-
-  std::set<VarDecl *> CommonVars;
-  std::set<std::string> CommonStVars;
-  findIntersection(LVarVis.getObservedDecls(), RVarVis.getObservedDecls(),
-                   CommonVars);
-  findIntersection(LVarVis.getStructAccess(), RVarVis.getStructAccess(),
-                   CommonStVars);
-
-  if (!CommonVars.empty() || CommonStVars.empty()) {
-    for (auto *LHSCVar : CR->getExprConstraintVarsSet(L)) {
-      if (LHSCVar->hasBoundsKey())
-        ArrPointerBoundsKey.insert(LHSCVar->getBoundsKey());
-    }
-  }
+  if (isAssignmentPointerArithmetic(L ,R))
+    recordArithmeticOperation(L, CR);
   return true;
 }
 

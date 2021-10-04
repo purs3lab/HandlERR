@@ -234,8 +234,8 @@ public:
   bool addAssignment(clang::Decl *L, clang::Decl *R);
   bool addAssignment(clang::DeclRefExpr *L, clang::DeclRefExpr *R);
   bool addAssignment(BoundsKey L, BoundsKey R);
-  bool handlePointerAssignment(clang::Stmt *St, clang::Expr *L, clang::Expr *R,
-                               ASTContext *C, ConstraintResolver *CR);
+  bool handlePointerAssignment(clang::Expr *L, clang::Expr *R, ASTContext *C,
+                               ConstraintResolver *CR);
   bool handleAssignment(clang::Expr *L, const CVarSet &LCVars,
                         const std::set<BoundsKey> &CSLKeys, clang::Expr *R,
                         const CVarSet &RCVars,
