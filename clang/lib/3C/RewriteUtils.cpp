@@ -593,7 +593,7 @@ void RewriteConsumer::emitRootCauseDiagnostics(ASTContext &Context) {
         // or are in the main file of the TU. Alternatively, don't filter causes
         // if -warn-all-root-cause is passed.
         int PtrCount = I.getNumPtrsAffected(WReason.first);
-        if (_3COpts.WarnAllRootCause || SM.isInMainFile(SL) || PtrCount > 1) {
+        if (_3COpts.WarnAllRootCause || SM.isInMainFile(SL) || PtrCount > 0) {
           // SL is invalid when the File is not in the current translation unit.
           if (SL.isValid()) {
             EmittedDiagnostics.insert(PSL);
