@@ -1,4 +1,5 @@
 // RUN: 3c -use-malloc=my_malloc -base-dir=%S -alltypes -warn-all-root-cause %s -- -Xclang -verify -Wno-everything
+// RUN: 3c -use-malloc=my_malloc -base-dir=%S -alltypes -warn-root-cause %s -- -Xclang -verify -Wno-everything
 
 // This test is unusual in that it checks for the errors in the code
 
