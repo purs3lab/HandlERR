@@ -172,7 +172,9 @@ CastPlacementVisitor::getCastString(ConstraintVariable *Dst,
   case CAST_TO_WILD:
     return std::make_pair("((" + Dst->getRewritableOriginalTy() + ")", ")");
   case CAST_TO_CHECKED: {
-    std::string Type, Suffix;
+    // Needed as default to TypeVar branch below, reset otherwise.
+    std::string Type = "_Ptr<";
+    std::string Suffix = ")";
     if (const auto *DstPVC = dyn_cast<PVConstraint>(Dst)) {
       assert("Checked cast not to a pointer" && !DstPVC->getCvars().empty());
       ConstAtom *CA =
@@ -188,9 +190,6 @@ CastPlacementVisitor::getCastString(ConstraintVariable *Dst,
       } else if (isa<NTArrAtom>(CA)) {
         Type = "_Nt_array_ptr<";
         Suffix = ", bounds(unknown))";
-      } else {
-        Type = "_Ptr<";
-        Suffix = ")";
       }
     }
     // The destination's type may be generic, which would have an out-of-scope
