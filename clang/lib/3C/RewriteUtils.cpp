@@ -448,8 +448,15 @@ public:
             Info.getABoundsInfo().needsRangeBound(CV->getBoundsKey())) {
           std::string TmpVarName = "__3c_tmp_" + CV->getName();
           rewriteSourceRange(R, O->getLHS()->getSourceRange(), TmpVarName);
-          R.InsertTextAfterToken(O->getEndLoc(),
-                                 ", " + CV->getName() + " = " + TmpVarName);
+          bool InsertFail = R.InsertTextAfterToken(O->getEndLoc(),
+                                                        ", " + CV->getName() +
+                                                        " = " + TmpVarName);
+          if (InsertFail) {
+            // FIXME: Use rewriteSourceRange so that it handle emitting error messages.
+            llvm::errs()
+              << "Rewriting failed while updating assignment!\n";
+            O->getEndLoc().print(llvm::errs(), R.getSourceMgr());
+          }
         }
       }
     }
@@ -716,4 +723,3 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   Info.exitCompilationUnit();
   return;
 }
-

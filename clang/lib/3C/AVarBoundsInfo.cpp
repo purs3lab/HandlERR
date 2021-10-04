@@ -353,37 +353,12 @@ bool AvarBoundsInference::getReachableBoundKeys(const ProgramVarScope *DstScope,
 void AvarBoundsInference::getRelevantBounds(BoundsKey BK,
                                             BndsKindMap &ResBounds) {
   // Try to get the bounds of all RBKeys.
-  // If this pointer is used in pointer arithmetic then there
-  // are no relevant bounds for this pointer.
-  //if (!BI->hasPointerArithmetic(BK)) {
-    if (CurrIterInferBounds.find(BK) != CurrIterInferBounds.end()) {
-      // get the bounds inferred from the current iteration
-      ResBounds = CurrIterInferBounds[BK];
-    } else if (ABounds *PrevBounds = BI->getBounds(BK)) {
-      ResBounds[PrevBounds->getKind()].insert(PrevBounds->getBKey());
-    }
-  //}
-
-  // A pointer that is used in pointer arithmetic can have relevant bounds, but
-  // it is not permitted to be a bound for another pointer. This avoids
-  // inferring bounds such as
-  //     _Array_ptr<int> a : count(1) = 0;
-  //     _Array_ptr<int> b : bounds(a, a + 1) = a;
-  //     b++;
-  //     _Array_ptr<int> c : count(1) = b;
-  // The bounds from `a` should not propagate through `b` to `c` because the
-  // pointer arithmetic on `b` potentially invalidates the bound. For future
-  // work, all bounds "down stream" of pointer arithmetic could also use range
-  // bounds, i.e., `c` could have `bounds(a, a + 1)` as well.
-  //for (auto &E : ResBounds) {
-  //  auto Iter = E.second.begin();
-  //  while (Iter != E.second.end()) {
-  //    if (BI->hasPointerArithmetic(*Iter))
-  //      Iter = E.second.erase(Iter);
-  //    else
-  //      ++Iter;
-  //  }
-  //}
+  if (CurrIterInferBounds.find(BK) != CurrIterInferBounds.end()) {
+    // get the bounds inferred from the current iteration
+    ResBounds = CurrIterInferBounds[BK];
+  } else if (ABounds *PrevBounds = BI->getBounds(BK)) {
+    ResBounds[PrevBounds->getKind()].insert(PrevBounds->getBKey());
+  }
 }
 
 bool AvarBoundsInference::areDeclaredBounds(
@@ -972,6 +947,18 @@ bool AVarBoundsInfo::handleAssignment(clang::Decl *L, CVarOption LCVars,
 }
 
 bool AVarBoundsInfo::addAssignment(BoundsKey L, BoundsKey R) {
+  // Before adding an edge from L to R or R to L, first verify that the source
+  // BoundsKey for the edge is not computed by pointer arithmetic. The pointer
+  // arithmetic invalidates the bounds on the pointer, so bounds should not
+  // propagate through it. The bounds are allowed to exist on the pointer
+  // because they will emitted as range bounds based on a different base
+  // pointer. For future work, all bounds "down stream" of pointer arithmetic
+  // could also use range bounds using the same base pointer.
+  auto AddEdgeUnlessPointerArithmetic = [this](BoundsKey From, BoundsKey To) {
+    if (!hasPointerArithmetic(From))
+      ProgVarGraph.addUniqueEdge(From, To);
+  };
+
   // If we are adding to function return, do not add bi-directional edges.
   if (isFunctionReturn(L) || isFunctionReturn(R)) {
     // Do not assign edge from return to itself.
@@ -980,14 +967,13 @@ bool AVarBoundsInfo::addAssignment(BoundsKey L, BoundsKey R) {
     // So, if we create a edge from return to itself then we create a cyclic
     // dependency and never will be able to find the bounds for the return
     // value.
-    if (L != R && !hasPointerArithmetic(R))
-      ProgVarGraph.addUniqueEdge(R, L);
+    if (L != R)
+      AddEdgeUnlessPointerArithmetic(R, L);
   } else {
-    if (!hasPointerArithmetic(R))
-      ProgVarGraph.addUniqueEdge(R, L);
+    AddEdgeUnlessPointerArithmetic(R, L);
     ProgramVar *PV = getProgramVar(R);
-    if (!(PV && PV->isNumConstant() && !hasPointerArithmetic(L)))
-      ProgVarGraph.addUniqueEdge(L, R);
+    if (!(PV && PV->isNumConstant()))
+      AddEdgeUnlessPointerArithmetic(L, R);
   }
   return true;
 }
@@ -1021,6 +1007,8 @@ bool AVarBoundsInfo::hasPointerArithmetic(BoundsKey BK) {
   return ArrPointersWithArithmetic.find(BK) != ArrPointersWithArithmetic.end();
 }
 
+// A pointer needs range bounds if it is computed by pointer arithmetic and
+// would otherwise need bounds.
 bool AVarBoundsInfo::needsRangeBound(BoundsKey BK) {
   return hasPointerArithmetic(BK) && getBounds(BK) != nullptr;
 }

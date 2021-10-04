@@ -6,7 +6,7 @@
 
 #include<stdlib.h>
 
-void foo(size_t l) {
+void test0(size_t l) {
   // Would get bounds, but there's pointer arithmetic. Now we split and use
   // range bound.
   int *p = malloc(l * sizeof(int));
@@ -23,21 +23,25 @@ void foo(size_t l) {
 // Parameters must be inserted inside function body. This also also checks
 // that a pre-declarations gets the correct bounds and does not generate a
 // second alias.
-void bar(int *a, int l);
-// CHECK_ALL: void bar(_Array_ptr<int> __3c_tmp_a : count(l), int l);
-void bar(int *a, int l) {
-  // CHECK_ALL: void bar(_Array_ptr<int> __3c_tmp_a : count(l), int l) _Checked {
+void test1(int *a, int l);
+// CHECK_ALL: void test1(_Array_ptr<int> a : count(l), int l);
+void test1(int *a, int l) {
+  // CHECK_ALL: void test1(_Array_ptr<int> __3c_tmp_a : count(l), int l) _Checked {
   // CHECK_ALL: _Array_ptr<int> a : bounds(__3c_tmp_a, __3c_tmp_a + l) = __3c_tmp_a;
+  a++;
+
+  // The increment above means this loop isn't safe. 3c won't consider this,
+  // but, now that we give `a` a bound, the access `a[l-1]` can be caught by
+  // Checked C.
   for(int i = 0; i < l; i++)
     a[i];
-  a++;
 }
 
 // Also check for itypes. They're interesting because the alias isn't checked.
-void baz(int *a, int l);
-// CHECK_ALL: void baz(int *__3c_tmp_a : itype(_Array_ptr<int>) count(l), int l);
-void baz(int *a, int l) {
-  // CHECK_ALL: void baz(int *__3c_tmp_a : itype(_Array_ptr<int>) count(l), int l) {
+void test2(int *a, int l);
+// CHECK_ALL: void test2(int *a : itype(_Array_ptr<int>) count(l), int l);
+void test2(int *a, int l) {
+  // CHECK_ALL: void test2(int *__3c_tmp_a : itype(_Array_ptr<int>) count(l), int l) {
   // CHECK_ALL: int *a  = __3c_tmp_a;
   for(int i = 0; i < l; i++)
     a[i];
@@ -46,8 +50,8 @@ void baz(int *a, int l) {
 }
 
 // Something more complex with multiple parameters.
-void buz(int *a, int *b, int *c, int *d) {
-  // CHECK_ALL: void buz(_Array_ptr<int> __3c_tmp_a : count(10), int *__3c_tmp_b : itype(_Array_ptr<int>) count(10), _Array_ptr<int> __3c_tmp_c : count(10), int *__3c_tmp_d : itype(_Array_ptr<int>) count(10)) {
+void test3(int *a, int *b, int *c, int *d) {
+  // CHECK_ALL: void test3(_Array_ptr<int> __3c_tmp_a : count(10), int *__3c_tmp_b : itype(_Array_ptr<int>) count(10), _Array_ptr<int> __3c_tmp_c : count(10), int *__3c_tmp_d : itype(_Array_ptr<int>) count(10)) {
   // CHECK_ALL: _Array_ptr<int> a : bounds(__3c_tmp_a, __3c_tmp_a + 10) = __3c_tmp_a;
   // CHECK_ALL: int *b = __3c_tmp_b;
   // CHECK_ALL: _Array_ptr<int> c : bounds(__3c_tmp_c, __3c_tmp_c + 10) = __3c_tmp_c;
@@ -61,7 +65,7 @@ void buz(int *a, int *b, int *c, int *d) {
 
 // Multi declarations are partially working with some known errors.
 // TODO: There would be an error if the initializer of `c` referenced `a`.
-void biz() {
+void test4() {
   int *a = malloc(10*sizeof(int)), b, *c = malloc(10*sizeof(int));
   // CHECK_ALL: _Array_ptr<int> __3c_tmp_a : count(10) = malloc<int>(10*sizeof(int));
   // CHECK_ALL: int b;
@@ -78,8 +82,8 @@ void biz() {
 // TODO: `b` could get `bounds(__3c_tmp_a, __3c_tmp_a + 2)`.
 // The same restriction also applies to bounds on the return, but it is is not
 // clear how range bounds could be assigned to the return.
-int *faz() {
-  // CHECK_ALL: _Array_ptr<int> faz(void) {
+int *test5() {
+  // CHECK_ALL: _Array_ptr<int> test5(void) {
   int *a = malloc(2 * sizeof(int));
   // CHECK_ALL: _Array_ptr<int> __3c_tmp_a : count(2) = malloc<int>(2 * sizeof(int));
   // CHECK_ALL: _Array_ptr<int> a : bounds(__3c_tmp_a, __3c_tmp_a + 2) = __3c_tmp_a;
@@ -95,28 +99,45 @@ int *faz() {
 
 // Assignments to the variable should update the original and the copy, as long
 // as the value being assigned doesn't depend on the pointer.
-void fiz() {
+void test6() {
   int *p = malloc(10 * sizeof(int));
-  //CHECK_ALL: _Array_ptr<int> __3c_tmp_p : count(10) = malloc<int>(10 * sizeof(int));
-  //CHECK_ALL: _Array_ptr<int> p : bounds(__3c_tmp_p, __3c_tmp_p + 10) = __3c_tmp_p;
+  // CHECK_ALL: _Array_ptr<int> __3c_tmp_p : count(10) = malloc<int>(10 * sizeof(int));
+  // CHECK_ALL: _Array_ptr<int> p : bounds(__3c_tmp_p, __3c_tmp_p + 10) = __3c_tmp_p;
   p++;
 
   // This assignment isn't touched because `p` is on the RHS.
-  // FIXME: This isn't recognized as pointer arithmetic by the array bounds
-  //        code. It should be treated the same as `p++`. Maybe the code should
-  //        be changed to mark a variable as assigned from pointer arithmetic
-  //        if it's on the LHS of an assignment where it also appears on the
-  //        RHS (like the check I implemented for this assignment updating).
   p = p + 1;
-  //CHECK_ALL: p = p + 1;
+  // CHECK_ALL: p = p + 1;
 
   // Null out `p`, so we need to null the original and the duplicate.
   p = 0;
-  //CHECK_ALL: __3c_tmp_p = 0, p = __3c_tmp_p;
+  // CHECK_ALL: __3c_tmp_p = 0, p = __3c_tmp_p;
 
   // A slightly more complex update to a different pointer value.
   int *q = malloc(10 * sizeof(int));
   p = q;
-  //CHECK_ALL: _Array_ptr<int> q : count(10) = malloc<int>(10 * sizeof(int));
-  //CHECK_ALL: __3c_tmp_p = q, p = __3c_tmp_p;
+  // CHECK_ALL: _Array_ptr<int> q : count(10) = malloc<int>(10 * sizeof(int));
+  // CHECK_ALL: __3c_tmp_p = q, p = __3c_tmp_p;
+
+  // Don't treat a call to realloc as pointer arithmetic. Freeing `p` after
+  // `p++` is highly questionable, but that's not the point here.
+  p = realloc(p, 10 * sizeof(int));
+  // CHECK_ALL: __3c_tmp_p = realloc<int>(p, 10 * sizeof(int)), p = __3c_tmp_p;
+}
+
+
+// Check interaction with declaration merging. Identifiers are added on the
+// first two declarations even though it's not required.
+void test7(int *);
+void test7();
+void test7(int *a);
+// CHECK_ALL: void test7(_Array_ptr<int> s : count(5));
+// CHECK_ALL: void test7(_Array_ptr<int> s : count(5));
+// CHECK_ALL: void test7(_Array_ptr<int> a : count(5));
+void test7(int *s) {
+// CHECK_ALL: void test7(_Array_ptr<int> __3c_tmp_s : count(5)) _Checked {
+// CHECK_ALL: _Array_ptr<int> s : bounds(__3c_tmp_s, __3c_tmp_s + 5) = __3c_tmp_s;
+  s++;
+  for (int i = 0; i < 5; i++)
+    s[i];
 }
