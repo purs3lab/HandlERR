@@ -18,41 +18,12 @@ INDIVIDUAL_COMMANDS_FILE = os.path.realpath("convert_individual.sh")
 # file in which the total commands will be stored.
 TOTAL_COMMANDS_FILE = os.path.realpath("convert_all.sh")
 
-VSCODE_SETTINGS_JSON = os.path.realpath("settings.json")
-
 # to separate multiple commands in a line
 CMD_SEP = " &&"
 DEFAULT_ARGS = ["-dump-stats"]
 if os.name == "nt":
     DEFAULT_ARGS.append("-extra-arg-before=--driver-mode=cl")
     CMD_SEP = " ;"
-
-
-class VSCodeJsonWriter():
-
-    def __init__(self):
-        self.clangd_path = ""
-        self.args = []
-
-    def setClangdPath(self, cdpath):
-        self.clangd_path = cdpath
-
-    def addClangdArg(self, arg):
-        if isinstance(arg, list):
-            self.args.extend(arg)
-        else:
-            self.args.append(arg)
-
-    def writeJsonFile(self, outputF):
-        fp = open(outputF, "w")
-        fp.write("{\"clangd.path\":\"" + self.clangd_path + "\",\n")
-        fp.write("\"clangd.arguments\": [\n")
-        argsstrs = map(lambda x: "\"" + x + "\"", self.args)
-        argsstrs = ",\n".join(argsstrs)
-        fp.write(argsstrs)
-        fp.write("]\n")
-        fp.write("}")
-        fp.close()
 
 
 def getCheckedCArgs(argument_list):
@@ -216,14 +187,6 @@ def run3C(checkedc_bin,
                   INDIVIDUAL_COMMANDS_FILE)
     os.system("chmod +x " + INDIVIDUAL_COMMANDS_FILE)
 
-    vcodewriter = VSCodeJsonWriter()
-    # get path to clangd3c
-    #
-    # clangd3c is believed not to work, but since this code has been here for a
-    # while and no one has been bothered by the fact that it didn't work, we
-    # won't bother removing it now; hopefully clangd3c will eventually be back.
-    vcodewriter.setClangdPath(
-        os.path.join(os.path.dirname(prog_name), "clangd3c"))
     args = []
     args.append(prog_name)
     args.extend(DEFAULT_ARGS)
@@ -231,16 +194,11 @@ def run3C(checkedc_bin,
     args.append('-p')
     args.append(compile_commands_json)
     args.append('-extra-arg=-w')
-    vcodewriter.addClangdArg("-log=verbose")
-    vcodewriter.addClangdArg(args[1:])
     args.append('-base-dir="' + compilation_base_dir + '"')
-    vcodewriter.addClangdArg('-base-dir=' + compilation_base_dir)
     # Try to choose a name unlikely to collide with anything in any real
     # project.
     args.append('-output-dir="' + compilation_base_dir + '/out.checked"')
     args.extend(list(set(all_files)))
-    vcodewriter.addClangdArg(list(set(all_files)))
-    vcodewriter.writeJsonFile(VSCODE_SETTINGS_JSON)
 
     f = open(TOTAL_COMMANDS_FILE, 'w')
     f.write("#!/bin/bash\n")
@@ -261,5 +219,4 @@ def run3C(checkedc_bin,
         compilation_base_dir, os.path.basename(INDIVIDUAL_COMMANDS_FILE)))
     logging.debug("Saved to:" + os.path.join(
         compilation_base_dir, os.path.basename(INDIVIDUAL_COMMANDS_FILE)))
-    logging.debug("VSCode Settings json saved to:" + VSCODE_SETTINGS_JSON)
     return
