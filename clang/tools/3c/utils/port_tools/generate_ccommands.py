@@ -6,24 +6,19 @@ import re
 import os
 import sys
 import json
-import traceback
 import subprocess
 import logging
 from common import TranslationUnitInfo
 from expand_macros import expandMacros, ExpandMacrosOptions
 
 SLASH = os.sep
-# file in which the individual commands will be stored
-INDIVIDUAL_COMMANDS_FILE = os.path.realpath("convert_individual.sh")
 # file in which the total commands will be stored.
 TOTAL_COMMANDS_FILE = os.path.realpath("convert_all.sh")
 
 # to separate multiple commands in a line
-CMD_SEP = " &&"
 DEFAULT_ARGS = ["-dump-stats"]
 if os.name == "nt":
     DEFAULT_ARGS.append("-extra-arg-before=--driver-mode=cl")
-    CMD_SEP = " ;"
 
 
 def getCheckedCArgs(argument_list):
@@ -66,48 +61,19 @@ def getCheckedCArgs(argument_list):
     return (clang_x_args, output_filename)
 
 
-def tryFixUp(s):
-    """
-    Fix-up for a failure between cmake and nmake.
-    """
-    b = open(s, 'r').read()
-    b = re.sub(r'@<<\n', "", b)
-    b = re.sub(r'\n<<', "", b)
-    f = open(s, 'w')
-    f.write(b)
-    f.close()
-    return
-
-
 # We no longer take the checkedc_include_dir here because we assume the working
 # tree is set up so that the Checked C headers get used automatically by 3c.
-def run3C(checkedc_bin,
+def run3C(_3c_bin,
           extra_3c_args,
           compilation_base_dir,
           compile_commands_json,
           skip_paths,
           expand_macros_opts: ExpandMacrosOptions,
-          skip_running=False,
-          run_individual=False):
-    global INDIVIDUAL_COMMANDS_FILE
-    global TOTAL_COMMANDS_FILE
-    runs = 0
-    cmds = None
+          skip_running=False):
     filters = []
     for i in skip_paths:
         filters.append(re.compile(i))
-    while runs < 2:
-        runs = runs + 1
-        try:
-            cmds = json.load(open(compile_commands_json, 'r'))
-        except:
-            traceback.print_exc()
-            tryFixUp(compile_commands_json)
-
-    if cmds == None:
-        logging.error("failed to get commands from compile commands json:" +
-                      compile_commands_json)
-        return
+    cmds = json.load(open(compile_commands_json, 'r'))
 
     translation_units: List[TranslationUnitInfo] = []
     all_files = []
@@ -146,49 +112,8 @@ def run3C(checkedc_bin,
 
     expandMacros(expand_macros_opts, compilation_base_dir, translation_units)
 
-    prog_name = checkedc_bin
-    f = open(INDIVIDUAL_COMMANDS_FILE, 'w')
-    f.write("#!/bin/bash\n")
-    for tu in translation_units:
-        args = []
-        # get the command to change the working directory
-        target_directory = tu.target_directory
-        change_dir_cmd = ""
-        if len(target_directory) > 0:
-            change_dir_cmd = "cd " + target_directory + CMD_SEP
-        else:
-            # default working directory
-            target_directory = os.getcwd()
-        args.append(prog_name)
-        args.extend(DEFAULT_ARGS)
-        args.extend(extra_3c_args)
-        # Even when we run 3c on a single file, we can let it read the compiler
-        # options from the compilation database.
-        args.append('-p')
-        args.append(compile_commands_json)
-        # ...but we need to add -w, as in getCheckedCArgs.
-        args.append('-extra-arg=-w')
-        args.append('-base-dir="' + compilation_base_dir + '"')
-        args.append('-output-dir="' + compilation_base_dir + '/out.checked"')
-        args.append(tu.input_filename)
-        # run individual commands.
-        if run_individual:
-            logging.debug("Running:" + ' '.join(args))
-            subprocess.check_call(' '.join(args),
-                                  cwd=target_directory,
-                                  shell=True)
-        # prepend the command to change the working directory.
-        if len(change_dir_cmd) > 0:
-            args = [change_dir_cmd] + args
-        f.write(" \\\n".join(args))
-        f.write("\n")
-    f.close()
-    logging.debug("Saved all the individual commands into the file:" +
-                  INDIVIDUAL_COMMANDS_FILE)
-    os.system("chmod +x " + INDIVIDUAL_COMMANDS_FILE)
-
     args = []
-    args.append(prog_name)
+    args.append(_3c_bin)
     args.extend(DEFAULT_ARGS)
     args.extend(extra_3c_args)
     args.append('-p')
@@ -202,11 +127,16 @@ def run3C(checkedc_bin,
 
     f = open(TOTAL_COMMANDS_FILE, 'w')
     f.write("#!/bin/bash\n")
-    f.write(" \\\n".join(args))
+    # Using an array literal rather than backslashes makes it easy for the user
+    # to comment out individual lines.
+    f.write("args=(\n")
+    f.write("".join(arg + "\n" for arg in args))
+    f.write(")\n")
+    f.write('"${args[@]}"')
     f.close()
     os.system("chmod +x " + TOTAL_COMMANDS_FILE)
     # run whole command
-    if not run_individual and not skip_running:
+    if not skip_running:
         logging.info("Running:" + str(' '.join(args)))
         subprocess.check_call(' '.join(args), shell=True)
     logging.debug("Saved the total command into the file:" +
@@ -215,8 +145,4 @@ def run3C(checkedc_bin,
         compilation_base_dir, os.path.basename(TOTAL_COMMANDS_FILE)))
     logging.debug("Saved to:" + os.path.join(
         compilation_base_dir, os.path.basename(TOTAL_COMMANDS_FILE)))
-    os.system("cp " + INDIVIDUAL_COMMANDS_FILE + " " + os.path.join(
-        compilation_base_dir, os.path.basename(INDIVIDUAL_COMMANDS_FILE)))
-    logging.debug("Saved to:" + os.path.join(
-        compilation_base_dir, os.path.basename(INDIVIDUAL_COMMANDS_FILE)))
     return
