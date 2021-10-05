@@ -141,3 +141,27 @@ void test7(int *s) {
   for (int i = 0; i < 5; i++)
     s[i];
 }
+
+// A structure field is handled as it was before implementing range bounds.
+// Future work could insert a new field, and update all struct initializer to
+// include it.
+struct s {
+  int *a;
+  // CHECK_ALL: _Array_ptr<int> a;
+};
+void test8() {
+  struct s t;
+  t.a++;
+  t.a[0];
+  // expected-error@-1 {{expression has unknown bounds}}
+}
+
+// Same as above. Future work might figure out how to emit range bounds for
+// global variables.
+int *glob;
+// CHECK_ALL: _Array_ptr<int> glob = ((void *)0);
+void test9() {
+  glob++;
+  glob[0];
+  // expected-error@-1 {{expression has unknown bounds}}
+}

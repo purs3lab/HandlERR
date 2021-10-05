@@ -352,7 +352,6 @@ bool AvarBoundsInference::getReachableBoundKeys(const ProgramVarScope *DstScope,
 
 void AvarBoundsInference::getRelevantBounds(BoundsKey BK,
                                             BndsKindMap &ResBounds) {
-  // Try to get the bounds of all RBKeys.
   if (CurrIterInferBounds.find(BK) != CurrIterInferBounds.end()) {
     // get the bounds inferred from the current iteration
     ResBounds = CurrIterInferBounds[BK];
@@ -812,8 +811,11 @@ BoundsKey AVarBoundsInfo::getVariable(clang::VarDecl *VD) {
     auto *PVar =
         ProgramVar::createNewProgramVar(NK, VD->getNameAsString(), PVS);
     insertProgramVar(NK, PVar);
-    if (isPtrOrArrayType(VD->getType()))
+    if (isPtrOrArrayType(VD->getType())) {
       PointerBoundsKey.insert(NK);
+      if (!VD->isLocalVarDeclOrParm())
+        IneligibleForRangeBounds.insert(NK);
+    }
   }
   return getVarKey(PSL);
 }
@@ -876,8 +878,10 @@ BoundsKey AVarBoundsInfo::getVariable(clang::FieldDecl *FD) {
     const StructScope *SS = StructScope::getStructScope(StName);
     auto *PVar = ProgramVar::createNewProgramVar(NK, FD->getNameAsString(), SS);
     insertProgramVar(NK, PVar);
-    if (isPtrOrArrayType(FD->getType()))
+    if (isPtrOrArrayType(FD->getType())) {
       PointerBoundsKey.insert(NK);
+      IneligibleForRangeBounds.insert(NK);
+    }
   }
   return getVarKey(PSL);
 }
@@ -955,7 +959,8 @@ bool AVarBoundsInfo::addAssignment(BoundsKey L, BoundsKey R) {
   // pointer. For future work, all bounds "down stream" of pointer arithmetic
   // could also use range bounds using the same base pointer.
   auto AddEdgeUnlessPointerArithmetic = [this](BoundsKey From, BoundsKey To) {
-    if (!hasPointerArithmetic(From))
+    if (!hasPointerArithmetic(From) &&
+        (!hasPointerArithmetic(To) || canInferRangeBounds(To)))
       ProgVarGraph.addUniqueEdge(From, To);
   };
 
@@ -1007,10 +1012,17 @@ bool AVarBoundsInfo::hasPointerArithmetic(BoundsKey BK) {
   return ArrPointersWithArithmetic.find(BK) != ArrPointersWithArithmetic.end();
 }
 
-// A pointer needs range bounds if it is computed by pointer arithmetic and
-// would otherwise need bounds.
+bool AVarBoundsInfo::canInferRangeBounds(BoundsKey BK) {
+  return IneligibleForRangeBounds.find(BK) == IneligibleForRangeBounds.end();
+}
+
 bool AVarBoundsInfo::needsRangeBound(BoundsKey BK) {
-  return hasPointerArithmetic(BK) && getBounds(BK) != nullptr;
+  // A pointer should get range bounds if it is computed by pointer arithmetic
+  // and would otherwise need bounds. Some pointers (global variables and struct
+  // fields) can't be rewritten to use range bounds (by 3C; Checked C does
+  // permit it), so we return false on these.
+  return hasPointerArithmetic(BK) && canInferRangeBounds(BK) &&
+         getBounds(BK) != nullptr;
 }
 
 ProgramVar *AVarBoundsInfo::getProgramVar(BoundsKey VK) {

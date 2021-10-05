@@ -594,8 +594,10 @@ std::string ArrayBoundsRewriter::getBoundsString(const PVConstraint *PV,
 
   if (ValidBKey && !PV->hasSomeSizedArr()) {
     ABounds *ArrB = ABInfo.getBounds(DK);
-    // Only we we have bounds and no pointer arithmetic on the variable.
-    if (ArrB != nullptr) {
+    // If we have pointer arithmetic and cannot add range bounds, then do not
+    // emit any bounds string.
+    if (ArrB != nullptr &&
+        (!ABInfo.hasPointerArithmetic(DK) || ABInfo.canInferRangeBounds(DK))) {
       if (UseRange)
         BString = ArrB->mkRangeString(&ABInfo, D, BasePtr);
       else

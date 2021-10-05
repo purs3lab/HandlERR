@@ -255,11 +255,13 @@ public:
   // Check if the given bounds key has a pointer arithmetic done on it.
   bool hasPointerArithmetic(BoundsKey BK);
 
+  // Check if range bounds can be inferred by 3C for the pointer corresponding
+  // to the bounds key.
+  bool canInferRangeBounds(BoundsKey BK);
+
   // Check if the bounds keys will need to be rewritten with range bounds. This
   // is true for bounds keys that are subject to pointer arithmetic but
   // otherwise have inferred bounds.
-  // TODO: disqualify pointers based on other conditions: e.g., fields probably
-  //       can't get range bound.
   bool needsRangeBound(BoundsKey BK);
 
   // Get the ProgramVar for the provided VarKey.
@@ -321,9 +323,18 @@ private:
   std::map<BoundsKey, std::map<BoundsPriority, ABounds *>> BInfo;
   // Set that contains BoundsKeys of variables which have invalid bounds.
   std::set<BoundsKey> InvalidBounds;
+
   // These are the bounds key of the pointers that has arithmetic operations
-  // performed on them.
+  // performed on them. These pointers cannot have the standard `count(n)`
+  // bounds and instead must use range bounds e.g., `bounds(p, p + n)`.
   std::set<BoundsKey> ArrPointersWithArithmetic;
+
+  // Some pointers, however, cannot be automatically given range bounds. This
+  // includes global variables and structure fields. If a pointer is in both the
+  // above pointer arithmetic set and this set, then it cannot be assigned any
+  // bound.
+  std::set<BoundsKey> IneligibleForRangeBounds;
+
   // Set of BoundsKeys that correspond to pointers.
   std::set<BoundsKey> PointerBoundsKey;
   // Set of BoundsKey that correspond to array pointers.
