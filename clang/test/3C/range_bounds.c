@@ -123,6 +123,11 @@ void test6() {
   // `p++` is highly questionable, but that's not the point here.
   p = realloc(p, 10 * sizeof(int));
   // CHECK_ALL: __3c_tmp_p = realloc<int>(p, 10 * sizeof(int)), p = __3c_tmp_p;
+
+  // Assignment rewriting should work in more complex expression and around
+  // other 3C rewriting without breaking anything.
+  int *v = 1 + (p = (int*) q, p = p + 1) + 1;
+  // CHECK_ALL: _Ptr<int> v = 1 + (__3c_tmp_p = (_Array_ptr<int>) q, p = __3c_tmp_p, p = p + 1) + 1;
 }
 
 
