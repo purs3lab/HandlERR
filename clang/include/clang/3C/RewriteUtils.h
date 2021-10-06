@@ -186,5 +186,7 @@ void rewriteSourceRange(Rewriter &R, const CharSourceRange &Range,
 
 void rewriteSourceRange(Rewriter &R, const SourceRange &Range,
                         const std::string &NewText, bool ErrFail = true);
+void insertText(Rewriter &R, SourceLocation S, const std::string &NewText,
+                bool ErrFail = true);
 
 #endif // LLVM_CLANG_3C_REWRITEUTILS_H

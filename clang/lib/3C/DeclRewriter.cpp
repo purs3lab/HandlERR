@@ -566,9 +566,9 @@ void DeclRewriter::rewriteFunctionDecl(FunctionDeclReplacement *N) {
 void DeclRewriter::emitSupplementaryDeclarations(
   const std::vector<std::string> &SDecls, SourceLocation Loc) {
   // There are no supplementary declarations to emit. The AllDecls String
-  // will remain empty, so R.InsertTextAfterToken should no-op, but it's still
-  // and error to insert an empty string and an invalid source location,
-  // so short circuit here to be safe.
+  // will remain empty, so insertText should no-op, but it's still an error to
+  // insert an empty string at an invalid source location, so short circuit here
+  // to be safe.
   if (SDecls.empty())
     return;
 
@@ -576,13 +576,7 @@ void DeclRewriter::emitSupplementaryDeclarations(
   for (std::string D : SDecls)
     AllDecls += "\n" + D;
 
-  bool RewriteSucess = !R.InsertTextAfterToken(Loc, AllDecls);
-  if (!RewriteSucess) {
-    // FIXME: Use rewriteSourceRange so that it handle emitting error messages.
-    llvm::errs()
-      << "Rewriting failed while emitting supplementary declaration.\n";
-    Loc.print(llvm::errs(), R.getSourceMgr());
-  }
+  insertText(R, Loc, AllDecls);
 }
 
 // A function to detect the presence of inline struct declarations

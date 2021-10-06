@@ -116,6 +116,13 @@ void rewriteSourceRange(Rewriter &R, const CharSourceRange &Range,
   }
 }
 
+void insertText(Rewriter &R, SourceLocation S, const std::string &NewText,
+                bool ErrFail) {
+  SourceRange SR(
+    Lexer::getLocForEndOfToken(S, 0, R.getSourceMgr(), R.getLangOpts()), S);
+  rewriteSourceRange(R, SR, NewText, ErrFail);
+}
+
 static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
   if (_3COpts.Verbose)
     errs() << "Writing files out\n";
@@ -450,15 +457,8 @@ public:
           if (ABInfo.needsRangeBound(CV)) {
             std::string TmpVarName = "__3c_tmp_" + CV->getName();
             rewriteSourceRange(R, O->getLHS()->getSourceRange(), TmpVarName);
-            bool InsertFail = R.InsertTextAfterToken(O->getEndLoc(),
-                                                          ", " + CV->getName() +
-                                                          " = " + TmpVarName);
-            if (InsertFail) {
-              // FIXME: Use rewriteSourceRange so that it handle emitting error messages.
-              llvm::errs()
-                << "Rewriting failed while updating assignment!\n";
-              O->getEndLoc().print(llvm::errs(), R.getSourceMgr());
-            }
+            insertText(R, O->getEndLoc(),
+                       ", " + CV->getName() + " = " + TmpVarName);
           }
         }
       }
