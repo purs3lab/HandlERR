@@ -431,31 +431,34 @@ private:
 class AssignmentUpdater : public RecursiveASTVisitor<AssignmentUpdater> {
 public:
   explicit AssignmentUpdater(ASTContext *C, ProgramInfo &I, Rewriter &R)
-    : Info(I), CR(I, C), R(R) {}
+    : ABInfo(I.getABoundsInfo()), CR(I, C), R(R) {}
 
   bool VisitBinaryOperator(BinaryOperator *O) {
     if (O->getOpcode() == clang::BO_Assign) {
       if (!isAssignmentPointerArithmetic(O->getLHS(), O->getRHS())) {
-        // TODO: I don't like calling getExprConstraintVars in the rewriting
-        //       because this has been a persistent source of errors in the cast
-        //       placement code.
         CVarSet LHSCVs = CR.getExprConstraintVarsSet(O->getLHS());
-        // FIXME: This isn't always a singleton: `int **a, **b; *(0 ? a : b) = 0;`
-        //        As long as inner pointers can't have bounds, we should be able
-        //        to differ a proper solution.
-        ConstraintVariable *CV = getOnly(LHSCVs);
-        if (CV->hasBoundsKey() &&
-            Info.getABoundsInfo().needsRangeBound(CV->getBoundsKey())) {
-          std::string TmpVarName = "__3c_tmp_" + CV->getName();
-          rewriteSourceRange(R, O->getLHS()->getSourceRange(), TmpVarName);
-          bool InsertFail = R.InsertTextAfterToken(O->getEndLoc(),
-                                                        ", " + CV->getName() +
-                                                        " = " + TmpVarName);
-          if (InsertFail) {
-            // FIXME: Use rewriteSourceRange so that it handle emitting error messages.
-            llvm::errs()
-              << "Rewriting failed while updating assignment!\n";
-            O->getEndLoc().print(llvm::errs(), R.getSourceMgr());
+        // It is possible for multiple ConstraintVariables to exist on the LHS
+        // of an assignment expression; e.g., `*(0 ? a : b) = 0`. If this
+        // happens, and one of those variables needed range bounds, then the
+        // following rewriting is not correct. I believe that it can only happen
+        // when the LHS is a pointer dereference or struct field access.
+        // Structure fields and inner pointer levels can never have range bounds
+        // so this case currently is not possible.
+        assert(LHSCVs.size() == 1 || llvm::count_if(LHSCVs, [this](
+          ConstraintVariable *CV) { return ABInfo.needsRangeBound(CV); }) == 0);
+        for (ConstraintVariable *CV: LHSCVs) {
+          if (ABInfo.needsRangeBound(CV)) {
+            std::string TmpVarName = "__3c_tmp_" + CV->getName();
+            rewriteSourceRange(R, O->getLHS()->getSourceRange(), TmpVarName);
+            bool InsertFail = R.InsertTextAfterToken(O->getEndLoc(),
+                                                          ", " + CV->getName() +
+                                                          " = " + TmpVarName);
+            if (InsertFail) {
+              // FIXME: Use rewriteSourceRange so that it handle emitting error messages.
+              llvm::errs()
+                << "Rewriting failed while updating assignment!\n";
+              O->getEndLoc().print(llvm::errs(), R.getSourceMgr());
+            }
           }
         }
       }
@@ -464,7 +467,7 @@ public:
   }
 
 private:
-  ProgramInfo &Info;
+  AVarBoundsInfo &ABInfo;
   ConstraintResolver CR;
   Rewriter &R;
 };

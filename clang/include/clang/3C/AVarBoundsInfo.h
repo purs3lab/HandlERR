@@ -262,7 +262,7 @@ public:
   // Check if the bounds keys will need to be rewritten with range bounds. This
   // is true for bounds keys that are subject to pointer arithmetic but
   // otherwise have inferred bounds.
-  bool needsRangeBound(BoundsKey BK);
+  bool needsRangeBound(ConstraintVariable *CV);
 
   // Get the ProgramVar for the provided VarKey.
   ProgramVar *getProgramVar(BoundsKey VK);

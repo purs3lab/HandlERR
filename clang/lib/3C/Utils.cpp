@@ -614,16 +614,14 @@ public:
     return true;
   }
 
-  // For a->b; We need to get `a->b` rather than just `b`. This way assignment
+  // For `a->b` we need to get `a->b` rather than just `b`. This way assignment
   // from a field in one instance of a structure to the same field in another
   // instance is not treated as pointer arithmetic.
   bool VisitMemberExpr(MemberExpr *ME) {
-    // TODO: Is this cast legit? `getMemberDecl()` returns a `ValueDecl*`, but I
+    // TODO: Is this cast legit? `getMemberDecl()` returns a `ValueDecl`, but I
     //       think it can only be a `FieldDecl` for structs in C.
     auto *FD = cast<FieldDecl>(ME->getMemberDecl());
 
-    // TODO: Is recursively using a new visitor the right thing to do? It feels
-    //       odd.
     CollectDeclsVisitor MEVis;
     MEVis.TraverseStmt(ME->getBase());
     // Field access through variable.

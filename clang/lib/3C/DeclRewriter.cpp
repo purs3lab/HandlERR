@@ -37,9 +37,7 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
                                   ProgramInfo &Info, ArrayBoundsRewriter &ABR,
                                   std::vector<std::string> *SDecls) {
   bool NeedsRangeBound =
-    SDecls != nullptr &&
-    Defn->hasBoundsKey() &&
-    Info.getABoundsInfo().needsRangeBound(Defn->getBoundsKey());
+    SDecls != nullptr && Info.getABoundsInfo().needsRangeBound(Defn);
   assert("Adding range bounds on return, global variable, or field!" &&
          (!NeedsRangeBound || (isa_and_nonnull<VarDecl>(Decl) &&
                                cast<VarDecl>(Decl)->isLocalVarDeclOrParm())));
@@ -130,9 +128,7 @@ void DeclRewriter::buildCheckedDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
                                     std::vector<std::string> *SDecls) {
   // I don't like using SDecls != nullptr as a nullptr as a sentinel like this.
   bool NeedsRangeBound =
-    SDecls != nullptr &&
-    Defn->hasBoundsKey() &&
-    Info.getABoundsInfo().needsRangeBound(Defn->getBoundsKey());
+    SDecls != nullptr && Info.getABoundsInfo().needsRangeBound(Defn);
   assert("Adding range bounds on return, global variable, or field!" &&
          (!NeedsRangeBound || (isa_and_nonnull<VarDecl>(Decl) &&
                                cast<VarDecl>(Decl)->isLocalVarDeclOrParm())));
