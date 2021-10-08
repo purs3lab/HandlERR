@@ -131,7 +131,7 @@ std::string ByteBound::mkRangeString(AVarBoundsInfo *ABI, clang::Decl *D,
   // BasePtr will be a pointer to some type that is not necessarily char, so
   // pointer arithmetic will not give the behavior needed for a byte count.
   // First cast the pointer to a char pointer, and then add byte count.
-  return "byte_count(" + BasePtr + ", ((_Array_ptr<char>)" + BasePtr + ") + " +
+  return "bounds(" + BasePtr + ", ((_Array_ptr<char>)" + BasePtr + ") + " +
          ABounds::getBoundsKeyStr(ByteVar, ABI, D) + ")";
 }
 
