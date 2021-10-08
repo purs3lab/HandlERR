@@ -230,6 +230,14 @@ int64_t getStmtIdWorkaround(const clang::Stmt *St,
 
 clang::SourceLocation getCheckedCAnnotationsEnd(const clang::Decl *D);
 
+// Get the source range for a declaration including Checked C annotations.
+// Optionally, any initializer can be excluded from the range in order to avoid
+// interfering with other rewrites inside an existing initializer
+// (https://github.com/correctcomputation/checkedc-clang/issues/267). If the
+// declaration has no initializer, then IncludeInitializer has no effect.
+clang::SourceRange getDeclSourceRangeWithAnnotations(
+    const clang::Decl *D, bool IncludeInitializer);
+
 // Shortcut for the getCustomDiagID + Report sequence to report a custom
 // diagnostic as we currently do in 3C.
 //

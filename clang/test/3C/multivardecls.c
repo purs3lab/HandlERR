@@ -130,7 +130,22 @@ int *d, e, **f;
 // CHECK: int e;
 // CHECK: _Ptr<_Ptr<int>> f = ((void *)0);
 
+// Simple test that storage and type qualifiers are preserved on both global and
+// function-scope variables.
+
+static const int *sd, se, **sf;
+// CHECK: static _Ptr<const int> sd = ((void *)0);
+// CHECK: static const int se;
+// CHECK: static _Ptr<_Ptr<const int>> sf = ((void *)0);
+
 void test5() {
+  static const int *fsd, fse, **fsf;
+  // CHECK: static _Ptr<const int> fsd = ((void *)0);
+  // CHECK: static const int fse;
+  // CHECK: static _Ptr<_Ptr<const int>> fsf = ((void *)0);
+}
+
+void test6() {
   int *a, *b;
   int *c, *e;
   struct foo {
@@ -148,3 +163,126 @@ void test5() {
 // CHECK: _Ptr<int> c;
 // CHECK: _Ptr<int> d;
 // CHECK: };
+
+// The next two tests have corresponding tests with -itypes-for-extern in
+// itypes_for_extern.c.
+// REVIEW: Should we put all these tests in one file? We would need a ton of
+// different CHECK prefixes. I don't know whether that would end up being easier
+// or harder to understand.
+
+// A multi-decl with a mix of pointers and arrays, including an "unchecked
+// pointer to constant size array" member that would trigger a known bug in
+// mkString (item 5 of
+// https://github.com/correctcomputation/checkedc-clang/issues/703),
+// demonstrating that unchanged multi-decl members whose base type wasn't
+// renamed use Decl::print (which doesn't have this bug).
+//
+// `m_force_rewrite` gets converted and forces the
+// multi-decl to be broken up even though nothing else changes when -alltypes is
+// off.
+//
+// `m_implicit_itype` and `m_change_with_bounds` together test that 3C includes
+// Checked C annotations in the range to be replaced (for both changed and
+// unchanged multi-decl members) rather than leaving them to duplicate the
+// annotations in the newly inserted declaration.
+int *m_force_rewrite, m_const_arr0[10], *m_const_arr1[10],
+    (*m_const_arr2)[10] = 1, *m_implicit_itype : count(2),
+    **m_change_with_bounds : count(2);
+//CHECK:       _Ptr<int> m_force_rewrite = ((void *)0);
+//CHECK_ALL:   int m_const_arr0 _Checked[10];
+//CHECK_NOALL: int m_const_arr0[10];
+//CHECK_ALL:   _Ptr<int> m_const_arr1 _Checked[10] = {((void *)0)};
+//CHECK_NOALL: int *m_const_arr1[10];
+//CHECK:       int (*m_const_arr2)[10] = 1;
+// 3C doesn't have proper support for itypes on variables: if a variable has an
+// existing itype, 3C uses the checked side as the variable's original type. So
+// 3C treats m_implicit_itype as having original type _Array_ptr<int>, but since
+// the solved type is the same, 3C uses Decl::print for the unchanged multi-decl
+// member and preserves the original declaration with the itype. When 3C gains
+// proper itype support for variables, it should generate an actual rewrite to
+// the fully checked type if nothing else in the program prevents it from doing
+// so.
+//CHECK:       int *m_implicit_itype : count(2);
+// In this case, the solved type changes and shows up in the output.
+//CHECK:       _Array_ptr<_Ptr<int>> m_change_with_bounds : count(2) = ((void *)0);
+
+// A similar multi-decl with an unnamed inline struct, which forces the use of
+// mkString. We can't include (*s_const_arr2)[10] because it would trigger the
+// previously mentioned mkString bug and produce output that doesn't compile.
+// `s` serves just to give the struct a shorter generated name.
+struct { int *x; } s, *s_force_rewrite, s_const_arr0[10], *s_const_arr1[10],
+    // The only way a variable of unnamed struct type can have an itype is if it
+    // comes implicitly from a bounds annotation, since we have no name to refer
+    // to the struct in a written itype.
+    *s_implicit_itype : count(2), **s_change_with_bounds : count(2);
+//CHECK:       struct s_struct_1 { _Ptr<int> x; };
+//CHECK:       struct s_struct_1 s;
+//CHECK:       _Ptr<struct s_struct_1> s_force_rewrite = ((void *)0);
+//CHECK_ALL:   struct s_struct_1 s_const_arr0 _Checked[10];
+//CHECK_NOALL: struct s_struct_1 s_const_arr0[10];
+//CHECK_ALL:   _Ptr<struct s_struct_1> s_const_arr1 _Checked[10] = {((void *)0)};
+// The reason this isn't `_Ptr<struct s_struct_1>` is probably the "outer wild
+// -> inner wild" constraint
+// (https://github.com/correctcomputation/checkedc-clang/issues/656).
+//CHECK_NOALL: struct s_struct_1 * s_const_arr1[10];
+// Like with m_implicit_itype above, 3C treats s_implicit_itype as having type
+// _Array_ptr<struct s_struct_1>, but now 3C uses mkString and that type
+// actually shows up in the output: not a great result, but at least we test
+// that it isn't any worse and that the bounds annotation is preserved. Since
+// s_implicit_itype is now the only member of its "multi-decl", if the user
+// manually edits it back to an itype, there won't be another multi-decl breakup
+// to cause 3C to mess it up again.
+//CHECK:       _Array_ptr<struct s_struct_1> s_implicit_itype : count(2);
+//CHECK:       _Array_ptr<_Ptr<struct s_struct_1>> s_change_with_bounds : count(2) = ((void *)0);
+
+void test7() {
+  // Test that variables that require struct initialization honor base type
+  // renames the same way as global variables.
+  struct { int *x; } s7;
+  //CHECK: struct s7_struct_1 { _Ptr<int> x; };
+  //CHECK: struct s7_struct_1 s7 = {};
+}
+
+// Test that getNextComma doesn't falsely trigger on commas inside a bounds
+// annotation. The scan shouldn't start until after the declaration source
+// range, which should include the bounds annotation, and it's unlikely that a
+// change to 3C could break that without also breaking other tests, but it
+// doesn't hurt to have a specific test for commas too. The extra nested comma
+// expression `(0, lo)` was needed to trigger the bug in older versions of 3C:
+// the lexer didn't seem to report the comma that is part of the `bounds`
+// construct to getNextComma as a comma token.
+//
+// `p3` is needed to trigger the multi-decl to be broken up at all.
+_Array_ptr<int> lo, hi;
+_Array_ptr<int> p1 : bounds((0, lo), hi), p2 : bounds(lo, (0, hi)), *p3;
+//CHECK: _Array_ptr<int> p1 : bounds((0, lo), hi);
+// The extra space after `0` seems to be because Decl::print treats the comma
+// operator like any other binary operator such as `+` and adds spaces both
+// before and after it. (TODO: Research whether this has already been discussed
+// in upstream Clang and if not, file a bug there?)
+//CHECK: _Array_ptr<int> p2 : bounds(lo, (0 , hi));
+//CHECK: _Ptr<_Array_ptr<int>> p3 = ((void *)0);
+
+// Simple tests of typedef multi-decls from
+// https://github.com/correctcomputation/checkedc-clang/issues/651.
+// inline_anon_structs.c has a few additional tests of typedef multi-decls
+// involving inline structs.
+// TODO: Are there other cases we should test?
+
+typedef int *A, *B;
+// CHECK: typedef _Ptr<int> A;
+// CHECK: typedef _Ptr<int> B;
+
+void foo(void) {
+  A a;
+  B b;
+}
+
+typedef int *C, *D;
+// CHECK: typedef _Ptr<int> C;
+// CHECK: typedef int *D;
+
+void bar(void) {
+  C c;
+  D d = (D)1;
+}
