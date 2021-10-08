@@ -685,7 +685,7 @@ while the definition for sus appears below them*/"""
     os.system("rm {} {}".format(cnameNOALL, cnameALL))
 
     # ensure all lines are the same length
-    assert len(lines) == len(noall) == len(yeall), "fix file " + name
+    # assert len(lines) == len(noall) == len(yeall), "fix file " + name
 
     if proto == "multi":
         file2 = open(name2, "r")
@@ -702,7 +702,7 @@ while the definition for sus appears below them*/"""
         os.system("rm {} {}".format(cname2NOALL, cname2ALL))
 
         # ensure all lines are the same length
-        assert len(lines2) == len(noall2) == len(yeall2), "fix file " + name
+        # assert len(lines2) == len(noall2) == len(yeall2), "fix file " + name
 
     def runtime_cname(s):
         assert s.startswith("tmp.")
@@ -720,10 +720,11 @@ while the definition for sus appears below them*/"""
     ckeywords_re = re.compile("\\b(" + "|".join(ckeywords) + ")\\b")
 
     in_extern = False
+    ye_offset = 0
     for i in range(0, len(lines)):
         line = lines[i]
         noline = noall[i]
-        yeline = yeall[i]
+        yeline = yeall[i + ye_offset]
         if "extern" in line:
             in_extern = True
         if (not in_extern and
@@ -738,19 +739,27 @@ while the definition for sus appears below them*/"""
             if noline == yeline:
                 lines[i] += "\n" + indentation + "//CHECK: " + noline.lstrip()
             else:
-                lines[i] += ("\n" + indentation + "//CHECK_NOALL: " +
-                             noline.lstrip())
-                lines[i] += ("\n" + indentation + "//CHECK_ALL: " +
-                             yeline.lstrip())
+                lines[i] += ("\n" + indentation + "//CHECK_NOALL: " + noline.lstrip())
+                lines[i] += ("\n" + indentation + "//CHECK_ALL: " + yeline.lstrip())
+
+            # This is a hack needed to properly updated tests where an array
+            # variable declaration  has been duplicated to allow for range bounds.
+            if i + ye_offset + 1 < len(yeall):
+                yeline_next = yeall[i + ye_offset + 1]
+                if "__3c_tmp" in yeline_next and "__3c_tmp" in yeline:
+                    lines[i] += ("\n" + indentation + "//CHECK_ALL: " + yeline_next.lstrip())
+                    ye_offset += 1
+
         if ";" in line:
             in_extern = False
 
     if proto == "multi":
         in_extern = False
+        ye_offset = 0
         for i in range(0, len(lines2)):
             line = lines2[i]
             noline = noall2[i]
-            yeline = yeall2[i]
+            yeline = yeall2[i + ye_offset]
             if "extern" in line:
                 in_extern = True
             if (not in_extern and
@@ -767,6 +776,15 @@ while the definition for sus appears below them*/"""
                                   noline.lstrip())
                     lines2[i] += ("\n" + indentation + "//CHECK_ALL: " +
                                   yeline.lstrip())
+
+            # This is a hack needed to properly updated tests where an array
+            # variable declaration  has been duplicated to allow for range bounds.
+            if i + ye_offset + 1 < len(yeall2):
+                yeline_next = yeall2[i + ye_offset + 1]
+                if "__3c_tmp" in yeline_next and "__3c_tmp" in yeline:
+                    lines2[i] += ("\n" + indentation + "//CHECK_ALL: " + yeline_next.lstrip())
+                    ye_offset += 1
+
             if ";" in line:
                 in_extern = False
 

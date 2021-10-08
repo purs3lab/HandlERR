@@ -147,7 +147,8 @@ int **bar() {
   }
   int **z = sus(x, y);
   //CHECK_NOALL: int **z = sus(x, y);
-  //CHECK_ALL: _Array_ptr<_Ptr<int>> z = sus(x, y);
+  //CHECK_ALL: _Array_ptr<_Ptr<int>> __3c_tmp_z : count(5) = sus(x, y);
+  //CHECK_ALL: _Array_ptr<_Ptr<int>> z : bounds(__3c_tmp_z, __3c_tmp_z + 5) = __3c_tmp_z;
 
   z += 2;
   return z;

@@ -352,16 +352,11 @@ bool AvarBoundsInference::getReachableBoundKeys(const ProgramVarScope *DstScope,
 
 void AvarBoundsInference::getRelevantBounds(BoundsKey BK,
                                             BndsKindMap &ResBounds) {
-  // Try to get the bounds of all RBKeys.
-  // If this pointer is used in pointer arithmetic then there
-  // are no relevant bounds for this pointer.
-  if (!BI->hasPointerArithmetic(BK)) {
-    if (CurrIterInferBounds.find(BK) != CurrIterInferBounds.end()) {
-      // get the bounds inferred from the current iteration
-      ResBounds = CurrIterInferBounds[BK];
-    } else if (ABounds *PrevBounds = BI->getBounds(BK)) {
-      ResBounds[PrevBounds->getKind()].insert(PrevBounds->getBKey());
-    }
+  if (CurrIterInferBounds.find(BK) != CurrIterInferBounds.end()) {
+    // get the bounds inferred from the current iteration
+    ResBounds = CurrIterInferBounds[BK];
+  } else if (ABounds *PrevBounds = BI->getBounds(BK)) {
+    ResBounds[PrevBounds->getKind()].insert(PrevBounds->getBKey());
   }
 }
 
@@ -816,8 +811,15 @@ BoundsKey AVarBoundsInfo::getVariable(clang::VarDecl *VD) {
     auto *PVar =
         ProgramVar::createNewProgramVar(NK, VD->getNameAsString(), PVS);
     insertProgramVar(NK, PVar);
-    if (isPtrOrArrayType(VD->getType()))
+    if (isPtrOrArrayType(VD->getType())) {
       PointerBoundsKey.insert(NK);
+      // Global variables cannot be given range bounds because it is not
+      // possible to initialize a duplicated pointer variable with the same
+      // value as the original.
+      // TODO: Followup issue.
+      if (!VD->isLocalVarDeclOrParm())
+        IneligibleForRangeBounds.insert(NK);
+    }
   }
   return getVarKey(PSL);
 }
@@ -880,8 +882,14 @@ BoundsKey AVarBoundsInfo::getVariable(clang::FieldDecl *FD) {
     const StructScope *SS = StructScope::getStructScope(StName);
     auto *PVar = ProgramVar::createNewProgramVar(NK, FD->getNameAsString(), SS);
     insertProgramVar(NK, PVar);
-    if (isPtrOrArrayType(FD->getType()))
+    if (isPtrOrArrayType(FD->getType())) {
       PointerBoundsKey.insert(NK);
+      // Fields are not rewritten with range bounds because we would need to
+      // duplicate the field and update all structure initializations to
+      // properly set the new field.
+      // TODO: Followup issue.
+      IneligibleForRangeBounds.insert(NK);
+    }
   }
   return getVarKey(PSL);
 }
@@ -951,6 +959,20 @@ bool AVarBoundsInfo::handleAssignment(clang::Decl *L, CVarOption LCVars,
 }
 
 bool AVarBoundsInfo::addAssignment(BoundsKey L, BoundsKey R) {
+  auto AddEdgeUnlessPointerArithmetic = [this](BoundsKey From, BoundsKey To) {
+    // Verify that the source BoundsKey for the edge is not computed by pointer
+    // arithmetic. Pointer arithmetic invalidates the bounds on the pointer, so
+    // bounds should not propagate through it.
+    // TODO: Followup issue
+    bool FromValid = !hasPointerArithmetic(From);
+    // The destination BoundsKey may be computed by pointer arithmetic as long
+    // 3C can emit range bounds the pointer. If 3C cannot emit range bounds,
+    // then the incoming edge is not added so that no bounds will be inferred.
+    bool ToValid = !hasPointerArithmetic(To) || canInferRangeBounds(To);
+    if (FromValid && ToValid)
+      ProgVarGraph.addUniqueEdge(From, To);
+  };
+
   // If we are adding to function return, do not add bi-directional edges.
   if (isFunctionReturn(L) || isFunctionReturn(R)) {
     // Do not assign edge from return to itself.
@@ -960,76 +982,21 @@ bool AVarBoundsInfo::addAssignment(BoundsKey L, BoundsKey R) {
     // dependency and never will be able to find the bounds for the return
     // value.
     if (L != R)
-      ProgVarGraph.addUniqueEdge(R, L);
+      AddEdgeUnlessPointerArithmetic(R, L);
   } else {
-    ProgVarGraph.addUniqueEdge(R, L);
+    AddEdgeUnlessPointerArithmetic(R, L);
     ProgramVar *PV = getProgramVar(R);
     if (!(PV && PV->isNumConstant()))
-      ProgVarGraph.addUniqueEdge(L, R);
+      AddEdgeUnlessPointerArithmetic(L, R);
   }
   return true;
 }
 
-// Visitor to collect all the variables and structure member access that are
-// used during the life-time of the visitor.
-class CollectDeclsVisitor : public RecursiveASTVisitor<CollectDeclsVisitor> {
-public:
-  explicit CollectDeclsVisitor(ASTContext *Ctx)
-    : ObservedDecls(), StructAccess(), C(Ctx) {}
-
-  virtual ~CollectDeclsVisitor() {}
-
-  bool VisitDeclRefExpr(DeclRefExpr *DRE) {
-    if (auto *VD = dyn_cast_or_null<VarDecl>(DRE->getDecl()))
-      ObservedDecls.insert(VD);
-    return true;
-  }
-
-  // For a->b; We need to get `a->b`
-  bool VisitMemberExpr(MemberExpr *ME) {
-    std::string MAccess = getSourceText(ME->getSourceRange(), *C);
-    if (!MAccess.empty()) {
-      StructAccess.insert(MAccess);
-    }
-    return false;
-  }
-
-  const std::set<VarDecl *> &getObservedDecls() { return ObservedDecls; }
-  const std::set<std::string> &getStructAccess() { return StructAccess; }
-
-private:
-  // Contains all VarDecls seen by this visitor
-  std::set<VarDecl *> ObservedDecls;
-
-  // Contains the source representation of all record access (MemberExpression)
-  // seen by this visitor.
-  std::set<std::string> StructAccess;
-
-  ASTContext *C;
-};
-
-bool AVarBoundsInfo::handlePointerAssignment(clang::Stmt *St, clang::Expr *L,
-                                             clang::Expr *R, ASTContext *C,
+bool AVarBoundsInfo::handlePointerAssignment(clang::Expr *L, clang::Expr *R,
+                                             ASTContext *C,
                                              ConstraintResolver *CR) {
-  CollectDeclsVisitor LVarVis(C);
-  LVarVis.TraverseStmt(L->getExprStmt());
-
-  CollectDeclsVisitor RVarVis(C);
-  RVarVis.TraverseStmt(R->getExprStmt());
-
-  std::set<VarDecl *> CommonVars;
-  std::set<std::string> CommonStVars;
-  findIntersection(LVarVis.getObservedDecls(), RVarVis.getObservedDecls(),
-                   CommonVars);
-  findIntersection(LVarVis.getStructAccess(), RVarVis.getStructAccess(),
-                   CommonStVars);
-
-  if (!CommonVars.empty() || CommonStVars.empty()) {
-    for (auto *LHSCVar : CR->getExprConstraintVarsSet(L)) {
-      if (LHSCVar->hasBoundsKey())
-        ArrPointerBoundsKey.insert(LHSCVar->getBoundsKey());
-    }
-  }
+  if (isAssignmentPointerArithmetic(L ,R))
+    recordArithmeticOperation(L, CR);
   return true;
 }
 
@@ -1052,6 +1019,22 @@ void AVarBoundsInfo::recordArithmeticOperation(clang::Expr *E,
 
 bool AVarBoundsInfo::hasPointerArithmetic(BoundsKey BK) {
   return ArrPointersWithArithmetic.find(BK) != ArrPointersWithArithmetic.end();
+}
+
+bool AVarBoundsInfo::canInferRangeBounds(BoundsKey BK) {
+  return IneligibleForRangeBounds.find(BK) == IneligibleForRangeBounds.end();
+}
+
+bool AVarBoundsInfo::needsRangeBound(ConstraintVariable *CV) {
+  if (!CV->hasBoundsKey())
+    return false;
+  BoundsKey BK = CV->getBoundsKey();
+  // A pointer should get range bounds if it is computed by pointer arithmetic
+  // and would otherwise need bounds. Some pointers (global variables and struct
+  // fields) can't be rewritten to use range bounds (by 3C; Checked C does
+  // permit it), so we return false on these.
+  return hasPointerArithmetic(BK) && canInferRangeBounds(BK) &&
+         getBounds(BK) != nullptr;
 }
 
 ProgramVar *AVarBoundsInfo::getProgramVar(BoundsKey VK) {

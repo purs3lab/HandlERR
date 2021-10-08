@@ -709,7 +709,7 @@ void ConstraintResolver::constrainLocalAssign(Stmt *TSt, Expr *LHS, Expr *RHS,
 
   // Handle pointer arithmetic.
   auto &ABI = Info.getABoundsInfo();
-  ABI.handlePointerAssignment(TSt, LHS, RHS, Context, this);
+  ABI.handlePointerAssignment(LHS, RHS, Context, this);
 
   // Only if all types are enabled and these are not pointers, then track
   // the assignment.

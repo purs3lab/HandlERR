@@ -37,7 +37,12 @@ public:
   static void
   buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl, std::string &Type,
                  std::string &IType, ProgramInfo &Info,
-                 ArrayBoundsRewriter &ABR);
+                 ArrayBoundsRewriter &ABR, std::vector<std::string> *SDecls);
+
+  static void
+  buildCheckedDecl(PVConstraint *Defn, DeclaratorDecl *Decl, std::string &Type,
+                   std::string &IType, std::string UseName, ProgramInfo &Info,
+                   ArrayBoundsRewriter &ABR, std::vector<std::string> *SDecls);
 
 private:
   Rewriter &R;
@@ -61,6 +66,8 @@ private:
   void rewriteFunctionDecl(FunctionDeclReplacement *N);
   SourceRange getNextComma(SourceLocation L);
   void denestTagDecls();
+  void emitSupplementaryDeclarations(const std::vector<std::string> &SDecls,
+                                     SourceLocation Loc);
 };
 
 // Visits function declarations and adds entries with their new rewritten
@@ -92,14 +99,15 @@ protected:
                             DeclaratorDecl *Decl, std::string &Type,
                             std::string &IType, std::string UseName,
                             bool &RewriteGen, bool &RewriteParm,
-                            bool &RewriteRet, bool StaticFunc);
+                            bool &RewriteRet, bool StaticFunc,
+                            std::vector<std::string> *SDecls);
   void buildCheckedDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
                         std::string &Type, std::string &IType,
                         std::string UseName, bool &RewriteParm,
-                        bool &RewriteRet);
+                        bool &RewriteRet, std::vector<std::string> *SDecls);
   void buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
                       std::string &Type, std::string &IType, bool &RewriteParm,
-                      bool &RewriteRet);
+                      bool &RewriteRet, std::vector<std::string> *SDecls);
 
   bool hasDeclWithTypedef(const FunctionDecl *FD);
 

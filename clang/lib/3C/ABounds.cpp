@@ -84,6 +84,14 @@ std::string CountBound::mkString(AVarBoundsInfo *ABI, clang::Decl *D) {
   return "count(" + ABounds::getBoundsKeyStr(CountVar, ABI, D) + ")";
 }
 
+std::string CountBound::mkRangeString(AVarBoundsInfo *ABI, clang::Decl *D,
+                                      std::string BasePtr) {
+  // Assume that BasePtr is the same pointer type as this pointer this bound
+  // acts on, so pointer arithmetic works as expected.
+  return "bounds(" + BasePtr + ", " + BasePtr + " + " +
+         ABounds::getBoundsKeyStr(CountVar, ABI, D) + ")";
+}
+
 bool CountBound::areSame(ABounds *O, AVarBoundsInfo *ABI) {
   if (O != nullptr) {
     if (CountBound *OT = dyn_cast<CountBound>(O))
@@ -101,6 +109,13 @@ std::string CountPlusOneBound::mkString(AVarBoundsInfo *ABI, clang::Decl *D) {
   return "count(" + CVar + " + 1)";
 }
 
+std::string CountPlusOneBound::mkRangeString(AVarBoundsInfo *ABI,
+                                             clang::Decl *D,
+                                             std::string BasePtr) {
+  return "bounds(" + BasePtr + ", " + BasePtr + " + " +
+         ABounds::getBoundsKeyStr(CountVar, ABI, D) + "+ 1)";
+}
+
 bool CountPlusOneBound::areSame(ABounds *O, AVarBoundsInfo *ABI) {
   if (CountPlusOneBound *OT = dyn_cast_or_null<CountPlusOneBound>(O))
     return ABI->areSameProgramVar(this->CountVar, OT->CountVar);
@@ -109,6 +124,15 @@ bool CountPlusOneBound::areSame(ABounds *O, AVarBoundsInfo *ABI) {
 
 std::string ByteBound::mkString(AVarBoundsInfo *ABI, clang::Decl *D) {
   return "byte_count(" + ABounds::getBoundsKeyStr(ByteVar, ABI, D) + ")";
+}
+
+std::string ByteBound::mkRangeString(AVarBoundsInfo *ABI, clang::Decl *D,
+                                     std::string BasePtr) {
+  // BasePtr will be a pointer to some type that is not necessarily char, so
+  // pointer arithmetic will not give the behavior needed for a byte count.
+  // First cast the pointer to a char pointer, and then add byte count.
+  return "bounds(" + BasePtr + ", ((_Array_ptr<char>)" + BasePtr + ") + " +
+         ABounds::getBoundsKeyStr(ByteVar, ABI, D) + ")";
 }
 
 bool ByteBound::areSame(ABounds *O, AVarBoundsInfo *ABI) {
@@ -125,6 +149,11 @@ std::string RangeBound::mkString(AVarBoundsInfo *ABI, clang::Decl *D) {
   std::string LBStr = ABounds::getBoundsKeyStr(LB, ABI, D);
   std::string UBStr = ABounds::getBoundsKeyStr(UB, ABI, D);
   return "bounds(" + LBStr + ", " + UBStr + ")";
+}
+
+std::string RangeBound::mkRangeString(AVarBoundsInfo *ABI, clang::Decl *D,
+                                      std::string BasePtr) {
+  return mkString(ABI, D);
 }
 
 bool RangeBound::areSame(ABounds *O, AVarBoundsInfo *ABI) {

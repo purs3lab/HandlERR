@@ -38,6 +38,8 @@ public:
 
   virtual ~DeclReplacement() {}
 
+  std::vector<std::string> SupplementaryDecls;
+
 protected:
   explicit DeclReplacement(std::string R, DRKind K)
       : Replacement(R), Kind(K) {}
@@ -103,7 +105,8 @@ typedef std::map<Decl *, DeclReplacement *> RSet;
 // IncludeInitializer = false to preserve an existing initializer.
 std::string mkStringForPVDecl(MultiDeclMemberDecl *MMD,
                               PVConstraint *PVC,
-                              ProgramInfo &Info);
+                              ProgramInfo &Info,
+                              std::vector<std::string> *SDecls);
 
 // Generate a string like mkStringForPVDecl, but for a declaration whose type is
 // known not to have changed (except possibly for a base type rename) and that
@@ -126,7 +129,8 @@ public:
   ArrayBoundsRewriter(ProgramInfo &I) : Info(I) {}
   // Get the string representation of the bounds for the given variable.
   std::string getBoundsString(const PVConstraint *PV, Decl *D,
-                              bool Isitype = false);
+                              bool Isitype = false, bool UseRange = false,
+                              std::string BasePtr = "");
 
   // Check if the constraint variable has newly created bounds string.
   bool hasNewBoundsString(const PVConstraint *PV, Decl *D,
@@ -176,5 +180,7 @@ void rewriteSourceRange(Rewriter &R, const CharSourceRange &Range,
 
 void rewriteSourceRange(Rewriter &R, const SourceRange &Range,
                         const std::string &NewText, bool ErrFail = true);
+void insertText(Rewriter &R, SourceLocation S, const std::string &NewText,
+                bool ErrFail = true);
 
 #endif // LLVM_CLANG_3C_REWRITEUTILS_H

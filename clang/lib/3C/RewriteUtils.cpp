@@ -23,11 +23,12 @@ using namespace clang;
 
 std::string mkStringForPVDecl(MultiDeclMemberDecl *MMD,
                               PVConstraint *PVC,
-                              ProgramInfo &Info) {
+                              ProgramInfo &Info,
+                              std::vector<std::string> *SDecls) {
   // Currently, it's cheap to keep recreating the ArrayBoundsRewriter. If that
   // ceases to be true, we should pass it along as another argument.
   ArrayBoundsRewriter ABRewriter{Info};
-  std::string NewDecl = getStorageQualifierString(MMD);
+  std::string Type, IType;
   bool IsExternGlobalVar =
       isa<VarDecl>(MMD) &&
       cast<VarDecl>(MMD)->getFormalLinkage() == Linkage::ExternalLinkage;
@@ -43,17 +44,16 @@ std::string mkStringForPVDecl(MultiDeclMemberDecl *MMD,
     // used. This does provide most of the rewriting infrastructure that
     // would be required to support these itypes if constraint generation
     // is updated to handle structure/global itypes.
-    std::string Type, IType;
     // VarDecl and FieldDecl subclass DeclaratorDecl, so the cast will
     // always succeed.
     DeclRewriter::buildItypeDecl(PVC, cast<DeclaratorDecl>(MMD), Type, IType,
-                                 Info, ABRewriter);
-    NewDecl += Type + IType;
+                                 Info, ABRewriter, SDecls);
   } else {
-    NewDecl += PVC->mkString(Info.getConstraints()) +
-               ABRewriter.getBoundsString(PVC, MMD);
+    DeclRewriter::buildCheckedDecl(PVC, cast<DeclaratorDecl>(MMD), Type,
+                                   IType, PVC->getName(), Info, ABRewriter,
+                                   SDecls);
   }
-  return NewDecl;
+  return getStorageQualifierString(MMD) + Type + IType;
 }
 
 std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *MMD,
@@ -107,7 +107,7 @@ std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *MMD,
     // probably the behavior we want with -itypes-for-extern. If we don't care
     // about this case, we could alternatively inline the few lines of
     // mkStringForPVDecl that would still be relevant.
-    return mkStringForPVDecl(MMD, PVC, Info);
+    return mkStringForPVDecl(MMD, PVC, Info, nullptr);
   }
 
   // If the type is not a pointer or array, then it should just equal the base
@@ -179,6 +179,13 @@ void rewriteSourceRange(Rewriter &R, const CharSourceRange &Range,
           SourceLocation());
     }
   }
+}
+
+void insertText(Rewriter &R, SourceLocation S, const std::string &NewText,
+                bool ErrFail) {
+  SourceRange SR(
+    Lexer::getLocForEndOfToken(S, 0, R.getSourceMgr(), R.getLangOpts()), S);
+  rewriteSourceRange(R, SR, NewText, ErrFail);
 }
 
 static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {
@@ -493,6 +500,43 @@ private:
   }
 };
 
+class AssignmentUpdater : public RecursiveASTVisitor<AssignmentUpdater> {
+public:
+  explicit AssignmentUpdater(ASTContext *C, ProgramInfo &I, Rewriter &R)
+    : ABInfo(I.getABoundsInfo()), CR(I, C), R(R) {}
+
+  bool VisitBinaryOperator(BinaryOperator *O) {
+    if (O->getOpcode() == clang::BO_Assign) {
+      if (!isAssignmentPointerArithmetic(O->getLHS(), O->getRHS())) {
+        CVarSet LHSCVs = CR.getExprConstraintVarsSet(O->getLHS());
+        // It is possible for multiple ConstraintVariables to exist on the LHS
+        // of an assignment expression; e.g., `*(0 ? a : b) = 0`. If this
+        // happens, and one of those variables needed range bounds, then the
+        // following rewriting is not correct. I believe that it can only happen
+        // when the LHS is a pointer dereference or struct field access.
+        // Structure fields and inner pointer levels can never have range bounds
+        // so this case currently is not possible.
+        assert(LHSCVs.size() == 1 || llvm::count_if(LHSCVs, [this](
+          ConstraintVariable *CV) { return ABInfo.needsRangeBound(CV); }) == 0);
+        for (ConstraintVariable *CV: LHSCVs) {
+          if (ABInfo.needsRangeBound(CV)) {
+            std::string TmpVarName = "__3c_tmp_" + CV->getName();
+            rewriteSourceRange(R, O->getLHS()->getSourceRange(), TmpVarName);
+            insertText(R, O->getEndLoc(),
+                       ", " + CV->getName() + " = " + TmpVarName);
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+private:
+  AVarBoundsInfo &ABInfo;
+  ConstraintResolver CR;
+  Rewriter &R;
+};
+
 SourceRange DeclReplacement::getSourceRange(SourceManager &SM) const {
   return getDeclSourceRangeWithAnnotations(getDecl(), /*IncludeInitializer=*/false);
 }
@@ -589,7 +633,11 @@ SourceLocation FunctionDeclReplacement::getDeclEnd(SourceManager &SM) const {
 }
 
 std::string ArrayBoundsRewriter::getBoundsString(const PVConstraint *PV,
-                                                 Decl *D, bool Isitype) {
+                                                 Decl *D, bool Isitype,
+                                                 bool UseRange,
+                                                 std::string BasePtr) {
+  assert("Need a base pointer to emit range bounds." &&
+         (!UseRange || !BasePtr.empty()));
   auto &ABInfo = Info.getABoundsInfo();
 
   // Try to find a bounds key for the constraint variable. If we can't,
@@ -607,9 +655,14 @@ std::string ArrayBoundsRewriter::getBoundsString(const PVConstraint *PV,
 
   if (ValidBKey && !PV->hasSomeSizedArr()) {
     ABounds *ArrB = ABInfo.getBounds(DK);
-    // Only we we have bounds and no pointer arithmetic on the variable.
-    if (ArrB != nullptr && !ABInfo.hasPointerArithmetic(DK)) {
-      BString = ArrB->mkString(&ABInfo, D);
+    // If we have pointer arithmetic and cannot add range bounds, then do not
+    // emit any bounds string.
+    if (ArrB != nullptr &&
+        (!ABInfo.hasPointerArithmetic(DK) || ABInfo.canInferRangeBounds(DK))) {
+      if (UseRange)
+        BString = ArrB->mkRangeString(&ABInfo, D, BasePtr);
+      else
+        BString = ArrB->mkString(&ABInfo, D);
       if (!BString.empty())
         BString = Pfix + BString;
     }
@@ -703,6 +756,7 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   CastPlacementVisitor ECPV(&Context, Info, R, CLV.getExprsWithCast());
   TypeExprRewriter TER(&Context, Info, R);
   TypeArgumentAdder TPA(&Context, Info, R);
+  AssignmentUpdater AU(&Context, Info, R);
   TranslationUnitDecl *TUD = Context.getTranslationUnitDecl();
   for (const auto &D : TUD->decls()) {
     if (_3COpts.AddCheckedRegions) {
@@ -721,6 +775,7 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
     CLV.TraverseDecl(D);
     ECPV.TraverseDecl(D);
     TPA.TraverseDecl(D);
+    AU.TraverseDecl(D);
   }
 
   // Output files.

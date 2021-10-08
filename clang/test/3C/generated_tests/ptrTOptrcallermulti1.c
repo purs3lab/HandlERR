@@ -132,7 +132,8 @@ char ***bar() {
   //CHECK: _Ptr<_Ptr<_Ptr<char>>> y = malloc<_Ptr<_Ptr<char>>>(sizeof(char **));
   char ***z = sus(x, y);
   //CHECK_NOALL: char ***z = sus(x, y);
-  //CHECK_ALL: _Array_ptr<_Array_ptr<char *>> z = sus(x, y);
+  //CHECK_ALL: _Array_ptr<_Array_ptr<char *>> __3c_tmp_z : count(5) = sus(x, y);
+  //CHECK_ALL: _Array_ptr<_Array_ptr<char *>> z : bounds(__3c_tmp_z, __3c_tmp_z + 5) = __3c_tmp_z;
   z += 2;
   return z;
 }

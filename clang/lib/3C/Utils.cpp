@@ -15,6 +15,7 @@
 #include "clang/Sema/Sema.h"
 #include "llvm/Support/Path.h"
 #include <errno.h>
+#include <clang/3C/ConstraintResolver.h>
 
 using namespace llvm;
 using namespace clang;
@@ -639,4 +640,96 @@ SourceRange getDeclSourceRangeWithAnnotations(
 
   SR.setEnd(DeclEnd);
   return SR;
+}
+
+// Visitor to collect all the variables and structure member access that are
+// used during the life-time of the visitor.
+class CollectDeclsVisitor : public RecursiveASTVisitor<CollectDeclsVisitor> {
+public:
+  explicit CollectDeclsVisitor() : ObservedDecls(), ObservedStructAccesses() {}
+
+  virtual ~CollectDeclsVisitor() {}
+
+  bool VisitDeclRefExpr(DeclRefExpr *DRE) {
+    if (auto *VD = dyn_cast_or_null<VarDecl>(DRE->getDecl()))
+      ObservedDecls.insert(VD);
+    return true;
+  }
+
+  // For `a->b` we need to get `a->b` rather than just `b`. This way assignment
+  // from a field in one instance of a structure to the same field in another
+  // instance is not treated as pointer arithmetic.
+  bool VisitMemberExpr(MemberExpr *ME) {
+    // TODO: Is this cast legit? `getMemberDecl()` returns a `ValueDecl`, but I
+    //       think it can only be a `FieldDecl` for structs in C.
+    auto *FD = cast<FieldDecl>(ME->getMemberDecl());
+
+    CollectDeclsVisitor MEVis;
+    MEVis.TraverseStmt(ME->getBase());
+    // Field access through variable.
+    for (auto *D : MEVis.getObservedDecls()) {
+      std::vector<FieldDecl *> SingletonAccessList({FD});
+      ObservedStructAccesses.insert(std::make_pair(D, SingletonAccessList));
+    }
+    // Field access through other structure fields.
+    for (StructAccess SA : MEVis.getObservedStructAccesses()) {
+      SA.second.push_back(FD);
+      ObservedStructAccesses.insert(SA);
+    }
+    return false;
+  }
+
+  bool VisitCallExpr(CallExpr *CE) {
+    // Stop the visitor when we hit a CallExpr. This stops us from treating a
+    // function call like `a = foo(a);` the same as `a = a + 1`.
+    return false;
+  }
+
+  const std::set<VarDecl *> &getObservedDecls() { return ObservedDecls; }
+
+  typedef std::pair<VarDecl *, std::vector<FieldDecl *>> StructAccess;
+  const std::set<StructAccess> &getObservedStructAccesses() {
+    return ObservedStructAccesses;
+  }
+
+private:
+  // Contains all VarDecls seen by this visitor
+  std::set<VarDecl *> ObservedDecls;
+
+  // Contains the source representation of all record access (MemberExpression)
+  // seen by this visitor.
+  std::set<StructAccess> ObservedStructAccesses;
+};
+
+bool isAssignmentPointerArithmetic(Expr *LHS, Expr *RHS) {
+  CollectDeclsVisitor LVarVis;
+  LVarVis.TraverseStmt(LHS);
+
+  CollectDeclsVisitor RVarVis;
+  RVarVis.TraverseStmt(RHS);
+
+  std::set<VarDecl *> CommonVars;
+  std::set<CollectDeclsVisitor::StructAccess> CommonStVars;
+  findIntersection(LVarVis.getObservedDecls(), RVarVis.getObservedDecls(),
+                   CommonVars);
+  findIntersection(LVarVis.getObservedStructAccesses(),
+                   RVarVis.getObservedStructAccesses(), CommonStVars);
+
+  // If CommonVars is not empty, then the same pointer appears on the LHS and
+  // RHS of an assignment. We say that the pointer is assigned from a pointer
+  // arithmetic expression.
+  return !CommonVars.empty() || !CommonStVars.empty();
+
+  // TODO: Consider alternative implementation. The above code is based on an
+  //       implementation that was already used in the array bounds inference
+  //       code, so I have continued using it here. When I first needed this for
+  //       my own code, I reimplemented using constraint variable sets as shown
+  //       below. I have not consider exactly how these differ yet.
+#if 0
+  CVarSet LHSCVs = CR.getExprConstraintVarsSet(LHS);
+  CVarSet RHSCVs = CR.getExprConstraintVarsSet(RHS);
+  CVarSet CommonCVars;
+  findIntersection(LHSCVs, RHSCVs, CommonCVars);
+  return !CommonCVars.empty();
+#endif
 }
