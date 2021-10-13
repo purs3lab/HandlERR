@@ -30,6 +30,7 @@ add_clang_library(clang3C
   AVarBoundsInfo.cpp
   AVarGraph.cpp
   ArrayBoundsInferenceConsumer.cpp
+  BasePointerAssignment.cpp
   CastPlacement.cpp
   3C.cpp
   3CInteractiveData.cpp

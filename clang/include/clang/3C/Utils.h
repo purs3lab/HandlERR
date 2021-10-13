@@ -256,10 +256,4 @@ inline const clang::DiagnosticBuilder &operator<<(
                   clang::DiagnosticsEngine::ArgumentKind::ak_nameddecl);
   return DB;
 }
-
-// Return true if an assignment LHS=RHS would result in invalidating the bounds
-// of LHS by assigning to a pointer a value derived from the pointer, for
-// example, by using pointer arithmetic to compute a new pointer at some offset
-// from the original.
-bool isAssignmentPointerArithmetic(clang::Expr *LHS, clang::Expr *RHS);
 #endif

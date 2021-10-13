@@ -14,6 +14,7 @@
 #include "clang/3C/CastPlacement.h"
 #include "clang/3C/CheckedRegions.h"
 #include "clang/3C/DeclRewriter.h"
+#include "clang/3C/BasePointerAssignment.h"
 #include "clang/3C/TypeVariableAnalysis.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Tooling/Transformer/SourceCode.h"
@@ -435,43 +436,6 @@ private:
   }
 };
 
-class AssignmentUpdater : public RecursiveASTVisitor<AssignmentUpdater> {
-public:
-  explicit AssignmentUpdater(ASTContext *C, ProgramInfo &I, Rewriter &R)
-    : ABInfo(I.getABoundsInfo()), CR(I, C), R(R) {}
-
-  bool VisitBinaryOperator(BinaryOperator *O) {
-    if (O->getOpcode() == clang::BO_Assign) {
-      if (!isAssignmentPointerArithmetic(O->getLHS(), O->getRHS())) {
-        CVarSet LHSCVs = CR.getExprConstraintVarsSet(O->getLHS());
-        // It is possible for multiple ConstraintVariables to exist on the LHS
-        // of an assignment expression; e.g., `*(0 ? a : b) = 0`. If this
-        // happens, and one of those variables needed range bounds, then the
-        // following rewriting is not correct. I believe that it can only happen
-        // when the LHS is a pointer dereference or struct field access.
-        // Structure fields and inner pointer levels can never have range bounds
-        // so this case currently is not possible.
-        assert(LHSCVs.size() == 1 || llvm::count_if(LHSCVs, [this](
-          ConstraintVariable *CV) { return ABInfo.needsRangeBound(CV); }) == 0);
-        for (ConstraintVariable *CV: LHSCVs) {
-          if (ABInfo.needsRangeBound(CV)) {
-            std::string TmpVarName = "__3c_tmp_" + CV->getName();
-            rewriteSourceRange(R, O->getLHS()->getSourceRange(), TmpVarName);
-            insertText(R, O->getEndLoc(),
-                       ", " + CV->getName() + " = " + TmpVarName);
-          }
-        }
-      }
-    }
-    return true;
-  }
-
-private:
-  AVarBoundsInfo &ABInfo;
-  ConstraintResolver CR;
-  Rewriter &R;
-};
-
 SourceRange DeclReplacement::getSourceRange(SourceManager &SM) const {
   SourceRange SR = getDecl()->getSourceRange();
   SourceLocation OldEnd = SR.getEnd();
@@ -698,7 +662,7 @@ void RewriteConsumer::HandleTranslationUnit(ASTContext &Context) {
   CastPlacementVisitor ECPV(&Context, Info, R, CLV.getExprsWithCast());
   TypeExprRewriter TER(&Context, Info, R);
   TypeArgumentAdder TPA(&Context, Info, R);
-  AssignmentUpdater AU(&Context, Info, R);
+  BasePointerAssignmentUpdater AU(&Context, Info, R);
   TranslationUnitDecl *TUD = Context.getTranslationUnitDecl();
   for (const auto &D : TUD->decls()) {
     if (_3COpts.AddCheckedRegions) {

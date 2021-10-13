@@ -14,6 +14,7 @@
 #include "clang/3C/ConstraintResolver.h"
 #include "clang/3C/ProgramInfo.h"
 #include <sstream>
+#include <clang/3C/BasePointerAssignment.h>
 
 std::vector<BoundsPriority> AVarBoundsInfo::PrioList{Declared, Allocator,
                                                      FlowInferred, Heuristics};
@@ -966,7 +967,7 @@ bool AVarBoundsInfo::addAssignment(BoundsKey L, BoundsKey R) {
     // TODO: Followup issue
     bool FromValid = !hasPointerArithmetic(From);
     // The destination BoundsKey may be computed by pointer arithmetic as long
-    // 3C can emit range bounds the pointer. If 3C cannot emit range bounds,
+    // 3C can emit range bounds on the pointer. If 3C cannot emit range bounds,
     // then the incoming edge is not added so that no bounds will be inferred.
     bool ToValid = !hasPointerArithmetic(To) || canInferRangeBounds(To);
     if (FromValid && ToValid)
@@ -995,7 +996,7 @@ bool AVarBoundsInfo::addAssignment(BoundsKey L, BoundsKey R) {
 bool AVarBoundsInfo::handlePointerAssignment(clang::Expr *L, clang::Expr *R,
                                              ASTContext *C,
                                              ConstraintResolver *CR) {
-  if (isAssignmentPointerArithmetic(L ,R))
+  if (!isBasePointerAssignment(L, R))
     recordArithmeticOperation(L, CR);
   return true;
 }
@@ -1023,6 +1024,10 @@ bool AVarBoundsInfo::hasPointerArithmetic(BoundsKey BK) {
 
 bool AVarBoundsInfo::canInferRangeBounds(BoundsKey BK) {
   return IneligibleForRangeBounds.find(BK) == IneligibleForRangeBounds.end();
+}
+
+void AVarBoundsInfo::markIneligibleForRangeBounds(BoundsKey BK) {
+  IneligibleForRangeBounds.insert(BK);
 }
 
 bool AVarBoundsInfo::needsRangeBound(ConstraintVariable *CV) {
