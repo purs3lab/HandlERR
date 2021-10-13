@@ -1900,9 +1900,13 @@ static bool typeIsPostfix(QualType QT) {
     switch (T->getTypeClass()) {
     default:
       return false;
-    case Type::Pointer:
-      QT = cast<PointerType>(T)->getPointeeType();
+    case Type::Pointer: {
+      const PointerType *PT = cast<PointerType>(T);
+      if (PT->isChecked())
+        return false;
+      QT = PT->getPointeeType();
       break;
+    }
     case Type::BlockPointer:
       QT = cast<BlockPointerType>(T)->getPointeeType();
       break;

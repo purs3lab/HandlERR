@@ -212,6 +212,12 @@ SourceLocation TypeLoc::getBeginLoc() const {
     case Qualified:
       Cur = Cur.getNextTypeLoc();
       continue;
+    case Pointer:
+      if (Cur.castAs<PointerTypeLoc>().getTypePtr()->isChecked()) {
+        LeftMost = Cur;
+        break;
+      }
+      LLVM_FALLTHROUGH;
     default:
       if (Cur.getLocalSourceRange().getBegin().isValid())
         LeftMost = Cur;
@@ -249,6 +255,9 @@ SourceLocation TypeLoc::getEndLoc() const {
         Last = Cur;
       break;
     case Pointer:
+      if (Cur.castAs<PointerTypeLoc>().getTypePtr()->isChecked())
+        return Cur.getLocalSourceRange().getEnd();
+      LLVM_FALLTHROUGH;
     case BlockPointer:
     case MemberPointer:
     case LValueReference:
