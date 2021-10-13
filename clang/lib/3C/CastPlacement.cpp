@@ -53,20 +53,29 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
       // Avoid adding incorrect casts to generic function arguments by
       // removing implicit casts when on arguments with a consistently
       // used generic type.
+      ConstraintVariable *TypeVar = nullptr;
       Expr *ArgExpr = A;
       if (FD && PIdx < FD->getNumParams()) {
         const int TyVarIdx = FV->getExternalParam(PIdx)->getGenericIndex();
-        if (TypeVars.find(TyVarIdx) != TypeVars.end() &&
-            TypeVars[TyVarIdx] != nullptr)
-          ArgExpr = ArgExpr->IgnoreImpCasts();
+        // Check if local type vars are available
+        if (TypeVars.find(TyVarIdx) != TypeVars.end()) {
+          TypeVar = TypeVars[TyVarIdx].getConstraint(
+                  Info.getConstraints().getVariables());
+        }
       }
+      if (TypeVar != nullptr)
+        ArgExpr = ArgExpr->IgnoreImpCasts();
 
       CVarSet ArgConstraints = CR.getExprConstraintVarsSet(ArgExpr);
       for (auto *ArgC : ArgConstraints) {
+        // If the function takes a void *, we already know about the wildness,
+        // so allow the implicit cast.
+        if (TypeVar == nullptr && FV->getExternalParam(PIdx)->isVoidPtr())
+          continue;
         CastNeeded CastKind = needCasting(
             ArgC, ArgC, FV->getInternalParam(PIdx), FV->getExternalParam(PIdx));
         if (CastKind != NO_CAST) {
-          surroundByCast(FV->getExternalParam(PIdx), CastKind, A);
+          surroundByCast(FV->getExternalParam(PIdx), TypeVar, CastKind, A);
           ExprsWithCast.insert(ignoreCheckedCImplicit(A));
           break;
         }
@@ -91,7 +100,7 @@ bool CastPlacementVisitor::VisitCallExpr(CallExpr *CE) {
                                         FV->getExternalReturn(), DstC, DstC);
       if (ExprsWithCast.find(CE) == ExprsWithCast.end() &&
           CastKind != NO_CAST) {
-        surroundByCast(DstC, CastKind, CE);
+        surroundByCast(DstC, nullptr, CastKind, CE);
         ExprsWithCast.insert(ignoreCheckedCImplicit(CE));
         break;
       }
@@ -151,11 +160,15 @@ CastPlacementVisitor::CastNeeded CastPlacementVisitor::needCasting(
 // when placed around the expression being cast.
 std::pair<std::string, std::string>
 CastPlacementVisitor::getCastString(ConstraintVariable *Dst,
+                                    ConstraintVariable *TypeVar,
                                     CastNeeded CastKind) {
   switch (CastKind) {
   case CAST_NT_ARRAY:
-    return std::make_pair(
-        "((" + Dst->mkString(Info.getConstraints(), false) + ")", ")");
+    return std::make_pair("((" +
+                              Dst->mkString(Info.getConstraints(),
+                                            MKSTRING_OPTS(EmitName = false)) +
+                              ")",
+                          ")");
   case CAST_TO_WILD:
     return std::make_pair("((" + Dst->getRewritableOriginalTy() + ")", ")");
   case CAST_TO_CHECKED: {
@@ -181,10 +194,18 @@ CastPlacementVisitor::getCastString(ConstraintVariable *Dst,
         Suffix = ", " + Bounds + ")";
       }
     }
-    return std::make_pair("_Assume_bounds_cast<" +
-                              Dst->mkString(Info.getConstraints(), false) +
-                              ">(",
-                          Suffix);
+    // The destination's type may be generic, which would have an out-of-scope
+    // type var, so use the already analysed local type var instead
+    std::string Type;
+    if (TypeVar != nullptr) {
+      Type = "_Ptr<" +
+          TypeVar->mkString(Info.getConstraints(),
+                            MKSTRING_OPTS(EmitName = false, EmitPointee = true)) +
+          ">";
+    } else {
+      Type = Dst->mkString(Info.getConstraints(), MKSTRING_OPTS(EmitName = false));
+    }
+    return std::make_pair("_Assume_bounds_cast<" + Type + ">(", Suffix);
   }
   default:
     llvm_unreachable("No casting needed");
@@ -192,6 +213,7 @@ CastPlacementVisitor::getCastString(ConstraintVariable *Dst,
 }
 
 void CastPlacementVisitor::surroundByCast(ConstraintVariable *Dst,
+                                          ConstraintVariable *TypeVar,
                                           CastNeeded CastKind, Expr *E) {
   PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(E, *Context);
   if (!canWrite(PSL.getFileName())) {
@@ -199,16 +221,16 @@ void CastPlacementVisitor::surroundByCast(ConstraintVariable *Dst,
     // unwritable files in common use cases. Until they are fixed, report a
     // warning rather than letting the main "unwritable change" error trigger
     // later.
-    clang::DiagnosticsEngine &DE = Writer.getSourceMgr().getDiagnostics();
-    unsigned ErrorId = DE.getCustomDiagID(
+    reportCustomDiagnostic(
+        Writer.getSourceMgr().getDiagnostics(),
         DiagnosticsEngine::Warning,
         "3C internal error: tried to insert a cast into an unwritable file "
-        "(https://github.com/correctcomputation/checkedc-clang/issues/454)");
-    DE.Report(E->getBeginLoc(), ErrorId);
+        "(https://github.com/correctcomputation/checkedc-clang/issues/454)",
+        E->getBeginLoc());
     return;
   }
 
-  auto CastStrs = getCastString(Dst, CastKind);
+  auto CastStrs = getCastString(Dst, TypeVar, CastKind);
 
   // If E is already a cast expression, we will try to rewrite the cast instead
   // of adding a new expression.
@@ -261,14 +283,13 @@ void CastPlacementVisitor::reportCastInsertionFailure(
   // FIXME: This is a warning rather than an error so that a new benchmark
   //        failure is not introduced in Lua.
   //        github.com/correctcomputation/checkedc-clang/issues/439
-  clang::DiagnosticsEngine &DE = Context->getDiagnostics();
-  unsigned ErrorId = DE.getCustomDiagID(
-      DiagnosticsEngine::Warning, "Unable to surround expression with cast.\n"
-                                  "Intended cast: \"%0\"");
-  auto ErrorBuilder = DE.Report(E->getExprLoc(), ErrorId);
-  ErrorBuilder.AddSourceRange(
-      Context->getSourceManager().getExpansionRange(E->getSourceRange()));
-  ErrorBuilder.AddString(CastStr);
+  reportCustomDiagnostic(Context->getDiagnostics(),
+                         DiagnosticsEngine::Warning,
+                         "Unable to surround expression with cast.\n"
+                         "Intended cast: \"%0\"",
+                         E->getExprLoc())
+      << Context->getSourceManager().getExpansionRange(E->getSourceRange())
+      << CastStr;
 }
 
 void CastPlacementVisitor::updateRewriteStats(CastNeeded CastKind) {

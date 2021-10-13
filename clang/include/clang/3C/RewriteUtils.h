@@ -24,21 +24,14 @@ class DeclReplacement {
 public:
   virtual Decl *getDecl() const = 0;
 
-  DeclStmt *getStatement() const { return Statement; }
-
   std::string getReplacement() const { return Replacement; }
 
-  virtual SourceRange getSourceRange(SourceManager &SM) const {
-    return getDecl()->getSourceRange();
-  }
+  virtual SourceRange getSourceRange(SourceManager &SM) const;
 
   // Discriminator for LLVM-style RTTI (dyn_cast<> et al.).
   enum DRKind {
-    DRK_VarDecl,
-    DRK_ParmVarDecl,
+    DRK_MultiDeclMember,
     DRK_FunctionDecl,
-    DRK_FieldDecl,
-    DRK_TypedefDecl
   };
 
   DRKind getKind() const { return Kind; }
@@ -46,11 +39,8 @@ public:
   virtual ~DeclReplacement() {}
 
 protected:
-  explicit DeclReplacement(DeclStmt *S, std::string R, DRKind K)
-      : Statement(S), Replacement(R), Kind(K) {}
-
-  // The Stmt, if it exists (may be nullptr).
-  DeclStmt *Statement;
+  explicit DeclReplacement(std::string R, DRKind K)
+      : Replacement(R), Kind(K) {}
 
   // The string to replace the declaration with.
   std::string Replacement;
@@ -62,8 +52,8 @@ private:
 template <typename DeclT, DeclReplacement::DRKind K>
 class DeclReplacementTempl : public DeclReplacement {
 public:
-  explicit DeclReplacementTempl(DeclT *D, DeclStmt *DS, std::string R)
-      : DeclReplacement(DS, R, K), Decl(D) {}
+  explicit DeclReplacementTempl(DeclT *D, std::string R)
+      : DeclReplacement(R, K), Decl(D) {}
 
   DeclT *getDecl() const override { return Decl; }
 
@@ -73,94 +63,61 @@ protected:
   DeclT *Decl;
 };
 
-typedef DeclReplacementTempl<VarDecl, DeclReplacement::DRK_VarDecl>
-    VarDeclReplacement;
-typedef DeclReplacementTempl<ParmVarDecl, DeclReplacement::DRK_ParmVarDecl>
-    ParmVarDeclReplacement;
-typedef DeclReplacementTempl<FieldDecl, DeclReplacement::DRK_FieldDecl>
-    FieldDeclReplacement;
-typedef DeclReplacementTempl<TypedefDecl, DeclReplacement::DRK_TypedefDecl>
-    TypedefDeclReplacement;
+typedef DeclReplacementTempl<NamedDecl, DeclReplacement::DRK_MultiDeclMember>
+    MultiDeclMemberReplacement;
 
 class FunctionDeclReplacement
     : public DeclReplacementTempl<FunctionDecl,
                                   DeclReplacement::DRK_FunctionDecl> {
 public:
   explicit FunctionDeclReplacement(FunctionDecl *D, std::string R, bool Return,
-                                   bool Params)
-      : DeclReplacementTempl(D, nullptr, R), RewriteReturn(Return),
-        RewriteParams(Params) {
+                                   bool Params, bool Generic = false)
+      : DeclReplacementTempl(D, R), RewriteGeneric(Generic),
+        RewriteReturn(Return), RewriteParams(Params) {
     assert("Doesn't make sense to rewrite nothing!" &&
-           (RewriteReturn || RewriteParams));
+           (RewriteGeneric || RewriteReturn || RewriteParams));
   }
 
   SourceRange getSourceRange(SourceManager &SM) const override;
 
 private:
   // This determines if the full declaration or the return will be replaced.
+  bool RewriteGeneric;
   bool RewriteReturn;
   bool RewriteParams;
 
   SourceLocation getDeclBegin(SourceManager &SM) const;
+  SourceLocation getReturnBegin(SourceManager &SM) const;
   SourceLocation getParamBegin(SourceManager &SM) const;
   SourceLocation getReturnEnd(SourceManager &SM) const;
   SourceLocation getDeclEnd(SourceManager &SM) const;
 };
 
-// Compare two DeclReplacement values. The algorithm for comparing them relates
-// their source positions. If two DeclReplacement values refer to overlapping
-// source positions, then they are the same. Otherwise, they are ordered
-// by their placement in the input file.
+typedef std::map<Decl *, DeclReplacement *> RSet;
+
+// Generate a string for the declaration based on the given PVConstraint.
+// Includes the storage qualifier, type, name, and bounds string (as
+// applicable), or generates an itype declaration if required due to
+// ItypesForExtern. Does not include a trailing semicolon or an initializer, so
+// it can be used in combination with getDeclSourceRangeWithAnnotations with
+// IncludeInitializer = false to preserve an existing initializer.
+std::string mkStringForPVDecl(MultiDeclMemberDecl *MMD,
+                              PVConstraint *PVC,
+                              ProgramInfo &Info);
+
+// Generate a string like mkStringForPVDecl, but for a declaration whose type is
+// known not to have changed (except possibly for a base type rename) and that
+// may not have a PVConstraint if the type is not a pointer or array type.
 //
-// There are two special cases: Function declarations, and DeclStmts. In turn:
-//
-//  - Function declarations might either be a DeclReplacement describing the
-//    entire declaration, i.e. replacing "int *foo(void)"
-//    with "int *foo(void) : itype(_Ptr<int>)". Or, it might describe just
-//    replacing only the return type, i.e. "_Ptr<int> foo(void)". This is
-//    discriminated against with the 'fullDecl' field of the DeclReplacement
-//    type and the comparison function first checks if the operands are
-//    FunctionDecls and if the 'fullDecl' field is set.
-//  - A DeclStmt of mupltiple Decls, i.e. 'int *a = 0, *b = 0'. In this case,
-//    we want the DeclReplacement to refer only to the specific sub-region that
-//    would be replaced, i.e. '*a = 0' and '*b = 0'. To do that, we traverse
-//    the Decls contained in a DeclStmt and figure out what the appropriate
-//    source locations are to describe the positions of the independent
-//    declarations.
-class DComp {
-public:
-  DComp(SourceManager &S) : SM(S) {}
-
-  bool operator()(DeclReplacement *Lhs, DeclReplacement *Rhs) const;
-
-private:
-  SourceManager &SM;
-
-  SourceRange getReplacementSourceRange(DeclReplacement *D) const;
-  SourceLocation getDeclBegin(DeclReplacement *D) const;
-};
-
-typedef std::set<DeclReplacement *, DComp> RSet;
-
-// This class is used to figure out which global variables are part of
-// multi-variable declarations. For local variables, all variables in a single
-// multi declaration are grouped together in a DeclStmt object. This is not the
-// case for global variables, so this class is required to correctly group
-// global variable declarations. Declarations in the same multi-declarations
-// have the same beginning source locations, so it is used to group variables.
-class GlobalVariableGroups {
-public:
-  GlobalVariableGroups(SourceManager &SourceMgr) : SM(SourceMgr) {}
-  void addGlobalDecl(Decl *VD, std::vector<Decl *> *VDVec = nullptr);
-
-  std::vector<Decl *> &getVarsOnSameLine(Decl *VD);
-
-  virtual ~GlobalVariableGroups();
-
-private:
-  SourceManager &SM;
-  std::map<Decl *, std::vector<Decl *> *> GlobVarGroups;
-};
+// For similar reasons as in the comment in DeclRewriter::buildItypeDecl, this
+// will get the string from Clang instead of mkString if the base type hasn't
+// been renamed (hence the need to assume the rest of the type has not changed).
+// Yet another possible approach would be to combine the new base type name with
+// the original source for the rest of the declaration, but that may run into
+// problems with macros and the like, so we might still need some fallback. For
+// now, we don't implement this "original source" approach.
+std::string mkStringForDeclWithUnchangedType(MultiDeclMemberDecl *D,
+                                             ProgramInfo &Info);
 
 // Class that handles rewriting bounds information for all the
 // detected array variables.
@@ -183,7 +140,7 @@ class RewriteConsumer : public ASTConsumer {
 public:
   explicit RewriteConsumer(ProgramInfo &I) : Info(I) {}
 
-  virtual void HandleTranslationUnit(ASTContext &Context);
+  void HandleTranslationUnit(ASTContext &Context) override;
 
 private:
   ProgramInfo &Info;
@@ -195,6 +152,12 @@ private:
   static std::set<PersistentSourceLoc> EmittedDiagnostics;
 
   void emitRootCauseDiagnostics(ASTContext &Context);
+
+  // Hack to avoid printing the main file to stdout multiple times in the edge
+  // case of a compilation database containing multiple translation units for
+  // the main file
+  // (https://github.com/correctcomputation/checkedc-clang/issues/374#issuecomment-893612654).
+  bool StdoutModeEmittedMainFile = false;
 };
 
 bool canRewrite(Rewriter &R, const SourceRange &SR);
