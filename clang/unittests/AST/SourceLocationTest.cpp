@@ -379,23 +379,35 @@ TEST(UncheckedPtr, FunctionTypeLoc) {
   EXPECT_TRUE(
       Verifier.match("int (*p)(int);", varDecl(hasGlobalStorage()), Lang_C99));
 }
-TEST(CheckedPtr, FunctionTypeLoc) {
-  VarDeclTypeLocRangeVerifier Verifier{0};
-  Verifier.expectRange(1, 1, 1, 15);
-  EXPECT_TRUE(Verifier.match("_Ptr<int (int)> p;", varDecl(hasGlobalStorage()),
-                             Lang_C99));
-}
 TEST(UncheckedPtr, FunctionPostfix) {
   RangeVerifier<VarDecl> Verifier;
   Verifier.expectRange(1, 1, 1, 13);
   EXPECT_TRUE(
       Verifier.match("int (*p)(int);", varDecl(hasGlobalStorage()), Lang_C99));
 }
+TEST(CheckedPtr, FunctionTypeLoc) {
+  VarDeclTypeLocRangeVerifier Verifier{0};
+  Verifier.expectRange(1, 1, 1, 15);
+  EXPECT_TRUE(Verifier.match("_Ptr<int (int)> p;", varDecl(hasGlobalStorage()),
+                             Lang_C99));
+}
 TEST(CheckedPtr, FunctionPostfix) {
   RangeVerifier<VarDecl> Verifier;
   Verifier.expectRange(1, 1, 1, 17);
   EXPECT_TRUE(Verifier.match("_Ptr<int (int)> p;", varDecl(hasGlobalStorage()),
                              Lang_C99));
+}
+
+// Test with array levels both inside and outside a checked pointer level.
+TEST(CheckedPtr, SandwichArrayTypeLoc) {
+  VarDeclTypeLocRangeVerifier Verifier{0};
+  Verifier.expectRange(1, 1, 1, 18);
+  EXPECT_TRUE(Verifier.match("_Ptr<int[10]> p[1];", varDecl(), Lang_C99));
+}
+TEST(CheckedPtr, SandwichArrayPostfix) {
+  RangeVerifier<VarDecl> Verifier;
+  Verifier.expectRange(1, 1, 1, 18);
+  EXPECT_TRUE(Verifier.match("_Ptr<int[10]> p[1];", varDecl(), Lang_C99));
 }
 
 TEST(CXXConstructorDecl, NoRetFunTypeLocRange) {
