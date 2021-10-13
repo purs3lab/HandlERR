@@ -255,8 +255,11 @@ SourceLocation TypeLoc::getEndLoc() const {
         Last = Cur;
       break;
     case Pointer:
-      if (Cur.castAs<PointerTypeLoc>().getTypePtr()->isChecked())
-        return Cur.getLocalSourceRange().getEnd();
+      if (Cur.castAs<PointerTypeLoc>().getTypePtr()->isChecked()) {
+        if (!Last)
+          Last = Cur;
+        return Last.getLocalSourceRange().getEnd();
+      }
       LLVM_FALLTHROUGH;
     case BlockPointer:
     case MemberPointer:
