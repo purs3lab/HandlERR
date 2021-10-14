@@ -293,118 +293,75 @@ TEST(TypeLoc, LongLongConstRange) {
   EXPECT_TRUE(Verifier.match("long long const a = 0;", typeLoc()));
 }
 
-class VarDeclTypeLocRangeVerifier : public RangeVerifier<VarDecl> {
-private:
-  unsigned int Depth;
-
-public:
-  VarDeclTypeLocRangeVerifier(unsigned int Depth) : Depth(Depth) {}
-
-protected:
-  SourceRange getRange(const VarDecl &Node) override {
-    TypeLoc TL = Node.getTypeSourceInfo()->getTypeLoc();
-    for (unsigned int i = 0; i < Depth; i++)
-      TL = TL.getNextTypeLoc();
-    return TL.getSourceRange();
-  }
-};
-
-// Test that we get the right source range for the entire _Ptr<...>.
-//
-// If we just use `typeLoc()` as the matcher, we seem to get an inner TypeLoc.
-// Instead, explicitly get the TypeLoc of the VarDecl.
-TEST(CheckedPtr, TypeLoc) {
-  VarDeclTypeLocRangeVerifier Verifier{0};
-  Verifier.expectRange(1, 1, 1, 11);
-  EXPECT_TRUE(Verifier.match("_Ptr<int *> p;", varDecl(), Lang_C99));
+// For multi-level types such as pointers, if we just used typeLoc() as above,
+// it would match the TypeLocs of all the levels and the RangeVerifier would
+// verify an arbitrary one of them. Instead, we want to verify a specific level.
+internal::BindableMatcher<TypeLoc> typeLocAtDepth(unsigned int Depth) {
+  internal::BindableMatcher<TypeLoc> Matcher = typeLoc(hasParent(varDecl()));
+  for (unsigned int I = 0; I < Depth; I++)
+    Matcher = typeLoc(hasParent(Matcher));
+  return Matcher;
 }
 
-// Test that we copied the TypeLoc for all levels of the pointee too.
+// Test the source range of a checked pointer type and all levels of its
+// pointee.
+TEST(CheckedPtr, TypeLoc) {
+  RangeVerifier<TypeLoc> Verifier;
+  Verifier.expectRange(1, 1, 1, 11);
+  EXPECT_TRUE(Verifier.match("_Ptr<int *> p;", typeLocAtDepth(0), Lang_C99));
+}
 TEST(CheckedPtr, TypeLocPointee) {
-  VarDeclTypeLocRangeVerifier Verifier{1};
+  RangeVerifier<TypeLoc> Verifier;
   Verifier.expectRange(1, 6, 1, 10);
-  EXPECT_TRUE(Verifier.match("_Ptr<int *> p;", varDecl(), Lang_C99));
+  EXPECT_TRUE(Verifier.match("_Ptr<int *> p;", typeLocAtDepth(1), Lang_C99));
 }
 TEST(CheckedPtr, TypeLocPointee2) {
-  VarDeclTypeLocRangeVerifier Verifier{2};
+  RangeVerifier<TypeLoc> Verifier;
   Verifier.expectRange(1, 6, 1, 6);
-  EXPECT_TRUE(Verifier.match("_Ptr<int *> p;", varDecl(), Lang_C99));
+  EXPECT_TRUE(Verifier.match("_Ptr<int *> p;", typeLocAtDepth(2), Lang_C99));
 }
 
-// Test inner type layers that go on the outside of an unchecked pointer in
-// inside-out C declarator syntax (and thus generally take priority in
-// determining the outer limits of the source range) but go on the inside of
-// _Ptr<...> (which should generally take priority over any inner type layer).
-
-// Tests of an (unchecked or checked) pointer to an array.
-
-TEST(UncheckedPtr, ArrayTypeLoc) {
-  VarDeclTypeLocRangeVerifier Verifier{0};
-  Verifier.expectRange(1, 1, 1, 12);
-  EXPECT_TRUE(Verifier.match("int (*p)[10];", varDecl(), Lang_C99));
-}
-// The *Postfix tests exercise DeclaratorDecl::getSourceRange, which uses
+// Tests of checked pointers in combination with arrays (as an example of a type
+// layer that uses the usual inside-out C declarator syntax). Also, some
+// corresponding tests of unchecked pointers to verify that the special handling
+// of checked pointers doesn't unintentionally affect unchecked pointers.
+//
+// For each example declaration, we test the source ranges of both the TypeLoc
+// and the VarDecl. The VarDecl uses DeclaratorDecl::getSourceRange, which uses
 // typeIsPostfix to decide whether the type extends past the name in order to
 // choose either the name or the end of the type as the end of the source range.
 // typeIsPostfix has logic roughly parallel to TypeLoc::getEndLoc. (Could the
 // code be refactored to remove this duplication?)
-//
-// In this case, typeIsPostfix should return true. If it returns false, the
-// range would incorrectly end at the `p`.
-TEST(UncheckedPtr, ArrayPostfix) {
+
+TEST(CheckedPtr, ArrayTypeLoc) {
+  RangeVerifier<TypeLoc> Verifier;
+  Verifier.expectRange(1, 1, 1, 13);
+  EXPECT_TRUE(Verifier.match("_Ptr<int[10]> p;", typeLocAtDepth(0), Lang_C99));
+}
+TEST(CheckedPtr, ArrayDecl) {
+  RangeVerifier<VarDecl> Verifier;
+  Verifier.expectRange(1, 1, 1, 15);
+  EXPECT_TRUE(Verifier.match("_Ptr<int[10]> p;", varDecl(), Lang_C99));
+}
+TEST(CheckedPtr, UncheckedArrayTypeLoc) {
+  RangeVerifier<TypeLoc> Verifier;
+  Verifier.expectRange(1, 1, 1, 12);
+  EXPECT_TRUE(Verifier.match("int (*p)[10];", typeLocAtDepth(0), Lang_C99));
+}
+TEST(CheckedPtr, UncheckedArrayDecl) {
   RangeVerifier<VarDecl> Verifier;
   Verifier.expectRange(1, 1, 1, 12);
   EXPECT_TRUE(Verifier.match("int (*p)[10];", varDecl(), Lang_C99));
 }
-TEST(CheckedPtr, ArrayTypeLoc) {
-  VarDeclTypeLocRangeVerifier Verifier{0};
-  Verifier.expectRange(1, 1, 1, 13);
-  EXPECT_TRUE(Verifier.match("_Ptr<int[10]> p;", varDecl(), Lang_C99));
-}
-// In this case, typeIsPostfix should return false. If it returns true, the
-// range would incorrectly end at the `>`.
-TEST(CheckedPtr, ArrayPostfix) {
-  RangeVerifier<VarDecl> Verifier;
-  Verifier.expectRange(1, 1, 1, 15);
-  EXPECT_TRUE(Verifier.match("_Ptr<int[10]> p;", varDecl(), Lang_C99));
-}
-
-// Tests of an (unchecked or checked) pointer to a function. Here we have to use
-// hasGlobalStorage to ensure we match only the global VarDecl, not the
-// ParmVarDecl of the function.
-
-TEST(UncheckedPtr, FunctionTypeLoc) {
-  VarDeclTypeLocRangeVerifier Verifier{0};
-  Verifier.expectRange(1, 1, 1, 13);
-  EXPECT_TRUE(
-      Verifier.match("int (*p)(int);", varDecl(hasGlobalStorage()), Lang_C99));
-}
-TEST(UncheckedPtr, FunctionPostfix) {
-  RangeVerifier<VarDecl> Verifier;
-  Verifier.expectRange(1, 1, 1, 13);
-  EXPECT_TRUE(
-      Verifier.match("int (*p)(int);", varDecl(hasGlobalStorage()), Lang_C99));
-}
-TEST(CheckedPtr, FunctionTypeLoc) {
-  VarDeclTypeLocRangeVerifier Verifier{0};
-  Verifier.expectRange(1, 1, 1, 15);
-  EXPECT_TRUE(Verifier.match("_Ptr<int (int)> p;", varDecl(hasGlobalStorage()),
-                             Lang_C99));
-}
-TEST(CheckedPtr, FunctionPostfix) {
-  RangeVerifier<VarDecl> Verifier;
-  Verifier.expectRange(1, 1, 1, 17);
-  EXPECT_TRUE(Verifier.match("_Ptr<int (int)> p;", varDecl(hasGlobalStorage()),
-                             Lang_C99));
-}
 
 // Test with array levels both inside and outside a checked pointer level.
 TEST(CheckedPtr, SandwichArrayTypeLoc) {
-  VarDeclTypeLocRangeVerifier Verifier{0};
+  RangeVerifier<TypeLoc> Verifier;
   Verifier.expectRange(1, 1, 1, 18);
-  EXPECT_TRUE(Verifier.match("_Ptr<int[10]> p[1];", varDecl(), Lang_C99));
+  EXPECT_TRUE(
+      Verifier.match("_Ptr<int[10]> p[1];", typeLocAtDepth(0), Lang_C99));
 }
-TEST(CheckedPtr, SandwichArrayPostfix) {
+TEST(CheckedPtr, SandwichArrayDecl) {
   RangeVerifier<VarDecl> Verifier;
   Verifier.expectRange(1, 1, 1, 18);
   EXPECT_TRUE(Verifier.match("_Ptr<int[10]> p[1];", varDecl(), Lang_C99));

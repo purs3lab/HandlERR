@@ -6290,7 +6290,7 @@ namespace {
     }
 
     void VisitPointerTypeLoc(PointerTypeLoc TL) {
-      // TODO: Error checks?
+      // REVIEW: Should we have any error checks here?
       TL.setKWLoc(DS.getCheckedPtrKWLoc());
       TL.setLeftSymLoc(DS.getCheckedPtrLeftSymLoc());
       TL.setRightSymLoc(DS.getCheckedPtrRightSymLoc());

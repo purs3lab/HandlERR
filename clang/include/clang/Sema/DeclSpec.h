@@ -852,7 +852,6 @@ public:
   bool SetConstexprSpec(ConstexprSpecKind ConstexprKind, SourceLocation Loc,
                         const char *&PrevSpec, unsigned &DiagID);
 
-  // TODO: Error checks?
   void setSpecCheckedPtr(SourceLocation KWLoc, SourceLocation LeftSymLoc,
                          SourceLocation RightSymLoc);
 

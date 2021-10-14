@@ -1903,6 +1903,7 @@ static bool typeIsPostfix(QualType QT) {
     case Type::Pointer: {
       const PointerType *PT = cast<PointerType>(T);
       if (PT->isChecked())
+        // See the comment about checked pointers in TypeLoc::getBeginLoc.
         return false;
       QT = PT->getPointeeType();
       break;
