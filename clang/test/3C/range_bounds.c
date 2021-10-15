@@ -185,21 +185,32 @@ void test10(size_t n){
 
   // The LHS is a macro, but we should still be able to rewrite.
   int *b = malloc(sizeof(int) * n);
-  //CHECK: _Array_ptr<int> __3c_tmp_b : count(n) = malloc<int>(sizeof(int) * n);
-  //CHECK: _Array_ptr<int> b : bounds(__3c_tmp_b, __3c_tmp_b + n) = __3c_tmp_b;
+  // CHECK: _Array_ptr<int> __3c_tmp_b : count(n) = malloc<int>(sizeof(int) * n);
+  // CHECK: _Array_ptr<int> b : bounds(__3c_tmp_b, __3c_tmp_b + n) = __3c_tmp_b;
   b++;
   b = NULL;
-  //CHECK: __3c_tmp_b = NULL, b = __3c_tmp_b;
+  // CHECK: __3c_tmp_b = NULL, b = __3c_tmp_b;
 
   // Like the above case, but the macro includes the semicolon, so we can't
   // rewrite.
   int *c = malloc(sizeof(int) * n);
-  //CHECK: _Array_ptr<int> c = malloc<int>(sizeof(int) * n);
+  // CHECK: _Array_ptr<int> c = malloc<int>(sizeof(int) * n);
   c++;
   c = null_with_semi
 
   int *d = malloc(sizeof(int) * n);
-  //CHECK: _Array_ptr<int> d = malloc<int>(sizeof(int) * n);
+  // CHECK: _Array_ptr<int> d = malloc<int>(sizeof(int) * n);
   d++;
   another_macro 0;
+}
+
+// Check byte_count rewriting. Interesting because range bound needs a cast to
+// `_Array_ptr<char>` for pointer arithmetic with offset to be correct.
+void byte_count_fn(int *a : byte_count(n), unsigned int n);
+void test11(int *b, unsigned int n) {
+// CHECK: void test11(_Array_ptr<int> __3c_tmp_b : byte_count(n), unsigned int n) _Checked {
+// CHECK: _Array_ptr<int> b : bounds(((_Array_ptr<char>)__3c_tmp_b), ((_Array_ptr<char>)__3c_tmp_b) + n) = __3c_tmp_b;
+
+  byte_count_fn(b, n);
+  b++;
 }
