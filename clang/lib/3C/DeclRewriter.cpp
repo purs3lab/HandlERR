@@ -191,7 +191,7 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
                 Var.mkString(Info.getConstraints(),
                              MKSTRING_OPTS(UnmaskTypedef = true));
             RewriteThese.insert(std::make_pair(
-                TD, new TypedefDeclReplacement(TD, nullptr, NewTy)));
+                TD, new TypedefDeclReplacement(TD, nullptr, NewTy, {})));
           }
         }
       }
@@ -271,14 +271,15 @@ void DeclRewriter::rewriteDecls(ASTContext &Context, ProgramInfo &Info,
         std::string NewTy = getStorageQualifierString(D) + RD.Type + RD.IType;
 
         if (auto *VD = dyn_cast<VarDecl>(D)) {
-          VarDeclReplacement *VDR = new VarDeclReplacement(VD, DS, NewTy);
+          std::vector<std::string> SDecl;
           if (!RD.SupplementaryDecl.empty())
-            VDR->SupplementaryDecls.push_back(RD.SupplementaryDecl);
+            SDecl.push_back(RD.SupplementaryDecl);
+          auto *VDR = new VarDeclReplacement(VD, DS, NewTy, SDecl);
           RewriteThese.insert(std::make_pair(VD, VDR));
         } else if (auto *FD = dyn_cast<FieldDecl>(D)) {
-          FieldDeclReplacement *FDR = new FieldDeclReplacement(FD, DS, NewTy);
           assert("Supplementary declaration created for FieldDecl." &&
                  RD.SupplementaryDecl.empty());
+          auto *FDR = new FieldDeclReplacement(FD, DS, NewTy, {});
           RewriteThese.insert(std::make_pair(FD, FDR));
         } else
           llvm_unreachable("Unrecognized declaration type.");
@@ -402,7 +403,7 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
   // initializers are preserved, any declarations that an initializer to
   // be valid checked-c are given one.
 
-  std::vector<std::string> AllSupplementaryDecls;
+  //std::vector<std::string> AllSupplementaryDecls;
 
   bool IsFirst = true;
   SourceLocation PrevEnd;
@@ -420,10 +421,10 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
       //       the new declarations with the old, but I haven't figured this out
       //       yet. The current implementation has known bugs when later
       //       declarations in the multidecl reference later declarations.
-      AllSupplementaryDecls.insert(AllSupplementaryDecls.begin(),
-         SameLineReplacement->SupplementaryDecls.begin(),
-         SameLineReplacement->SupplementaryDecls.end());
-      SameLineReplacement->SupplementaryDecls.clear();
+      //AllSupplementaryDecls.insert(AllSupplementaryDecls.begin(),
+      //   SameLineReplacement->getSupplementaryDecls().begin(),
+      //   SameLineReplacement->getSupplementaryDecls().end());
+      //SameLineReplacement->getSupplementaryDecls().clear();
     }
 
     if (IsFirst && ContainsInlineStruct) {
@@ -438,6 +439,8 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
       if (Found) {
         SourceRange SR(DL->getBeginLoc(), DL->getEndLoc());
         doDeclRewrite(SR, SameLineReplacement);
+        if (!SameLineReplacement->getSupplementaryDecls().empty())
+          ReplaceText = ";";
       }
     } else {
       // The subsequent decls are more complicated because we need to insert a
@@ -447,6 +450,8 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
         // string stored in it that should be used.
         SourceRange SR(PrevEnd, DL->getEndLoc());
         doDeclRewrite(SR, SameLineReplacement);
+        if (!SameLineReplacement->getSupplementaryDecls().empty())
+          ReplaceText = ";";
       } else {
         // When the type hasn't changed, we still need to insert the original
         // type for the variable.
@@ -497,11 +502,17 @@ void DeclRewriter::rewriteMultiDecl(DeclReplacement *N, RSet &ToRewrite,
     else
       End = getNextCommaOrSemicolon(DL->getEndLoc());
     rewriteSourceRange(R, End, ReplaceText);
-    // Offset by one to skip past what we've just added so it isn't overwritten.
-    PrevEnd = End.getEnd().getLocWithOffset(1);
+    // Offset to skip past what we've just added so it isn't overwritten.
+    // If a duplicate declaration was emitted for as part of rewriting a
+    // declaration, then the offset must be 2 to skip past that as well.
+    unsigned int Offset = 1;
+    if (SameLineReplacement &&
+        !SameLineReplacement->getSupplementaryDecls().empty())
+      Offset = 2;
+    PrevEnd = End.getEnd().getLocWithOffset(Offset);
   }
 
-  emitSupplementaryDeclarations(AllSupplementaryDecls, PrevEnd);
+  //emitSupplementaryDeclarations(AllSupplementaryDecls, PrevEnd);
 }
 
 // Common rewriting logic used to replace a single decl either on its own or as
@@ -543,7 +554,7 @@ void DeclRewriter::doDeclRewrite(SourceRange &SR, DeclReplacement *N) {
     A.getLangOpts());
   SourceLocation L = NextToken.hasValue() ? NextToken.getValue().getLocation()
                                           : SourceLocation();
-  emitSupplementaryDeclarations(N->SupplementaryDecls, L);
+  emitSupplementaryDeclarations(N->getSupplementaryDecls(), L);
 }
 
 void DeclRewriter::rewriteFunctionDecl(FunctionDeclReplacement *N) {
@@ -552,7 +563,7 @@ void DeclRewriter::rewriteFunctionDecl(FunctionDeclReplacement *N) {
   if (N->getDecl()->isThisDeclarationADefinition()) {
     Stmt *S = N->getDecl()->getBody();
     /*FIXME :*/ assert("N->getDecl()->getBody() can be null." && S != nullptr);
-    emitSupplementaryDeclarations(N->SupplementaryDecls,
+    emitSupplementaryDeclarations(N->getSupplementaryDecls(),
                                   N->getDecl()->getBody()->getBeginLoc());
   }
 }
@@ -569,6 +580,7 @@ void DeclRewriter::emitSupplementaryDeclarations(
   std::string AllDecls;
   for (std::string D : SDecls)
     AllDecls += "\n" + D;
+  AllDecls += "\n";
 
   insertText(R, Loc, AllDecls);
 }
@@ -872,10 +884,8 @@ bool FunctionDeclBuilder::VisitFunctionDecl(FunctionDecl *FD) {
 
   // Add new declarations to RewriteThese if it has changed
   if (RewriteReturn || RewriteParams) {
-    auto *FDR = new FunctionDeclReplacement(FD, NewSig, RewriteReturn,
+    auto *FDR = new FunctionDeclReplacement(FD, NewSig, SDecls, RewriteReturn,
                                             RewriteParams, RewriteGeneric);
-    FDR->SupplementaryDecls.insert(FDR->SupplementaryDecls.begin(),
-                                   SDecls.begin(), SDecls.end());
     RewriteThese.insert(std::make_pair(FD, FDR));
   }
 

@@ -42,11 +42,14 @@ public:
 
   virtual ~DeclReplacement() {}
 
-  std::vector<std::string> SupplementaryDecls;
+  const std::vector<std::string> &getSupplementaryDecls() const {
+    return SupplementaryDecls;
+  }
 
 protected:
-  explicit DeclReplacement(DeclStmt *S, std::string R, DRKind K)
-      : Statement(S), Replacement(R), Kind(K) {}
+  explicit DeclReplacement(DeclStmt *S, std::string R,
+                           std::vector<std::string> SDecls, DRKind K)
+    : Statement(S), Replacement(R), SupplementaryDecls(SDecls), Kind(K) {}
 
   // The Stmt, if it exists (may be nullptr).
   DeclStmt *Statement;
@@ -54,6 +57,7 @@ protected:
   // The string to replace the declaration with.
   std::string Replacement;
 
+  std::vector<std::string> SupplementaryDecls;
 private:
   const DRKind Kind;
 };
@@ -61,8 +65,9 @@ private:
 template <typename DeclT, DeclReplacement::DRKind K>
 class DeclReplacementTempl : public DeclReplacement {
 public:
-  explicit DeclReplacementTempl(DeclT *D, DeclStmt *DS, std::string R)
-      : DeclReplacement(DS, R, K), Decl(D) {}
+  explicit DeclReplacementTempl(DeclT *D, DeclStmt *DS, std::string R,
+                                std::vector<std::string> SDecls)
+    : DeclReplacement(DS, R, SDecls, K), Decl(D) {}
 
   DeclT *getDecl() const override { return Decl; }
 
@@ -83,9 +88,10 @@ class FunctionDeclReplacement
     : public DeclReplacementTempl<FunctionDecl,
                                   DeclReplacement::DRK_FunctionDecl> {
 public:
-  explicit FunctionDeclReplacement(FunctionDecl *D, std::string R, bool Return,
+  explicit FunctionDeclReplacement(FunctionDecl *D, std::string R,
+                                   std::vector<std::string> SDecls, bool Return,
                                    bool Params, bool Generic = false)
-      : DeclReplacementTempl(D, nullptr, R), RewriteGeneric(Generic),
+    : DeclReplacementTempl(D, nullptr, R, SDecls), RewriteGeneric(Generic),
         RewriteReturn(Return), RewriteParams(Params) {
     assert("Doesn't make sense to rewrite nothing!" &&
            (RewriteGeneric || RewriteReturn || RewriteParams));

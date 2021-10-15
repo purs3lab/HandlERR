@@ -63,15 +63,18 @@ void test3(int *a, int *b, int *c, int *d) {
     a[i], b[i], c[i], d[i];
 }
 
-// Multi declarations are partially working with some known errors.
-// TODO: There would be an error if the initializer of `c` referenced `a`.
+// Multi declarations might need to a new declarations. The order of the new
+// declarations is important because a later declaration in the same multi-decl
+// might reference the variable being emmitted. The new declaration of `c` must
+// come before `d`.
 void test4() {
-  int *a = malloc(10*sizeof(int)), b, *c = malloc(10*sizeof(int));
+  int *a = malloc(10*sizeof(int)), b, *c = malloc(10*sizeof(int)), *d = c;
   // CHECK_ALL: _Array_ptr<int> __3c_tmp_a : count(10) = malloc<int>(10*sizeof(int));
+  // CHECK_ALL: _Array_ptr<int> a : bounds(__3c_tmp_a, __3c_tmp_a + 10) = __3c_tmp_a;
   // CHECK_ALL: int b;
   // CHECK_ALL: _Array_ptr<int> __3c_tmp_c : count(10) = malloc<int>(10*sizeof(int));
   // CHECK_ALL: _Array_ptr<int> c : bounds(__3c_tmp_c, __3c_tmp_c + 10) = __3c_tmp_c;
-  // CHECK_ALL: _Array_ptr<int> a : bounds(__3c_tmp_a, __3c_tmp_a + 10) = __3c_tmp_a;
+  // CHECK_ALL: _Ptr<int> d = c;
 
   b;
   a++, c++;
