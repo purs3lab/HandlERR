@@ -132,7 +132,7 @@ void BasePointerAssignmentFinder::visitBasePointerAssignment(Expr *LHS,
   SourceLocation RHSEnd =
     getLocationAfter(RHS->getEndLoc(), C->getSourceManager(), C->getLangOpts());
   SourceLocation LHSLoc = LHS->getExprLoc();
-  if (!Rewriter::isRewritable(LHSLoc) ||
+  if (!(LHSLoc.isValid() && Rewriter::isRewritable(LHSLoc)) ||
       !(RHSEnd.isValid() && Rewriter::isRewritable(RHSEnd))) {
     CVarSet LHSCVs = CR.getExprConstraintVarsSet(LHS);
     for (auto *CV: LHSCVs)
