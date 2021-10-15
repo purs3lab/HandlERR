@@ -22,6 +22,7 @@
 using namespace llvm;
 using namespace clang;
 
+
 void GlobalVariableGroups::addGlobalDecl(Decl *VD, std::vector<Decl *> *VDVec) {
   if (VD && GlobVarGroups.find(VD) == GlobVarGroups.end()) {
     if (VDVec == nullptr)
@@ -119,9 +120,12 @@ void rewriteSourceRange(Rewriter &R, const CharSourceRange &Range,
 
 void insertText(Rewriter &R, SourceLocation S, const std::string &NewText,
                 bool ErrFail) {
-  SourceRange SR(
-    Lexer::getLocForEndOfToken(S, 0, R.getSourceMgr(), R.getLangOpts()), S);
+  SourceRange SR(getLocationAfter(S, R.getSourceMgr(), R.getLangOpts()), S);
   rewriteSourceRange(R, SR, NewText, ErrFail);
+}
+
+std::string get3CTmpVar(std::string VarName) {
+  return "__3c_tmp_" + VarName;
 }
 
 static void emit(Rewriter &R, ASTContext &C, bool &StdoutModeEmittedMainFile) {

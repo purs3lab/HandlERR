@@ -230,6 +230,10 @@ int64_t getStmtIdWorkaround(const clang::Stmt *St,
 
 clang::SourceLocation getCheckedCAnnotationsEnd(const clang::Decl *D);
 
+clang::SourceLocation
+getLocationAfter(clang::SourceLocation SL, const clang::SourceManager &SM,
+                 const clang::LangOptions &LO);
+
 // Shortcut for the getCustomDiagID + Report sequence to report a custom
 // diagnostic as we currently do in 3C.
 //

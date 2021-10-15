@@ -38,9 +38,6 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
                                   std::vector<std::string> *SDecls) {
   bool NeedsRangeBound =
     SDecls != nullptr && Info.getABoundsInfo().needsRangeBound(Defn);
-  assert("Adding range bounds on return, global variable, or field!" &&
-         (!NeedsRangeBound || (isa_and_nonnull<VarDecl>(Decl) &&
-                               cast<VarDecl>(Decl)->isLocalVarDeclOrParm())));
 
   std::string DeclName = Decl ? Decl->getNameAsString() : "";
   // The idea here is that the name should only be empty if this is an unnamed
@@ -48,7 +45,7 @@ void DeclRewriter::buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
   // prototype so Decl is null.
   assert(!DeclName.empty() || Decl == nullptr || isa<ParmVarDecl>(Decl));
   if (NeedsRangeBound)
-    DeclName = "__3c_tmp_" + DeclName;
+    DeclName = get3CTmpVar(DeclName);
 
   const EnvironmentMap &Env = Info.getConstraints().getVariables();
   // True when the type of this variable is defined by a typedef, and the
@@ -134,13 +131,9 @@ void DeclRewriter::buildCheckedDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
                                cast<VarDecl>(Decl)->isLocalVarDeclOrParm())));
 
   std::string DeclName = UseName;
-  // The idea here is that the name should only be empty if this is an unnamed
-  // parameter in a function pre-declaration, or the pre-declaration is not a
-  // prototype so Decl is null. In all of these cases, we don't want to insert
-  // a duplicate declaration, so we don't need a tmp name.
   if (NeedsRangeBound) {
     assert(!DeclName.empty());
-    DeclName = "__3c_tmp_" + DeclName;
+    DeclName = get3CTmpVar(DeclName);
   }
 
   Type =

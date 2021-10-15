@@ -599,3 +599,8 @@ SourceLocation getCheckedCAnnotationsEnd(const Decl *D) {
 
   return End;
 }
+
+SourceLocation getLocationAfter(SourceLocation SL, const SourceManager &SM,
+                                const LangOptions &LO) {
+  return Lexer::getLocForEndOfToken(SL, 0, SM, LO);
+}

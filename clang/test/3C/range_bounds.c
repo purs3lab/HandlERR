@@ -170,3 +170,36 @@ void test9() {
   glob[0];
   // expected-error@-1 {{expression has unknown bounds}}
 }
+
+// Another case where range bounds aren't allowed: if we would have to update
+// an assignemnt expression in a macro (which would be a rewriting error), then
+// the pointer cannot get range bounds.
+#define set_a_to_null a = 0
+#define null_with_semi 0;
+#define another_macro d =
+void test10(size_t n){
+  int *a = malloc(sizeof(int) * n);
+  //CHECK: _Array_ptr<int> a = malloc<int>(sizeof(int) * n);
+  a++;
+  set_a_to_null;
+
+  // The LHS is a macro, but we should still be able to rewrite.
+  int *b = malloc(sizeof(int) * n);
+  //CHECK: _Array_ptr<int> __3c_tmp_b : count(n) = malloc<int>(sizeof(int) * n);
+  //CHECK: _Array_ptr<int> b : bounds(__3c_tmp_b, __3c_tmp_b + n) = __3c_tmp_b;
+  b++;
+  b = NULL;
+  //CHECK: __3c_tmp_b = NULL, b = __3c_tmp_b;
+
+  // Like the above case, but the macro includes the semicolon, so we can't
+  // rewrite.
+  int *c = malloc(sizeof(int) * n);
+  //CHECK: _Array_ptr<int> c = malloc<int>(sizeof(int) * n);
+  c++;
+  c = null_with_semi
+
+  int *d = malloc(sizeof(int) * n);
+  //CHECK: _Array_ptr<int> d = malloc<int>(sizeof(int) * n);
+  d++;
+  another_macro 0;
+}

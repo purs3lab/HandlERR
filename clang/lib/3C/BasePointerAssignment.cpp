@@ -119,7 +119,7 @@ void BasePointerAssignmentUpdater::visitBasePointerAssignment(Expr *LHS,
     ConstraintVariable *CV) { return ABInfo.needsRangeBound(CV); }) == 0);
   for (ConstraintVariable *CV: LHSCVs) {
     if (ABInfo.needsRangeBound(CV)) {
-      std::string TmpVarName = "__3c_tmp_" + CV->getName();
+      std::string TmpVarName = get3CTmpVar(CV->getName());
       rewriteSourceRange(R, LHS->getSourceRange(), TmpVarName);
       insertText(R, RHS->getEndLoc(),
                  ", " + CV->getName() + " = " + TmpVarName);
@@ -129,8 +129,11 @@ void BasePointerAssignmentUpdater::visitBasePointerAssignment(Expr *LHS,
 
 void BasePointerAssignmentFinder::visitBasePointerAssignment(Expr *LHS,
                                                              Expr *RHS) {
-  if (!Rewriter::isRewritable(LHS->getExprLoc()) ||
-      !Rewriter::isRewritable(RHS->getEndLoc())) {
+  SourceLocation RHSEnd =
+    getLocationAfter(RHS->getEndLoc(), C->getSourceManager(), C->getLangOpts());
+  SourceLocation LHSLoc = LHS->getExprLoc();
+  if (!Rewriter::isRewritable(LHSLoc) ||
+      !(RHSEnd.isValid() && Rewriter::isRewritable(RHSEnd))) {
     CVarSet LHSCVs = CR.getExprConstraintVarsSet(LHS);
     for (auto *CV: LHSCVs)
       if (CV->hasBoundsKey())

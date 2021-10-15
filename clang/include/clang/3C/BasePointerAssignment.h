@@ -49,12 +49,13 @@ private:
 class BasePointerAssignmentFinder : public BasePointerAssignmentVisitor {
 public:
   explicit BasePointerAssignmentFinder(ASTContext *C, ProgramInfo &I) : ABInfo(
-    I.getABoundsInfo()), CR(I, C) {}
+    I.getABoundsInfo()), CR(I, C), C(C) {}
 
   void visitBasePointerAssignment(Expr *LHS, Expr *RHS) override;
 
 private:
   AVarBoundsInfo &ABInfo;
   ConstraintResolver CR;
+  ASTContext *C;
 };
 #endif //LLVM_BASEPOINTERASSIGNMENT_H
