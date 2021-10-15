@@ -24,6 +24,30 @@
 using namespace llvm;
 using namespace clang;
 
+// Represent a rewritten declaration split into three components. For a
+// parameter or local variable declaration, concatenating Type and IType will
+// give the full declaration. For a function return, Type should appear the
+// identifier and parameter list and itype should appear after.
+struct RewrittenDecl {
+  explicit RewrittenDecl() : Type(), IType(), SupplementaryDecl() {}
+  explicit RewrittenDecl(std::string Type, std::string IType,
+                         std::string SupplementaryDecl)
+    : Type(Type), IType(IType), SupplementaryDecl(SupplementaryDecl) {}
+
+  // The type for declaration and the identifier if this is not a return value.
+  std::string Type;
+
+  // The Checked C itype or bounds expressions if required, empty otherwise.
+  std::string IType;
+
+  // A duplicate declaration used to support range bounds. The duplicate
+  // declaration refers to the original in the bounds expression, so it must be
+  // emitted after the original declaration.
+  // e.g., `_Array_ptr<int> a : bounds(__3c_tmp_a, __3c_tmp_a + n)`
+  // If the declaration does not need range bounds, then this string is empty.
+  std::string SupplementaryDecl;
+};
+
 class DeclRewriter {
 public:
   DeclRewriter(Rewriter &R, ASTContext &A, GlobalVariableGroups &GP)
@@ -34,15 +58,15 @@ public:
   // Info parameter are rewritten.
   static void rewriteDecls(ASTContext &Context, ProgramInfo &Info, Rewriter &R);
 
-  static void
-  buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl, std::string &Type,
-                 std::string &IType, ProgramInfo &Info,
-                 ArrayBoundsRewriter &ABR, std::vector<std::string> *SDecls);
 
-  static void
-  buildCheckedDecl(PVConstraint *Defn, DeclaratorDecl *Decl, std::string &Type,
-                   std::string &IType, std::string UseName, ProgramInfo &Info,
-                   ArrayBoundsRewriter &ABR, std::vector<std::string> *SDecls);
+  static RewrittenDecl
+  buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl, ProgramInfo &Info,
+                 ArrayBoundsRewriter &ABR, bool GenerateSDecls);
+
+  static RewrittenDecl
+  buildCheckedDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
+                   std::string UseName, ProgramInfo &Info,
+                   ArrayBoundsRewriter &ABR, bool GenerateSDecls);
 
 private:
   static RecordDecl *LastRecordDecl;
@@ -109,21 +133,19 @@ protected:
   // Get existing itype string from constraint variables.
   std::string getExistingIType(ConstraintVariable *DeclC);
 
-  virtual void buildDeclVar(const FVComponentVariable *CV,
-                            DeclaratorDecl *Decl, std::string &Type,
-                            std::string &IType, std::string UseName,
-                            bool &RewriteGen, bool &RewriteParm,
-                            bool &RewriteRet, bool StaticFunc,
-                            std::vector<std::string> *SDecls);
-  void buildCheckedDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
-                        std::string &Type, std::string &IType,
-                        std::string UseName, bool &RewriteParm,
-                        bool &RewriteRet, std::vector<std::string> *SDecls);
-  void buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
-                      std::string &Type, std::string &IType, bool &RewriteParm,
-                      bool &RewriteRet, std::vector<std::string> *SDecls);
+  virtual RewrittenDecl
+  buildDeclVar(const FVComponentVariable *CV, DeclaratorDecl *Decl,
+               std::string UseName, bool &RewriteGen, bool &RewriteParm,
+               bool &RewriteRet, bool StaticFunc, bool GenerateSDecls);
 
-  bool hasDeclWithTypedef(const FunctionDecl *FD);
+  RewrittenDecl
+  buildCheckedDecl(PVConstraint *Defn, DeclaratorDecl *Decl,
+                   std::string UseName, bool &RewriteParm, bool &RewriteRet,
+                   bool GenerateSDecls);
+
+  RewrittenDecl
+  buildItypeDecl(PVConstraint *Defn, DeclaratorDecl *Decl, bool &RewriteParm,
+                 bool &RewriteRet, bool GenerateSDecls);
 
   bool inParamMultiDecl(const ParmVarDecl *PVD);
 };
