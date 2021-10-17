@@ -6,6 +6,10 @@ set(LLVM_LINK_COMPONENTS
 
 add_clang_library(clangdetecterr
   DetectERR.cpp
+  DetectERRASTConsumer.cpp
+  PersistentSourceLoc.cpp
+  ProjectInfo.cpp
+  Utils.cpp
   LINK_LIBS
   clangAST
   clangAnalysis

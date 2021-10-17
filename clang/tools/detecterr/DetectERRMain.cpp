@@ -24,8 +24,21 @@ using namespace clang::tooling;
 using namespace clang;
 using namespace llvm;
 
+static cl::OptionCategory DetectERRCategory("detecterr options");
+
+static const char *HelpOverview =
+    "detecterr: Automatically detect error handling if statements.\n";
+static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
+
+static cl::opt<bool> OptVerbose("verbose",
+                                cl::desc("Print verbose "
+                                         "information"),
+                                cl::init(false), cl::cat(DetectERRCategory));
+
 
 int main(int argc, const char **argv) {
+  struct DetectERROptions DOpt;
+
   sys::PrintStackTraceOnErrorSignal(argv[0]);
 
   // Initialize targets for clang module support.
@@ -33,5 +46,35 @@ int main(int argc, const char **argv) {
   InitializeAllTargetMCs();
   InitializeAllAsmPrinters();
   InitializeAllAsmParsers();
+
+  // The following code is based on clangTidyMain in
+  // clang-tools-extra/clang-tidy/tool/ClangTidyMain.cpp. Apparently every
+  // LibTooling-based tool is supposed to duplicate it??
+  llvm::Expected<CommonOptionsParser> ExpectedOptionsParser =
+      CommonOptionsParser::create(argc, (const char **)(argv), DetectERRCategory,
+                                  cl::ZeroOrMore, HelpOverview);
+
+  if (!ExpectedOptionsParser) {
+    llvm::errs() << "detecterr: Error(s) parsing command-line arguments:\n"
+                 << llvm::toString(ExpectedOptionsParser.takeError());
+    return 1;
+  }
+
+  CommonOptionsParser &OptionsParser = *ExpectedOptionsParser;
+  // Specifying cl::ZeroOrMore rather than cl::OneOrMore and then checking this
+  // here lets us give a better error message than the default "Must specify at
+  // least 1 positional argument".
+  if (OptionsParser.getSourcePathList().empty()) {
+    llvm::errs() << "detecterr: Error: No source files specified.\n"
+                 << "See: " << argv[0] << " --help\n";
+    return 1;
+  }
+
+  DetectERRInterface DErrInf(DOpt, OptionsParser.getSourcePathList(),
+                             &(OptionsParser.getCompilations()));
+
+  if (DErrInf.parseASTs()) {
+
+  }
 
 }

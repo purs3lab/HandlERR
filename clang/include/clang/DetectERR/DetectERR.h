@@ -15,13 +15,32 @@
 #ifndef LLVM_CLANG_DETECTERR_DETECTERR_H
 #define LLVM_CLANG_DETECTERR_DETECTERR_H
 
+#include "clang/DetectERR/ProjectInfo.h"
 #include "clang/Tooling/CommonOptionsParser.h"
 #include <mutex>
 
-// The main interface exposed by the DetectERR to interact with the tool.
-//
-class DetectERRInterface {
+using namespace clang;
 
+// Future, if we want to pass some options.
+struct DetectERROptions {
+
+};
+
+// The main interface exposed by the DetectERR to interact with the tool.
+class DetectERRInterface {
+public:
+  DetectERRInterface(const struct DetectERROptions &DEopt,
+                     const std::vector<std::string> &SourceFileList,
+                     clang::tooling::CompilationDatabase *CompDB);
+
+  // Parse the asts of all the source files.
+  bool parseASTs();
+
+private:
+  ProjectInfo PInfo;
+  struct DetectERROptions DErrOptions;
+  tooling::CommandLineArguments SourceFiles;
+  tooling::CompilationDatabase *CurrCompDB;
 };
 
 #endif // LLVM_CLANG_DETECTERR_DETECTERR_H
