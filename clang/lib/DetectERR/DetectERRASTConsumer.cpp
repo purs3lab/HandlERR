@@ -48,10 +48,13 @@ public:
         if (!CDNodes.empty()) {
           // We should use all CDs
           // Get the last statement from the list of control dependencies.
-          Stmt *TStmt = (*(CDNodes.back())).getTerminatorStmt();
-          // check if this is an if statement.
-          if (dyn_cast_or_null<IfStmt>(TStmt)) {
-            Info.addErrorGuardingStmt(FID, TStmt);
+          for (auto &CDGNode : CDNodes) {
+            // Collect the possible length bounds keys.
+            Stmt *TStmt = (*(CDNodes.back())).getTerminatorStmt();
+            // check if this is an if statement.
+            if (dyn_cast_or_null<IfStmt>(TStmt)) {
+              Info.addErrorGuardingStmt(FID, TStmt, Context);
+            }
           }
         }
       }
@@ -88,7 +91,7 @@ void DetectERRASTConsumer::handleFuncDecl(ASTContext &C,
 
   FullSourceLoc FL = C.getFullLoc(FD->getBeginLoc());
   if (FL.isValid() && FD->hasBody() && FD->isThisDeclarationADefinition()) {
-    FuncId FID = getFuncID(FD);
+    FuncId FID = getFuncID(FD, &C);
 
     // Call Return NULL visitor.
     ReturnNullVisitor RNV(&C, Info, const_cast<FunctionDecl*>(FD), FID);

@@ -26,6 +26,8 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
+using namespace clang;
+
 class PersistentSourceLoc {
 protected:
   PersistentSourceLoc(std::string F, uint32_t L, uint32_t C, uint32_t E)
@@ -64,6 +66,9 @@ public:
   void print(llvm::raw_ostream &O) const { O << toString(); }
 
   void dump() const { print(llvm::errs()); }
+
+  static PersistentSourceLoc mkPSL(const Decl *D,
+                                   const ASTContext &C);
 
   static PersistentSourceLoc mkPSL(const clang::Stmt *S,
                                    const clang::ASTContext &Context);

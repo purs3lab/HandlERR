@@ -27,7 +27,8 @@ public:
     ErrGuardingConds.clear();
   }
 
-  bool addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *ST);
+  bool addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *ST,
+                            ASTContext *C);
 private:
   // map of function id and set of error guarding conditions.
   std::map<FuncId, std::set<PersistentSourceLoc>> ErrGuardingConds;

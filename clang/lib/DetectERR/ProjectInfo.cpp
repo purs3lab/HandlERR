@@ -10,9 +10,15 @@
 
 #include "clang/DetectERR/ProjectInfo.h"
 
-bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID,
-                                       const clang::Stmt *ST) {
-  bool RetVal = false;
+using namespace clang;
 
+bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID,
+                                       const clang::Stmt *ST,
+                                       ASTContext *C) {
+  bool RetVal = false;
+  PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(ST, *C);
+  if (PSL.valid()) {
+    RetVal = ErrGuardingConds[FID].insert(PSL).second;
+  }
   return RetVal;
 }

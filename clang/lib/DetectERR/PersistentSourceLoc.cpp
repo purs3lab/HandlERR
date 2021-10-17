@@ -13,6 +13,13 @@
 using namespace clang;
 using namespace llvm;
 
+PersistentSourceLoc PersistentSourceLoc::mkPSL(const Decl *D,
+                                               const ASTContext &C) {
+  if (D == nullptr) return PersistentSourceLoc();
+  SourceLocation SL = C.getSourceManager().getExpansionLoc(D->getLocation());
+  return mkPSL(D->getSourceRange(), SL, C);
+}
+
 // Create a PersistentSourceLoc for a Stmt.
 PersistentSourceLoc PersistentSourceLoc::mkPSL(const Stmt *S,
                                                const ASTContext &Context) {

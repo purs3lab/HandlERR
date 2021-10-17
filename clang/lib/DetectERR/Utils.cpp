@@ -3,13 +3,16 @@
 //
 
 #include "clang/DetectERR/Utils.h"
+#include "clang/DetectERR/PersistentSourceLoc.h"
 #include "clang/AST/Expr.h"
 
 using namespace clang;
 
-FuncId getFuncID(const clang::FunctionDecl *FD) {
+FuncId getFuncID(const clang::FunctionDecl *FD, ASTContext *C) {
   FuncId RetFID;
-  // TODO: fill this.
+  auto PSL = PersistentSourceLoc::mkPSL(FD, *C);
+  RetFID.first = FD->getNameAsString();
+  RetFID.second = PSL.getFileName();
   return RetFID;
 }
 

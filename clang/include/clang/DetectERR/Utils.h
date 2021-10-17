@@ -18,8 +18,10 @@ using namespace clang;
 
 typedef std::pair<std::string, std::string> FuncId;
 
-FuncId getFuncID(const clang::FunctionDecl *FD);
+// Get function id for the given function declaration.
+FuncId getFuncID(const clang::FunctionDecl *FD, ASTContext *C);
 
+// Is the expression a NULL pointer expression?
 bool isNULLExpr(const clang::Expr *E, ASTContext &C);
 
 
