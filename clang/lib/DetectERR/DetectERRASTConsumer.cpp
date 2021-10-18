@@ -50,7 +50,7 @@ public:
           // Get the last statement from the list of control dependencies.
           for (auto &CDGNode : CDNodes) {
             // Collect the possible length bounds keys.
-            Stmt *TStmt = (*(CDNodes.back())).getTerminatorStmt();
+            Stmt *TStmt = CDGNode->getTerminatorStmt();
             // check if this is an if statement.
             if (dyn_cast_or_null<IfStmt>(TStmt)) {
               Info.addErrorGuardingStmt(FID, TStmt, Context);
@@ -92,9 +92,18 @@ void DetectERRASTConsumer::handleFuncDecl(ASTContext &C,
   FullSourceLoc FL = C.getFullLoc(FD->getBeginLoc());
   if (FL.isValid() && FD->hasBody() && FD->isThisDeclarationADefinition()) {
     FuncId FID = getFuncID(FD, &C);
-
+    if (Opts.Verbose) {
+      llvm::outs() << "[+] Handling function:" << FID.first << "\n";
+    }
     // Call Return NULL visitor.
     ReturnNullVisitor RNV(&C, Info, const_cast<FunctionDecl*>(FD), FID);
+    if (Opts.Verbose) {
+      llvm::outs() << "[+] Running return NULL handler.\n";
+    }
     RNV.TraverseDecl(const_cast<FunctionDecl*>(FD));
+
+    if (Opts.Verbose) {
+      llvm::outs() << "[+] Finished handling function:" << FID.first << "\n";
+    }
   }
 }

@@ -63,6 +63,16 @@ public:
            std::to_string(ColNoS) + ":" + std::to_string(ColNoE);
   }
 
+  std::string toJsonString() const {
+    return "{\"File\":\"" + FileName + "\", \"LineNo\":" +
+           std::to_string(LineNo) + ", \"ColNo\":" + std::to_string(ColNoS) +
+           "}";
+  }
+
+  void toJsonString(llvm::raw_ostream &O) const {
+    O << toJsonString();
+  }
+
   void print(llvm::raw_ostream &O) const { O << toString(); }
 
   void dump() const { print(llvm::errs()); }

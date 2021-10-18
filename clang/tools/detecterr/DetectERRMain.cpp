@@ -35,6 +35,13 @@ static cl::opt<bool> OptVerbose("verbose",
                                          "information"),
                                 cl::init(false), cl::cat(DetectERRCategory));
 
+static cl::opt<std::string>
+    OptOutputJson("output",
+                       cl::desc("Path to the file where all the stats "
+                                "will be dumped as json"),
+                       cl::init("ErrHandlingBlocks.json"),
+                       cl::cat(DetectERRCategory));
+
 
 int main(int argc, const char **argv) {
   struct DetectERROptions DOpt;
@@ -70,11 +77,27 @@ int main(int argc, const char **argv) {
     return 1;
   }
 
+  // Verbose flag.
+  DOpt.Verbose = OptVerbose;
+
   DetectERRInterface DErrInf(DOpt, OptionsParser.getSourcePathList(),
                              &(OptionsParser.getCompilations()));
 
   if (DErrInf.parseASTs()) {
-
+    llvm::outs() << "[+] Successfully parsed ASTs.\n";
+  } else {
+    llvm::outs() << "[-] Unable to parse ASTs.\n";
   }
 
+  llvm::outs() << "[+] Trying to write error handling information to:"
+               << OptOutputJson << ".\n";
+  std::error_code Ec;
+  llvm::raw_fd_ostream OutputJson(OptOutputJson, Ec);
+  if (!OutputJson.has_error()) {
+    DErrInf.dumpInfo(OutputJson);
+    OutputJson.close();
+    llvm::outs() << "[+] Finished writing to given output file.\n";
+  } else {
+    llvm::outs() << "[-] Error trying to open file:" << OptOutputJson << ".\n";
+  }
 }

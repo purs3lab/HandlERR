@@ -26,37 +26,41 @@ using namespace clang::tooling;
 using namespace clang;
 using namespace llvm;
 
-template <typename T, typename V>
+template <typename T, typename V, typename W>
 class GenericAction : public ASTFrontendAction {
 public:
-  GenericAction(V &I) : Info(I) {}
+  GenericAction(V &I, W &Op) : Info(I), Opts(Op) {}
 
   virtual std::unique_ptr<ASTConsumer>
   CreateASTConsumer(CompilerInstance &Compiler, StringRef InFile) {
-    return std::unique_ptr<ASTConsumer>(new T(Info, &Compiler.getASTContext()));
+    return std::unique_ptr<ASTConsumer>(new T(Info, Opts, &Compiler.getASTContext()));
   }
 
 private:
   V &Info;
+  W &Opts;
 };
 
 template <typename T>
 std::unique_ptr<FrontendActionFactory>
-newFrontendActionFactoryA(ProjectInfo &I) {
+newFrontendActionFactoryA(ProjectInfo &I, struct DetectERROptions &OP) {
   class ArgFrontendActionFactory : public FrontendActionFactory {
   public:
-    explicit ArgFrontendActionFactory(ProjectInfo &I) : Info(I) {}
+    explicit ArgFrontendActionFactory(ProjectInfo &I,
+                                      struct DetectERROptions &OP) : Info(I),
+                                                                     Opts(OP) {}
 
     std::unique_ptr<FrontendAction> create() override {
-      return std::unique_ptr<FrontendAction>(new T(Info));
+      return std::unique_ptr<FrontendAction>(new T(Info, Opts));
     }
 
   private:
     ProjectInfo &Info;
+    struct DetectERROptions &Opts;
   };
 
   return std::unique_ptr<FrontendActionFactory>(
-      new ArgFrontendActionFactory(I));
+      new ArgFrontendActionFactory(I, OP));
 }
 
 DetectERRInterface::DetectERRInterface(const struct DetectERROptions &DEopt,
@@ -78,7 +82,8 @@ bool DetectERRInterface::parseASTs() {
 
   std::unique_ptr<ToolAction> ConstraintTool = newFrontendActionFactoryA<
       GenericAction<DetectERRASTConsumer,
-                    ProjectInfo>>(this->PInfo);
+                    ProjectInfo, struct DetectERROptions>>(this->PInfo,
+                                                           this->DErrOptions);
 
   if (ConstraintTool) {
     Tool->run(ConstraintTool.get());
@@ -88,4 +93,8 @@ bool DetectERRInterface::parseASTs() {
   }
 
   return RetVal;
+}
+
+void DetectERRInterface::dumpInfo(llvm::raw_ostream &O) {
+  this->PInfo.errCondsToJsonString(O);
 }

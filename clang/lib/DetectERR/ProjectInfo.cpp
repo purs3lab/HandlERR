@@ -22,3 +22,31 @@ bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID,
   }
   return RetVal;
 }
+
+std::string ProjectInfo::errCondsToJsonString() const {
+  std::string RetVal = "{\"ErrGuardingConditions\":[";
+  bool AddComma = false;
+  for (auto &FC : ErrGuardingConds) {
+    if (AddComma) {
+      RetVal += ",\n";
+    }
+    RetVal += "{\"FunctionInfo\":{\"Name\":\"" + FC.first.first + "\", \"File\":\"" + FC.first.second + "\"}";
+    RetVal += ",\"ErrConditions\":[";
+    bool AddComma1 = false;
+    for (auto &ED : FC.second) {
+      if (AddComma1) {
+        RetVal += ",";
+      }
+      RetVal += ED.toJsonString();
+      AddComma1 = true;
+    }
+    RetVal += "]}";
+    AddComma = true;
+  }
+  RetVal += "\n]}";
+  return RetVal;
+}
+
+void ProjectInfo::errCondsToJsonString(llvm::raw_ostream &O) const {
+  O << errCondsToJsonString();
+}

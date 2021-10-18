@@ -23,7 +23,7 @@ using namespace clang;
 
 // Future, if we want to pass some options.
 struct DetectERROptions {
-
+  bool Verbose;
 };
 
 // The main interface exposed by the DetectERR to interact with the tool.
@@ -35,6 +35,8 @@ public:
 
   // Parse the asts of all the source files.
   bool parseASTs();
+
+  void dumpInfo(llvm::raw_ostream &O);
 
 private:
   ProjectInfo PInfo;

@@ -29,6 +29,13 @@ public:
 
   bool addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *ST,
                             ASTContext *C);
+
+  // Convert error conditions to json string.
+  std::string errCondsToJsonString() const;
+
+  // Write the detected error conditions to the provided output stream.
+  void errCondsToJsonString(llvm::raw_ostream &O) const;
+
 private:
   // map of function id and set of error guarding conditions.
   std::map<FuncId, std::set<PersistentSourceLoc>> ErrGuardingConds;
