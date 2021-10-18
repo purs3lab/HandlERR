@@ -11,67 +11,11 @@
 
 #include "clang/DetectERR/DetectERRASTConsumer.h"
 #include "clang/DetectERR/Utils.h"
+#include "clang/DetectERR/ReturnVisitors.h"
 #include "clang/Analysis/CFG.h"
-#include "clang/Analysis/Analyses/Dominators.h"
-#include "clang/ASTMatchers/ASTMatchers.h"
-#include <algorithm>
 
 using namespace llvm;
 using namespace clang;
-
-// Condition guarding return NULL is error guarding.
-class ReturnNullVisitor : public RecursiveASTVisitor<ReturnNullVisitor> {
-public:
-  explicit ReturnNullVisitor(ASTContext *Context, ProjectInfo &I,
-                             FunctionDecl *FD,
-                             FuncId &FnID)
-      : Context(Context), Info(I), FnDecl(FD), FID(FnID),
-        Cfg(CFG::buildCFG(nullptr, FD->getBody(),
-                          Context, CFG::BuildOptions())),
-        CDG(Cfg.get()) {
-    for (auto *CBlock : *(Cfg.get())) {
-      for (auto &CfgElem : *CBlock) {
-        if (CfgElem.getKind() == clang::CFGElement::Statement) {
-          const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
-          StMap[TmpSt] = CBlock;
-        }
-      }
-    }
-  }
-
-  bool VisitReturnStmt(ReturnStmt *S) {
-    CFGBlock *CurBB;
-    if (isNULLExpr(S->getRetValue(), *Context)) {
-      if (StMap.find(S) != StMap.end()) {
-        CurBB = StMap[S];
-        auto &CDNodes = CDG.getControlDependencies(CurBB);
-        if (!CDNodes.empty()) {
-          // We should use all CDs
-          // Get the last statement from the list of control dependencies.
-          for (auto &CDGNode : CDNodes) {
-            // Collect the possible length bounds keys.
-            Stmt *TStmt = CDGNode->getTerminatorStmt();
-            // check if this is an if statement.
-            if (dyn_cast_or_null<IfStmt>(TStmt)) {
-              Info.addErrorGuardingStmt(FID, TStmt, Context);
-            }
-          }
-        }
-      }
-    }
-    return true;
-  }
-
-private:
-  ASTContext *Context;
-  ProjectInfo &Info;
-  FunctionDecl *FnDecl;
-  FuncId &FID;
-
-  std::unique_ptr<CFG> Cfg;
-  ControlDependencyCalculator CDG;
-  std::map<const Stmt *, CFGBlock *> StMap;
-};
 
 void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
   TranslationUnitDecl *TUD = C.getTranslationUnitDecl();
@@ -101,6 +45,12 @@ void DetectERRASTConsumer::handleFuncDecl(ASTContext &C,
       llvm::outs() << "[+] Running return NULL handler.\n";
     }
     RNV.TraverseDecl(const_cast<FunctionDecl*>(FD));
+
+    ReturnNegativeNumVisitor RNegV(&C, Info, const_cast<FunctionDecl*>(FD), FID);
+    if (Opts.Verbose) {
+      llvm::outs() << "[+] Running return negative value handler.\n";
+    }
+    RNegV.TraverseDecl(const_cast<FunctionDecl*>(FD));
 
     if (Opts.Verbose) {
       llvm::outs() << "[+] Finished handling function:" << FID.first << "\n";

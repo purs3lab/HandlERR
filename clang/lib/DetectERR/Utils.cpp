@@ -35,3 +35,14 @@ bool isNULLExpr(const clang::Expr *E, ASTContext &C) {
   return Typ->isPointerType() && E->isIntegerConstantExpr(C) &&
          E->isNullPointerConstant(C, Expr::NPC_ValueDependentIsNotNull);
 }
+
+bool isNegativeNumber(const clang::Expr *E, ASTContext &C) {
+  E = removeAuxillaryCasts(E);
+  if (E->isIntegerConstantExpr(C)) {
+    auto NewAPI = E->getIntegerConstantExpr(C);
+    if (NewAPI.hasValue()) {
+      return (NewAPI->getSExtValue() < 0);
+    }
+  }
+  return false;
+}

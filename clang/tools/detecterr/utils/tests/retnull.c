@@ -5,5 +5,5 @@ int* foo(int a) {
       return &a;
     }
   }
-  return NULL;
+  return -1;
 }

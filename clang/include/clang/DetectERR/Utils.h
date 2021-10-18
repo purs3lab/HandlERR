@@ -24,5 +24,8 @@ FuncId getFuncID(const clang::FunctionDecl *FD, ASTContext *C);
 // Is the expression a NULL pointer expression?
 bool isNULLExpr(const clang::Expr *E, ASTContext &C);
 
+// Is the expression a negative integer expression?
+bool isNegativeNumber(const clang::Expr *E, ASTContext &C);
+
 
 #endif //LLVM_CLANG_DETECTERR_UTILS_H
