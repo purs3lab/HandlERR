@@ -13,6 +13,7 @@ add_clang_subdirectory(clang-offload-wrapper)
 add_clang_subdirectory(clang-scan-deps)
 add_clang_subdirectory(3c)
 add_clang_subdirectory(detecterr)
+add_clang_subdirectory(diagcollector)
 add_clang_subdirectory(c-index-test)
 
 add_clang_subdirectory(clang-rename)

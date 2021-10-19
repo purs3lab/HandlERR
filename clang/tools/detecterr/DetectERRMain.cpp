@@ -99,5 +99,7 @@ int main(int argc, const char **argv) {
     llvm::outs() << "[+] Finished writing to given output file.\n";
   } else {
     llvm::outs() << "[-] Error trying to open file:" << OptOutputJson << ".\n";
+    return -1;
   }
+  return 0;
 }
