@@ -12,6 +12,7 @@
 
 #include "llvm/Support/TargetSelect.h"
 #include "clang/Frontend/ASTConsumers.h"
+#include "clang/Frontend/FrontendActions.h"
 #include "clang/Frontend/VerifyDiagnosticConsumer.h"
 #include "clang/Tooling/ArgumentsAdjusters.h"
 #include "clang/Tooling/CommonOptionsParser.h"
@@ -48,17 +49,45 @@ public:
   void HandleDiagnostic(DiagnosticsEngine::Level DiagLevel,
                         const Diagnostic &Info) override {
     SmallString<100> Buf;
+    SourceManager &SM = Info.getSourceManager();
+
     Info.FormatDiagnostic(Buf);
     if (DiagLevel == DiagnosticsEngine::Level::Warning) {
+      OutputStream << "WARNING;Location:";
+      if (Info.getLocation().isValid()) {
+        Info.getLocation().print(OutputStream, SM);
+        OutputStream << ";";
+      }
       OutputStream << Buf.str() << "\n";
     }
     if (DiagLevel == DiagnosticsEngine::Level::Error) {
+      OutputStream << "ERROR;Location:";
+      if (Info.getLocation().isValid()) {
+        Info.getLocation().print(OutputStream, SM);
+        OutputStream << ";";
+      }
       OutputStream << Buf.str() << "\n";
     }
   }
 
 private:
   llvm::raw_ostream &OutputStream;
+};
+
+class GenericAction : public ASTFrontendAction {
+public:
+
+  virtual std::unique_ptr<ASTConsumer>
+  CreateASTConsumer(CompilerInstance &Compiler, StringRef InFile) {
+    return nullptr;
+  }
+};
+
+class ArgFrontendActionFactory : public FrontendActionFactory {
+
+  std::unique_ptr<FrontendAction> create() override {
+    return std::unique_ptr<FrontendAction>(new GenericAction());
+  }
 };
 
 class DummyAction : public ToolAction {
@@ -68,13 +97,6 @@ public:
   }
   virtual ~DummyAction() {
 
-  }
-  bool
-  runInvocation(std::shared_ptr<CompilerInvocation> Invocation,
-                FileManager *Files,
-                std::shared_ptr<PCHContainerOperations> PCHContainerOps,
-                DiagnosticConsumer *DiagConsumer) {
-    return false;
   }
 };
 int main(int argc, const char **argv) {
@@ -119,7 +141,7 @@ int main(int argc, const char **argv) {
     auto *OD = new OutDiagConsumer(OutputTxt);
     auto *FWD = new ForwardingDiagnosticConsumer(*OD);
     Tool->setDiagnosticConsumer(FWD);
-    Tool->run(new DummyAction());
+    Tool->run(newFrontendActionFactory<SyntaxOnlyAction>().get());
   } else {
     llvm::outs() << "[-] Error trying to open file:" << OptOutputTxt << ".\n";
     return 1;
