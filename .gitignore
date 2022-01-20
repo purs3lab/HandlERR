@@ -72,3 +72,7 @@ pythonenv*
 
 # automodapi puts generated documentation files here.
 /lldb/docs/python_api/
+
+# cmake build directory
+/cmake-build-debug
+/cmake-build-release
