@@ -87,4 +87,37 @@ private:
   std::map<const Stmt *, CFGBlock *> StMap;
 };
 
+// Condition guarding return 0 value is error guarding.
+class ReturnZeroVisitor : public RecursiveASTVisitor<ReturnZeroVisitor> {
+public:
+  explicit ReturnZeroVisitor(ASTContext *Context, ProjectInfo &I,
+                                    FunctionDecl *FD,
+                                    FuncId &FnID)
+      : Context(Context), Info(I), FnDecl(FD), FID(FnID),
+        Cfg(CFG::buildCFG(nullptr, FD->getBody(),
+                          Context, CFG::BuildOptions())),
+        CDG(Cfg.get()) {
+    for (auto *CBlock : *(Cfg.get())) {
+      for (auto &CfgElem : *CBlock) {
+        if (CfgElem.getKind() == clang::CFGElement::Statement) {
+          const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
+          StMap[TmpSt] = CBlock;
+        }
+      }
+    }
+  }
+
+  bool VisitReturnStmt(ReturnStmt *S);
+
+private:
+  ASTContext *Context;
+  ProjectInfo &Info;
+  FunctionDecl *FnDecl;
+  FuncId &FID;
+
+  std::unique_ptr<CFG> Cfg;
+  ControlDependencyCalculator CDG;
+  std::map<const Stmt *, CFGBlock *> StMap;
+};
+
 #endif //LLVM_CLANG_DETECTERR_RETURNVISITORS_H

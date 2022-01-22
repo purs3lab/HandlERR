@@ -46,3 +46,12 @@ bool isNegativeNumber(const clang::Expr *E, ASTContext &C) {
   }
   return false;
 }
+
+/// Checks if the expression is Zero
+bool isZero(const clang::Expr *E, ASTContext &C){
+  E = removeAuxillaryCasts(E);
+  if(auto res = dyn_cast<IntegerLiteral>(E)){
+    return res->getValue().getSExtValue() == 0;
+  }
+  return false;
+}

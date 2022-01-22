@@ -39,18 +39,27 @@ void DetectERRASTConsumer::handleFuncDecl(ASTContext &C,
     if (Opts.Verbose) {
       llvm::outs() << "[+] Handling function:" << FID.first << "\n";
     }
-    // Call Return NULL visitor.
+
+    // Return NULL visitor.
     ReturnNullVisitor RNV(&C, Info, const_cast<FunctionDecl*>(FD), FID);
     if (Opts.Verbose) {
       llvm::outs() << "[+] Running return NULL handler.\n";
     }
     RNV.TraverseDecl(const_cast<FunctionDecl*>(FD));
 
+    // Return Negative Number Visitor
     ReturnNegativeNumVisitor RNegV(&C, Info, const_cast<FunctionDecl*>(FD), FID);
     if (Opts.Verbose) {
       llvm::outs() << "[+] Running return negative value handler.\n";
     }
     RNegV.TraverseDecl(const_cast<FunctionDecl*>(FD));
+
+    // Return 0 visitor
+    ReturnZeroVisitor RZV(&C, Info, const_cast<FunctionDecl*>(FD), FID);
+    if(Opts.Verbose){
+      llvm::outs() << "[+] Running return zero handler.\n";
+    }
+    RZV.TraverseDecl(const_cast<FunctionDecl*>(FD));
 
     if (Opts.Verbose) {
       llvm::outs() << "[+] Finished handling function:" << FID.first << "\n";

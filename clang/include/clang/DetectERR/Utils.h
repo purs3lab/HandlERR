@@ -27,5 +27,7 @@ bool isNULLExpr(const clang::Expr *E, ASTContext &C);
 // Is the expression a negative integer expression?
 bool isNegativeNumber(const clang::Expr *E, ASTContext &C);
 
+// Is the expression a zero
+bool isZero(const clang::Expr *E, ASTContext &C);
 
 #endif //LLVM_CLANG_DETECTERR_UTILS_H
