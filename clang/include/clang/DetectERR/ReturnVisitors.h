@@ -8,11 +8,11 @@
 // This class represents all the visitors dealing with return statements.
 //===----------------------------------------------------------------------===//
 
+#include "clang/ASTMatchers/ASTMatchers.h"
+#include "clang/Analysis/Analyses/Dominators.h"
+#include "clang/Analysis/CFG.h"
 #include "clang/DetectERR/DetectERRASTConsumer.h"
 #include "clang/DetectERR/Utils.h"
-#include "clang/Analysis/CFG.h"
-#include "clang/Analysis/Analyses/Dominators.h"
-#include "clang/ASTMatchers/ASTMatchers.h"
 #include <algorithm>
 
 using namespace llvm;
@@ -25,11 +25,10 @@ using namespace clang;
 class ReturnNullVisitor : public RecursiveASTVisitor<ReturnNullVisitor> {
 public:
   explicit ReturnNullVisitor(ASTContext *Context, ProjectInfo &I,
-                             FunctionDecl *FD,
-                             FuncId &FnID)
+                             FunctionDecl *FD, FuncId &FnID)
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
-        Cfg(CFG::buildCFG(nullptr, FD->getBody(),
-                          Context, CFG::BuildOptions())),
+        Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
+                          CFG::BuildOptions())),
         CDG(Cfg.get()) {
     for (auto *CBlock : *(Cfg.get())) {
       for (auto &CfgElem : *CBlock) {
@@ -55,14 +54,14 @@ private:
 };
 
 // Condition guarding return negative value is error guarding.
-class ReturnNegativeNumVisitor : public RecursiveASTVisitor<ReturnNegativeNumVisitor> {
+class ReturnNegativeNumVisitor
+    : public RecursiveASTVisitor<ReturnNegativeNumVisitor> {
 public:
   explicit ReturnNegativeNumVisitor(ASTContext *Context, ProjectInfo &I,
-                                    FunctionDecl *FD,
-                                    FuncId &FnID)
+                                    FunctionDecl *FD, FuncId &FnID)
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
-        Cfg(CFG::buildCFG(nullptr, FD->getBody(),
-                          Context, CFG::BuildOptions())),
+        Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
+                          CFG::BuildOptions())),
         CDG(Cfg.get()) {
     for (auto *CBlock : *(Cfg.get())) {
       for (auto &CfgElem : *CBlock) {
@@ -91,11 +90,10 @@ private:
 class ReturnZeroVisitor : public RecursiveASTVisitor<ReturnZeroVisitor> {
 public:
   explicit ReturnZeroVisitor(ASTContext *Context, ProjectInfo &I,
-                                    FunctionDecl *FD,
-                                    FuncId &FnID)
+                             FunctionDecl *FD, FuncId &FnID)
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
-        Cfg(CFG::buildCFG(nullptr, FD->getBody(),
-                          Context, CFG::BuildOptions())),
+        Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
+                          CFG::BuildOptions())),
         CDG(Cfg.get()) {
     for (auto *CBlock : *(Cfg.get())) {
       for (auto &CfgElem : *CBlock) {
@@ -117,6 +115,39 @@ private:
 
   std::unique_ptr<CFG> Cfg;
   ControlDependencyCalculator CDG;
+  std::map<const Stmt *, CFGBlock *> StMap;
+};
+
+// Condition guarding return 0 value is error guarding.
+class ReturnValVisitor : public RecursiveASTVisitor<ReturnValVisitor> {
+public:
+  explicit ReturnValVisitor(ASTContext *Context, ProjectInfo &I,
+                            FunctionDecl *FD, FuncId &FnID)
+      : Context(Context), Info(I), FnDecl(FD), FID(FnID),
+        Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
+                          CFG::BuildOptions())),
+        CDG(Cfg.get()), DomTree(Cfg.get()) {
+    for (auto *CBlock : *(Cfg.get())) {
+      for (auto &CfgElem : *CBlock) {
+        if (CfgElem.getKind() == clang::CFGElement::Statement) {
+          const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
+          StMap[TmpSt] = CBlock;
+        }
+      }
+    }
+  }
+
+  bool VisitReturnStmt(ReturnStmt *S);
+
+private:
+  ASTContext *Context;
+  ProjectInfo &Info;
+  FunctionDecl *FnDecl;
+  FuncId &FID;
+
+  std::unique_ptr<CFG> Cfg;
+  ControlDependencyCalculator CDG;
+  CFGDomTree DomTree;
   std::map<const Stmt *, CFGBlock *> StMap;
 };
 

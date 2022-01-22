@@ -10,9 +10,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/DetectERR/DetectERRASTConsumer.h"
-#include "clang/DetectERR/Utils.h"
-#include "clang/DetectERR/ReturnVisitors.h"
 #include "clang/Analysis/CFG.h"
+#include "clang/DetectERR/ReturnVisitors.h"
+#include "clang/DetectERR/Utils.h"
 
 using namespace llvm;
 using namespace clang;
@@ -41,25 +41,33 @@ void DetectERRASTConsumer::handleFuncDecl(ASTContext &C,
     }
 
     // Return NULL visitor.
-    ReturnNullVisitor RNV(&C, Info, const_cast<FunctionDecl*>(FD), FID);
+    ReturnNullVisitor RNV(&C, Info, const_cast<FunctionDecl *>(FD), FID);
     if (Opts.Verbose) {
       llvm::outs() << "[+] Running return NULL handler.\n";
     }
-    RNV.TraverseDecl(const_cast<FunctionDecl*>(FD));
+    RNV.TraverseDecl(const_cast<FunctionDecl *>(FD));
 
     // Return Negative Number Visitor
-    ReturnNegativeNumVisitor RNegV(&C, Info, const_cast<FunctionDecl*>(FD), FID);
+    ReturnNegativeNumVisitor RNegV(&C, Info, const_cast<FunctionDecl *>(FD),
+                                   FID);
     if (Opts.Verbose) {
       llvm::outs() << "[+] Running return negative value handler.\n";
     }
-    RNegV.TraverseDecl(const_cast<FunctionDecl*>(FD));
+    RNegV.TraverseDecl(const_cast<FunctionDecl *>(FD));
 
     // Return 0 visitor
-    ReturnZeroVisitor RZV(&C, Info, const_cast<FunctionDecl*>(FD), FID);
-    if(Opts.Verbose){
+    ReturnZeroVisitor RZV(&C, Info, const_cast<FunctionDecl *>(FD), FID);
+    if (Opts.Verbose) {
       llvm::outs() << "[+] Running return zero handler.\n";
     }
-    RZV.TraverseDecl(const_cast<FunctionDecl*>(FD));
+    RZV.TraverseDecl(const_cast<FunctionDecl *>(FD));
+
+    // Return val visitor
+    ReturnValVisitor RVV(&C, Info, const_cast<FunctionDecl *>(FD), FID);
+    if (Opts.Verbose) {
+      llvm::outs() << "[+] Running return val handler.\n";
+    }
+    RVV.TraverseDecl(const_cast<FunctionDecl *>(FD));
 
     if (Opts.Verbose) {
       llvm::outs() << "[+] Finished handling function:" << FID.first << "\n";
