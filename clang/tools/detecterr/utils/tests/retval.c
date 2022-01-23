@@ -7,3 +7,11 @@ int *bar(int a) {
   }
   return x;
 }
+
+int *baz(int a) {
+  int *x = NULL;
+  if (!x) {
+    x = malloc(sizeof(int));
+  }
+  return x;
+}

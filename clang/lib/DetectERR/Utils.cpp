@@ -3,8 +3,8 @@
 //
 
 #include "clang/DetectERR/Utils.h"
-#include "clang/DetectERR/PersistentSourceLoc.h"
 #include "clang/AST/Expr.h"
+#include "clang/DetectERR/PersistentSourceLoc.h"
 
 using namespace clang;
 
@@ -47,11 +47,23 @@ bool isNegativeNumber(const clang::Expr *E, ASTContext &C) {
   return false;
 }
 
-/// Checks if the expression is Zero
-bool isZero(const clang::Expr *E, ASTContext &C){
+/// Is the expression a zero
+bool isZero(const clang::Expr *E, ASTContext &C) {
   E = removeAuxillaryCasts(E);
-  if(auto res = dyn_cast<IntegerLiteral>(E)){
+  if (auto res = dyn_cast<IntegerLiteral>(E)) {
     return res->getValue().getSExtValue() == 0;
   }
   return false;
+}
+
+/// Checks if the expression is a variable
+bool isDeclExpr(const clang::Expr *E) {
+  E = removeAuxillaryCasts(E);
+  return dyn_cast<DeclRefExpr>(E) != nullptr;
+}
+
+DeclRefExpr *getDeclRefExpr(const clang::Expr *E) {
+  E = removeAuxillaryCasts(E);
+  DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E);
+  return DRE;
 }

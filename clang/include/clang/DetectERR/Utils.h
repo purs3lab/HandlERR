@@ -8,8 +8,8 @@
 // Type declarations for map data structures and other general helper methods.
 //===----------------------------------------------------------------------===//
 
-#include "clang/AST/Decl.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 
 #ifndef LLVM_CLANG_DETECTERR_UTILS_H
 #define LLVM_CLANG_DETECTERR_UTILS_H
@@ -27,7 +27,13 @@ bool isNULLExpr(const clang::Expr *E, ASTContext &C);
 // Is the expression a negative integer expression?
 bool isNegativeNumber(const clang::Expr *E, ASTContext &C);
 
-// Is the expression a zero
+/// Is the expression a zero
 bool isZero(const clang::Expr *E, ASTContext &C);
+
+/// Is the expression is a variable
+bool isDeclExpr(const clang::Expr *E);
+
+/// Get the underlying DeclRefExpr
+DeclRefExpr *getDeclRefExpr(const clang::Expr *E);
 
 #endif //LLVM_CLANG_DETECTERR_UTILS_H
