@@ -62,6 +62,11 @@ bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *S) {
 
 /// H05 - if a "return 0" statement is control dependent upon one or more
 /// "if" checks AND the return type of the function is a pointer type
+///
+/// Conditions:
+/// - function has pointer return type
+/// - return stmt returns a zero
+/// - the return stmt is dominated by one or more checks
 bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *S) {
   // is the return type a pointer type?
   if (FnDecl->getReturnType()->isPointerType()) {
@@ -116,14 +121,13 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
       // is a IfStmt and the condition of that IfStmt is a NULL check
       // against the value being returned
 
-      // TODO: shank
       // Tasks:
       // [x] return stmt is a 'return var'
       // [x] find dominator nodes
       // [x] terminator stmt of dominator block is and if check
       // [x] the if check is a 'var != NULL'
 
-      // [x] return stmt is a 'return var'
+      // return stmt is a 'return var'
       if (isDeclExpr(S->getRetValue())) { // return val
         CurBB = StMap[S];
 
@@ -133,7 +137,7 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
         const NamedDecl *returnNamedDecl =
             returnDRE->getFoundDecl()->getUnderlyingDecl();
 
-        // [x] find dominator nodes
+        // find dominator nodes:
         // iterate over all blocks to find which nodes dominate this one
         for (auto &otherBB : *Cfg.get()) {
           if (DomTree.properlyDominates(otherBB, CurBB)) {
