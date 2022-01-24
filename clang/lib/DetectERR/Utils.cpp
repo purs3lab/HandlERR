@@ -62,8 +62,8 @@ bool isDeclExpr(const clang::Expr *E) {
   return dyn_cast<DeclRefExpr>(E) != nullptr;
 }
 
-DeclRefExpr *getDeclRefExpr(const clang::Expr *E) {
-  E = removeAuxillaryCasts(E);
-  DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E);
-  return DRE;
+const DeclRefExpr *getDeclRefExpr(const clang::Expr *E) {
+  auto *Exp = removeAuxillaryCasts(E);
+  // Exp->dump();
+  return dyn_cast<DeclRefExpr>(Exp);
 }
