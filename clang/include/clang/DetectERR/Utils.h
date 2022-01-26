@@ -34,6 +34,6 @@ bool isZero(const clang::Expr *E, ASTContext &C);
 bool isDeclExpr(const clang::Expr *E);
 
 /// Get the underlying DeclRefExpr
-DeclRefExpr *getDeclRefExpr(const clang::Expr *E);
+const DeclRefExpr *getDeclRefExpr(const clang::Expr *E);
 
 #endif //LLVM_CLANG_DETECTERR_UTILS_H

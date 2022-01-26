@@ -62,6 +62,11 @@ bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *S) {
 
 /// H05 - if a "return 0" statement is control dependent upon one or more
 /// "if" checks AND the return type of the function is a pointer type
+///
+/// Conditions:
+/// - function has pointer return type
+/// - return stmt returns a zero
+/// - the return stmt is dominated by one or more checks
 bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *S) {
   // is the return type a pointer type?
   if (FnDecl->getReturnType()->isPointerType()) {
@@ -116,18 +121,23 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
       // is a IfStmt and the condition of that IfStmt is a NULL check
       // against the value being returned
 
-      // TODO: shank
       // Tasks:
       // [x] return stmt is a 'return var'
       // [x] find dominator nodes
       // [x] terminator stmt of dominator block is and if check
       // [x] the if check is a 'var != NULL'
 
-      // [x] return stmt is a 'return var'
+      // return stmt is a 'return var'
       if (isDeclExpr(S->getRetValue())) { // return val
         CurBB = StMap[S];
 
-        // [x] find dominator nodes
+        // store the underlying NamedDecl for comparing against later
+        const Expr *E = S->getRetValue();
+        const DeclRefExpr *returnDRE = getDeclRefExpr(E);
+        const NamedDecl *returnNamedDecl =
+            returnDRE->getFoundDecl()->getUnderlyingDecl();
+
+        // find dominator nodes:
         // iterate over all blocks to find which nodes dominate this one
         for (auto &otherBB : *Cfg.get()) {
           if (DomTree.properlyDominates(otherBB, CurBB)) {
@@ -135,27 +145,26 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
             if (IfStmt *ifCheck = dyn_cast_or_null<IfStmt>(TStmt)) {
               Expr *cond = ifCheck->getCond();
 
-              NamedDecl *nd = nullptr;
               // cond: x != NULL
               if (BinaryOperator *bin = dyn_cast<BinaryOperator>(cond)) {
-                DeclRefExpr *declRefExpr = nullptr;
+                Expr *declRefExpr = nullptr;
 
                 if (isNULLExpr(bin->getLHS(), *Context)) {
-                  llvm::outs() << "lhs is null expr\n";
-                  declRefExpr = dyn_cast<DeclRefExpr>(bin->getRHS());
+                  // llvm::outs() << "lhs is null\n";
+                  declRefExpr = bin->getRHS();
 
                 } else if (isNULLExpr(bin->getRHS(), *Context)) {
-                  llvm::outs() << "rhs is null expr\n";
-                  declRefExpr = dyn_cast<DeclRefExpr>(bin->getLHS());
+                  // llvm::outs() << "rhs is null\n";
+                  declRefExpr = bin->getLHS();
                 }
 
                 if (declRefExpr) {
-                  nd = declRefExpr->getFoundDecl()->getUnderlyingDecl();
+                  const DeclRefExpr *checkedDRE = getDeclRefExpr(declRefExpr);
+                  auto checkedNamedDecl =
+                      checkedDRE->getFoundDecl()->getUnderlyingDecl();
 
                   // check this against the NamedDecl for the return stmt
-                  Expr *E = S->getRetValue();
-                  DeclRefExpr *DRE = getDeclRefExpr(E);
-                  if (nd == DRE->getFoundDecl()->getUnderlyingDecl()) {
+                  if (returnNamedDecl == checkedNamedDecl) {
                     Info.addErrorGuardingStmt(FID, TStmt, Context);
                   }
                 }
