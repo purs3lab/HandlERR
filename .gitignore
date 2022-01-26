@@ -76,3 +76,5 @@ pythonenv*
 # cmake build directory
 /cmake-build-debug
 /cmake-build-release
+
+llvm/.clion.source.upload.marker
