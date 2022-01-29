@@ -113,7 +113,7 @@ bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *S) {
 /// - there is a check for this returned variable which dominates the return
 ///     stmt but the return is not control dependent on the check
 bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
-  CFGBlock *CurBB;
+  CFGBlock *ReturnBB;
   if (FnDecl->getReturnType()->isPointerType()) {  // return type = pointer
     if (!isNULLExpr(S->getRetValue(), *Context)) { // not return NULL
       // find all the blocks that dominate the exit block (containing the return stmt)
@@ -129,21 +129,21 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
 
       // return stmt is a 'return var'
       if (isDeclExpr(S->getRetValue())) { // return val
-        CurBB = StMap[S];
+        ReturnBB = StMap[S];
 
         // store the underlying NamedDecl for comparing against later
         const Expr *E = S->getRetValue();
-        const DeclRefExpr *returnDRE = getDeclRefExpr(E);
-        const NamedDecl *returnNamedDecl =
+        const DeclRefExpr *ReturnDRE = getDeclRefExpr(E);
+        const NamedDecl *ReturnNamedDecl =
             returnDRE->getFoundDecl()->getUnderlyingDecl();
 
         // find dominator nodes:
         // iterate over all blocks to find which nodes dominate this one
-        for (auto &otherBB : *Cfg.get()) {
-          if (DomTree.properlyDominates(otherBB, CurBB)) {
-            Stmt *TStmt = otherBB->getTerminatorStmt();
-            if (IfStmt *ifCheck = dyn_cast_or_null<IfStmt>(TStmt)) {
-              Expr *cond = ifCheck->getCond();
+        for (auto &CurrBB : *Cfg.get()) {
+          if (DomTree.properlyDominates(CurrBB, ReturnBB)) {
+            Stmt *TStmt = CurrBB->getTerminatorStmt();
+            if (IfStmt *IfCheck = dyn_cast_or_null<IfStmt>(TStmt)) {
+              Expr *Cond = ifCheck->getCond();
 
               // cond: x != NULL
               if (BinaryOperator *bin = dyn_cast<BinaryOperator>(cond)) {
@@ -169,6 +169,13 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
                   }
                 }
               }
+
+              // cond: no assignment to the underlying value in any of the post-dominators
+              // for the current node
+              //
+              // 'CurrBB' is the BB that contains the if condition
+              // we need to consider all post-dominator BB of 'CurrBB'
+
             }
           }
         }
