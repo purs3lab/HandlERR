@@ -135,7 +135,7 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
         const Expr *E = S->getRetValue();
         const DeclRefExpr *ReturnDRE = getDeclRefExpr(E);
         const NamedDecl *ReturnNamedDecl =
-            returnDRE->getFoundDecl()->getUnderlyingDecl();
+            ReturnDRE->getFoundDecl()->getUnderlyingDecl();
 
         // find dominator nodes:
         // iterate over all blocks to find which nodes dominate this one
@@ -143,38 +143,83 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
           if (DomTree.properlyDominates(CurrBB, ReturnBB)) {
             Stmt *TStmt = CurrBB->getTerminatorStmt();
             if (IfStmt *IfCheck = dyn_cast_or_null<IfStmt>(TStmt)) {
-              Expr *Cond = ifCheck->getCond();
+              Expr *Cond = IfCheck->getCond();
 
               // cond: x != NULL
-              if (BinaryOperator *bin = dyn_cast<BinaryOperator>(cond)) {
-                Expr *declRefExpr = nullptr;
+              if (BinaryOperator *BinaryOp = dyn_cast<BinaryOperator>(Cond)) {
+                Expr *DRE = nullptr;
 
-                if (isNULLExpr(bin->getLHS(), *Context)) {
-                  // llvm::outs() << "lhs is null\n";
-                  declRefExpr = bin->getRHS();
+                if (isNULLExpr(BinaryOp->getLHS(), *Context)) {
+                  DRE = BinaryOp->getRHS();
 
-                } else if (isNULLExpr(bin->getRHS(), *Context)) {
-                  // llvm::outs() << "rhs is null\n";
-                  declRefExpr = bin->getLHS();
+                } else if (isNULLExpr(BinaryOp->getRHS(), *Context)) {
+                  DRE = BinaryOp->getLHS();
                 }
 
-                if (declRefExpr) {
-                  const DeclRefExpr *checkedDRE = getDeclRefExpr(declRefExpr);
-                  auto checkedNamedDecl =
-                      checkedDRE->getFoundDecl()->getUnderlyingDecl();
+                if (DRE) {
+                  const DeclRefExpr *CheckedDRE = getDeclRefExpr(DRE);
+                  const auto *CheckedNamedDecl =
+                      CheckedDRE->getFoundDecl()->getUnderlyingDecl();
 
                   // check this against the NamedDecl for the return stmt
-                  if (returnNamedDecl == checkedNamedDecl) {
-                    Info.addErrorGuardingStmt(FID, TStmt, Context);
+                  if (ReturnNamedDecl == CheckedNamedDecl) {
+
+                    // now check that there was no assignment in between the return and
+                    // the error check
+
+                    // cond: no assignment to the underlying value in any of the post-dominators
+                    // for the current node
+                    //
+                    // 'CurrBB' is the BB that contains the if condition
+                    // we need to consider all post-dominator BB of 'CurrBB'
+                    //
+                    // - get post-dominated blocks
+                    // -
+
+                    bool updated = false;
+
+                    const auto *PostDomTree = &CDG.getCFGPostDomTree();
+                    for (CFGBlock *OtherBB : *Cfg.get()) {
+                      if(updated){
+                        break;
+                      }
+                      if (PostDomTree->properlyDominates(OtherBB, CurrBB)) {
+                        for (CFGElement &CFGElem : *OtherBB) {
+                          if(updated){
+                            break;
+                          }
+                          if(CFGElem.getKind() == CFGElement::Kind::Statement){
+                            const Stmt *CurrStmt = CFGElem.getAs<CFGStmt>()->getStmt();
+                            if(const BinaryOperator *BinOp = dyn_cast<BinaryOperator>(CurrStmt)){
+                              if (BinOp->getOpcode() == BinaryOperator::Opcode::BO_Assign){
+                                const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(BinOp->getLHS());
+                                if (DRE) {
+                                  const DeclRefExpr *UpdatedDRE = getDeclRefExpr(DRE);
+                                  const auto *UpdatedNamedDecl =
+                                      UpdatedDRE->getFoundDecl()->getUnderlyingDecl();
+
+                                  // check this against the NamedDecl for the return stmt
+                                  if (ReturnNamedDecl == UpdatedNamedDecl) {
+                                    // skip this in case of update
+                                    updated = true;
+                                    continue;
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+
+                    // finally, note the guarding statement
+                    if(!updated){
+                      llvm::errs() << "not updated, adding error guarding stmt\n";
+                      Info.addErrorGuardingStmt(FID, TStmt, Context);
+                    }
                   }
                 }
               }
-
-              // cond: no assignment to the underlying value in any of the post-dominators
-              // for the current node
-              //
-              // 'CurrBB' is the BB that contains the if condition
-              // we need to consider all post-dominator BB of 'CurrBB'
 
             }
           }

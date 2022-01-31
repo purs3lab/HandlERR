@@ -50,8 +50,8 @@ bool isNegativeNumber(const clang::Expr *E, ASTContext &C) {
 /// Is the expression a zero
 bool isZero(const clang::Expr *E, ASTContext &C) {
   E = removeAuxillaryCasts(E);
-  if (auto res = dyn_cast<IntegerLiteral>(E)) {
-    return res->getValue().getSExtValue() == 0;
+  if (const auto *Res = dyn_cast<IntegerLiteral>(E)) {
+    return Res->getValue().getSExtValue() == 0;
   }
   return false;
 }
