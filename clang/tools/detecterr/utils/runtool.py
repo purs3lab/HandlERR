@@ -127,7 +127,7 @@ def convert_project(build_dirs):
         print(f"[+] converting project {d}")
         if "compile_commands.json" in os.listdir(d):
             print("[+] compile_commands.json found")
-            print("[+] running convert_project.py")
+            print(f"[+] running {convert_project_bin}")
             subprocess.check_call(
                 f"{convert_project_bin} -dr -pr {d} -p {PROG_PATH}", shell=True)
         else:
