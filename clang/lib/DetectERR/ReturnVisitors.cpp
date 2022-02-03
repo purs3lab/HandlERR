@@ -90,7 +90,6 @@ bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *S) {
   }
   return true;
 }
-
 /// H06 - a "return <val>" statement is dominated by a check for that particular
 /// value but is not control dependent on the check
 ///
@@ -166,61 +165,19 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
 
                     // now check that there was no assignment in between the return and
                     // the error check
-
-                    // cond: no assignment to the underlying value in any of the post-dominators
-                    // for the current node
-                    //
-                    // 'CurrBB' is the BB that contains the if condition
-                    // we need to consider all post-dominator BB of 'CurrBB'
-                    //
-                    // - get post-dominated blocks
-                    // -
-
-                    bool updated = false;
-
-                    const auto *PostDomTree = &CDG.getCFGPostDomTree();
-                    for (CFGBlock *OtherBB : *Cfg.get()) {
-                      if(updated){
-                        break;
-                      }
-                      if (PostDomTree->properlyDominates(OtherBB, CurrBB)) {
-                        for (CFGElement &CFGElem : *OtherBB) {
-                          if(updated){
-                            break;
-                          }
-                          if(CFGElem.getKind() == CFGElement::Kind::Statement){
-                            const Stmt *CurrStmt = CFGElem.getAs<CFGStmt>()->getStmt();
-                            if(const BinaryOperator *BinOp = dyn_cast<BinaryOperator>(CurrStmt)){
-                              if (BinOp->getOpcode() == BinaryOperator::Opcode::BO_Assign){
-                                const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(BinOp->getLHS());
-                                if (DRE) {
-                                  const DeclRefExpr *UpdatedDRE = getDeclRefExpr(DRE);
-                                  const auto *UpdatedNamedDecl =
-                                      UpdatedDRE->getFoundDecl()->getUnderlyingDecl();
-
-                                  // check this against the NamedDecl for the return stmt
-                                  if (ReturnNamedDecl == UpdatedNamedDecl) {
-                                    // skip this in case of update
-                                    updated = true;
-                                    continue;
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
+                    bool IsUpdated = isUpdatedInPostDominators(
+                        ReturnNamedDecl, *CurrBB, &CDG.getCFGPostDomTree(),
+                        *Cfg.get());
 
                     // finally, note the guarding statement
-                    if(!updated){
-                      llvm::errs() << "not updated, adding error guarding stmt\n";
+                    if (!IsUpdated) {
+                      llvm::errs()
+                          << "not updated, adding error guarding stmt\n";
                       Info.addErrorGuardingStmt(FID, TStmt, Context);
                     }
                   }
                 }
               }
-
             }
           }
         }

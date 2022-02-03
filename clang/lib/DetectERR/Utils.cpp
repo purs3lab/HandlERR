@@ -5,6 +5,7 @@
 #include "clang/DetectERR/Utils.h"
 #include "clang/AST/Expr.h"
 #include "clang/DetectERR/PersistentSourceLoc.h"
+#include "clang/Analysis/CFG.h"
 
 using namespace clang;
 
@@ -67,3 +68,39 @@ const DeclRefExpr *getDeclRefExpr(const clang::Expr *E) {
   // Exp->dump();
   return dyn_cast<DeclRefExpr>(Exp);
 }
+
+bool isUpdatedInPostDominators(const NamedDecl *ND, CFGBlock &CurrBB, const CFGPostDomTree* PDTree, const CFG &Cfg){
+  // iterate over all the BasicBlocks of the given CFG
+  for (CFGBlock *OtherBB : Cfg) {
+
+    // if the OtherBB properly dominates the CurrBB
+    if (PDTree->properlyDominates(OtherBB, &CurrBB)) {
+
+      // iterate over all the statements in the OtherBB
+      for (CFGElement &CFGElem : *OtherBB) {
+
+        // we only care about Statements as the assignment would be done as part of a Statement
+        if(CFGElem.getKind() == CFGElement::Kind::Statement){
+          const Stmt *CurrStmt = CFGElem.getAs<CFGStmt>()->getStmt();
+          if(const BinaryOperator *BinOp = dyn_cast<BinaryOperator>(CurrStmt)){
+            if (BinOp->getOpcode() == BinaryOperator::Opcode::BO_Assign){
+              const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(BinOp->getLHS());
+              if (DRE) {
+                const DeclRefExpr *UpdatedDRE = getDeclRefExpr(DRE);
+                const auto *UpdatedNamedDecl =
+                    UpdatedDRE->getFoundDecl()->getUnderlyingDecl();
+
+                // check this against the NamedDecl for the return stmt
+                if (ND == UpdatedNamedDecl) {
+                  return true;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+

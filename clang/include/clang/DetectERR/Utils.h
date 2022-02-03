@@ -10,6 +10,7 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
+#include "clang/Analysis/Analyses/Dominators.h"
 
 #ifndef LLVM_CLANG_DETECTERR_UTILS_H
 #define LLVM_CLANG_DETECTERR_UTILS_H
@@ -35,5 +36,9 @@ bool isDeclExpr(const clang::Expr *E);
 
 /// Get the underlying DeclRefExpr
 const DeclRefExpr *getDeclRefExpr(const clang::Expr *E);
+
+/// Checks whether a particular variable (Decl) has been updated anywhere
+/// in the Post-Dominator BasicBlocks of a particular BasicBlock
+bool isUpdatedInPostDominators(const NamedDecl *ND, CFGBlock &CurrBB, const CFGPostDomTree* PDTree, const CFG &Cfg);
 
 #endif //LLVM_CLANG_DETECTERR_UTILS_H

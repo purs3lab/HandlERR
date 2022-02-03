@@ -2,6 +2,7 @@
 
 int *baz(int a){
   int *x = NULL;
+  // should not be included
   if (x != NULL) {
     x = malloc(sizeof(int));
   }
@@ -11,6 +12,7 @@ int *baz(int a){
 
 int *foo(int a) {
   int *x = NULL;
+  // should be included
   if (x != NULL) {
     x = malloc(sizeof(int));
   }
@@ -19,6 +21,7 @@ int *foo(int a) {
 
 int *bar(int a) {
   int *x = NULL;
+  // should be included
   if (!x) {
     x = malloc(sizeof(int));
   }
