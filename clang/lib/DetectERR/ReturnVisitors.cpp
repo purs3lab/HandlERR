@@ -15,20 +15,22 @@
 /// H04 - if a "return NULL" statement is control dependent upon one or more
 /// "if" checks
 bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *S) {
-  CFGBlock *CurBB;
-  if (isNULLExpr(S->getRetValue(), *Context)) {
-    if (StMap.find(S) != StMap.end()) {
-      CurBB = StMap[S];
-      auto &CDNodes = CDG.getControlDependencies(CurBB);
-      if (!CDNodes.empty()) {
-        // We should use all CDs
-        // Get the last statement from the list of control dependencies.
-        for (auto &CDGNode : CDNodes) {
-          // Collect the possible length bounds keys.
-          Stmt *TStmt = CDGNode->getTerminatorStmt();
-          // check if this is an if statement.
-          if (dyn_cast_or_null<IfStmt>(TStmt)) {
-            Info.addErrorGuardingStmt(FID, TStmt, Context);
+  if (FnDecl->getReturnType()->isPointerType()) {
+    CFGBlock *CurBB;
+    if (isNULLExpr(S->getRetValue(), *Context)) {
+      if (StMap.find(S) != StMap.end()) {
+        CurBB = StMap[S];
+        auto &CDNodes = CDG.getControlDependencies(CurBB);
+        if (!CDNodes.empty()) {
+          // We should use all CDs
+          // Get the last statement from the list of control dependencies.
+          for (auto &CDGNode : CDNodes) {
+            // Collect the possible length bounds keys.
+            Stmt *TStmt = CDGNode->getTerminatorStmt();
+            // check if this is an if statement.
+            if (dyn_cast_or_null<IfStmt>(TStmt)) {
+              Info.addErrorGuardingStmt(FID, TStmt, Context);
+            }
           }
         }
       }
@@ -38,20 +40,22 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *S) {
 }
 
 bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *S) {
-  CFGBlock *CurBB;
-  if (isNegativeNumber(S->getRetValue(), *Context)) {
-    if (StMap.find(S) != StMap.end()) {
-      CurBB = StMap[S];
-      auto &CDNodes = CDG.getControlDependencies(CurBB);
-      if (!CDNodes.empty()) {
-        // We should use all CDs
-        // Get the last statement from the list of control dependencies.
-        for (auto &CDGNode : CDNodes) {
-          // Collect the possible length bounds keys.
-          Stmt *TStmt = CDGNode->getTerminatorStmt();
-          // check if this is an if statement.
-          if (dyn_cast_or_null<IfStmt>(TStmt)) {
-            Info.addErrorGuardingStmt(FID, TStmt, Context);
+  if (FnDecl->getReturnType()->isIntegerType()) {
+    CFGBlock *CurBB;
+    if (isNegativeNumber(S->getRetValue(), *Context)) {
+      if (StMap.find(S) != StMap.end()) {
+        CurBB = StMap[S];
+        auto &CDNodes = CDG.getControlDependencies(CurBB);
+        if (!CDNodes.empty()) {
+          // We should use all CDs
+          // Get the last statement from the list of control dependencies.
+          for (auto &CDGNode : CDNodes) {
+            // Collect the possible length bounds keys.
+            Stmt *TStmt = CDGNode->getTerminatorStmt();
+            // check if this is an if statement.
+            if (dyn_cast_or_null<IfStmt>(TStmt)) {
+              Info.addErrorGuardingStmt(FID, TStmt, Context);
+            }
           }
         }
       }
