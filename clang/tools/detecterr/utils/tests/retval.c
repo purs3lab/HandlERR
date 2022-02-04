@@ -27,3 +27,12 @@ int *bar(int a) {
   }
   return x;
 }
+
+int *foo_while(int a) {
+  int *x = NULL;
+  // should be included
+  while (x != NULL) {
+    x = malloc(sizeof(int));
+  }
+  return x;
+}

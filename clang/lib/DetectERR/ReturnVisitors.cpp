@@ -135,15 +135,26 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
         for (auto &CurrBB : *Cfg.get()) {
           if (DomTree.properlyDominates(CurrBB, ReturnBB)) {
             Stmt *TStmt = CurrBB->getTerminatorStmt();
+
+            Expr *DRE = nullptr;
+            Expr *Cond = nullptr;
+
+            // IF Stmt
             if (IfStmt *IfCheck = dyn_cast_or_null<IfStmt>(TStmt)) {
-              Expr *Cond = IfCheck->getCond();
+              Cond = IfCheck->getCond();
+            }
 
-              Expr *DRE = nullptr;
+            // While Stmt
+            else if (WhileStmt *WhileCheck =
+                         dyn_cast_or_null<WhileStmt>(TStmt)) {
+              Cond = WhileCheck->getCond();
+            }
 
-              // cond: x != NULL
-              if (BinaryOperator *BinaryOp = dyn_cast<BinaryOperator>(Cond)){
+            if (Cond) {
+              // I: cond: x != NULL
+              if (BinaryOperator *BinaryOp = dyn_cast<BinaryOperator>(Cond)) {
                 // we only care about !=
-                if( BinaryOp->getOpcode() == BinaryOperator::Opcode::BO_NE){
+                if (BinaryOp->getOpcode() == BinaryOperator::Opcode::BO_NE) {
                   if (isNULLExpr(BinaryOp->getLHS(), *Context)) {
                     DRE = BinaryOp->getRHS();
 
@@ -153,33 +164,33 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
                 }
               }
 
-              // cond: !x
+              // II: cond: !x
               else if (UnaryOperator *UnaryOp = dyn_cast<UnaryOperator>(Cond)) {
                 // we only care about !
-                if(UnaryOp->getOpcode() == UnaryOperator::Opcode::UO_LNot){
+                if (UnaryOp->getOpcode() == UnaryOperator::Opcode::UO_LNot) {
                   DRE = UnaryOp->getSubExpr();
                 }
               }
+            }
 
-              if (DRE) {
-                const DeclRefExpr *CheckedDRE = getDeclRefExpr(DRE);
-                const auto *CheckedNamedDecl =
-                    CheckedDRE->getFoundDecl()->getUnderlyingDecl();
+            if (DRE && Cond) {
+              const DeclRefExpr *CheckedDRE = getDeclRefExpr(DRE);
+              const auto *CheckedNamedDecl =
+                  CheckedDRE->getFoundDecl()->getUnderlyingDecl();
 
-                // check this against the NamedDecl for the return stmt
-                if (ReturnNamedDecl == CheckedNamedDecl) {
+              // check this against the NamedDecl for the return stmt
+              if (ReturnNamedDecl == CheckedNamedDecl) {
 
-                  // now check that there was no assignment in between the return and
-                  // the error check
-                  bool IsUpdated = isUpdatedInPostDominators(
-                      ReturnNamedDecl, *CurrBB, &CDG.getCFGPostDomTree(),
-                      *Cfg.get());
+                // now check that there was no assignment in between the return and
+                // the error check
+                bool IsUpdated = isUpdatedInPostDominators(
+                    ReturnNamedDecl, *CurrBB, &CDG.getCFGPostDomTree(),
+                    *Cfg.get());
 
-                  // finally, note the guarding statement
-                  if (!IsUpdated) {
-                    llvm::errs() << "not updated, adding error guarding stmt\n";
-                    Info.addErrorGuardingStmt(FID, TStmt, Context);
-                  }
+                // finally, note the guarding statement
+                if (!IsUpdated) {
+                  llvm::errs() << "not updated, adding error guarding stmt\n";
+                  Info.addErrorGuardingStmt(FID, TStmt, Context);
                 }
               }
             }

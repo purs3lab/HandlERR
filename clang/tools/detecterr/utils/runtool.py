@@ -135,6 +135,22 @@ def convert_project(build_dirs):
         print(f"[+] converting project done")
 
 
+def run_tool_on_all(dirs):
+    """
+    Runs the convert_individual.sh script present in each of the directories in
+    the list passed as argument. Each of these directories is expected to
+    contain a compile_individual.sh and a convert_all.sh script (generated
+    from convert_project.py).
+    """
+    for d in dirs:
+        print(f"[+] running tool on {d}")
+        convert_individual_script = os.path.join(d, "convert_individual.sh")
+        convert_all_script = os.path.join(d, "convert_all.sh")
+        subprocess.check_call(
+            f"{convert_individual_script}", shell=True, cwd=d)
+        print(f"[+] running tool done")
+
+
 def run_main(args):
     # TODO
     # - Extract, run configure, and run bear make
@@ -146,6 +162,9 @@ def run_main(args):
 
     build_dirs = extract_and_configure_archives(args.input_path)
     convert_project(build_dirs)
+    run_tool_on_all(build_dirs)
+
+    # TODO - collecting the individual err handler jsons
 
 
 if __name__ == '__main__':
@@ -171,23 +190,23 @@ if __name__ == '__main__':
     if not args.prog_path or not os.path.isfile(args.prog_path):
         print("Error: Path to the program to run is invalid.")
         print("Provided argument: {} is not a file.".format(args.prog_path))
-        sys.exit()
+        sys.exit(1)
 
     if not args.input_path or not os.path.isdir(args.input_path):
         print("Error: Path to the input archives folder is invalid.")
         print("Provided argument: {} is not a directory.".format(args.input_path))
-        sys.exit()
+        sys.exit(1)
 
     if not args.benchmarks_path or not os.path.isdir(args.benchmarks_path):
         print("Error: Path to the benchmarks folder is invalid.")
         print("Provided argument: {} is not a directory.".format(
             args.benchmarks_path))
-        sys.exit()
+        sys.exit(1)
 
     if not args.bear_path or not os.path.isfile(args.bear_path):
         print("Error: Path to the bear binary is invalid.")
         print("Provided argument: {} is not a file.".format(args.bear_path))
-        sys.exit()
+        sys.exit(1)
 
     BEAR_PATH = args.bear_path
     PROG_PATH = args.prog_path
