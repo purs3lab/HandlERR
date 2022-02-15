@@ -23,7 +23,7 @@ VSCODE_SETTINGS_JSON = os.path.realpath("settings.json")
 # to separate multiple commands in a line
 CMD_SEP = " &&"
 DEFAULT_ARGS = ["-verbose"]
-#if os.name == "nt":
+# if os.name == "nt":
 #    DEFAULT_ARGS.append("-extra-arg-before=--driver-mode=cl")
 #    CMD_SEP = " ;"
 
@@ -73,6 +73,7 @@ def getCheckedCArgs(argument_list):
     # that might need to be made absolute here.
     clang_x_args = []
     source_filename = argument_list[-1]
+    print(f"source_filename: {source_filename}")
     assert source_filename.endswith('.c')
     # By default; may be overwritten below.
     output_filename = source_filename[:-len('.c')] + '.o'
@@ -153,6 +154,10 @@ def run3C(checkedc_bin,
         # also has a field called 'arguments' instead of 'command' in the cmake
         # style. Use that to detect BEAR and add the directory.
         if 'arguments' in i and not 'command' in i:
+            # TODO: shank - tmp fix
+            if not i["arguments"][-1].endswith('.c'):
+                continue
+
             # BEAR. Need to add directory.
             file_to_add = i['directory'] + SLASH + file_to_add
             compiler_path = i['arguments'][0]
@@ -224,7 +229,7 @@ def run3C(checkedc_bin,
     # clangd3c is believed not to work, but since this code has been here for a
     # while and no one has been bothered by the fact that it didn't work, we
     # won't bother removing it now; hopefully clangd3c will eventually be back.
-    #vcodewriter.setClangdPath(
+    # vcodewriter.setClangdPath(
     #    os.path.join(os.path.dirname(prog_name), "clangd3c"))
     args = []
     args.append(prog_name)

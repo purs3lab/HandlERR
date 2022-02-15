@@ -9,7 +9,9 @@ add_clang_library(clangdetecterr
   DetectERRASTConsumer.cpp
   PersistentSourceLoc.cpp
   ProjectInfo.cpp
+  EHFVisitor.cpp
   ReturnVisitors.cpp
+  EHFCallVisitors.cpp
   Utils.cpp
   LINK_LIBS
   clangAST

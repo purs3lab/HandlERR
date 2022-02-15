@@ -4,8 +4,8 @@
 
 #include "clang/DetectERR/Utils.h"
 #include "clang/AST/Expr.h"
-#include "clang/DetectERR/PersistentSourceLoc.h"
 #include "clang/Analysis/CFG.h"
+#include "clang/DetectERR/PersistentSourceLoc.h"
 
 using namespace clang;
 
@@ -65,11 +65,28 @@ bool isDeclExpr(const clang::Expr *E) {
 
 const DeclRefExpr *getDeclRefExpr(const clang::Expr *E) {
   auto *Exp = removeAuxillaryCasts(E);
-  // Exp->dump();
   return dyn_cast<DeclRefExpr>(Exp);
 }
 
-bool isUpdatedInPostDominators(const NamedDecl *ND, CFGBlock &CurrBB, const CFGPostDomTree* PDTree, const CFG &Cfg){
+bool hasPostDominators(CFGBlock &CurrBB, const CFGPostDomTree *PDTree,
+                       const CFG &Cfg) {
+  bool foundDominator = false;
+  // iterate over all the BasicBlocks of the given CFG
+  for (CFGBlock *OtherBB : Cfg) {
+    // if otherBB properly dominates CurrBB
+    if (PDTree->properlyDominates(OtherBB, &CurrBB)) {
+      // if the dominator is ExitBB, ignore it
+      if (OtherBB != &Cfg.getExit()) {
+        foundDominator = true;
+        break;
+      }
+    }
+  }
+  return foundDominator;
+}
+
+bool isUpdatedInPostDominators(const NamedDecl *ND, CFGBlock &CurrBB,
+                               const CFGPostDomTree *PDTree, const CFG &Cfg) {
   // iterate over all the BasicBlocks of the given CFG
   for (CFGBlock *OtherBB : Cfg) {
 
@@ -80,10 +97,11 @@ bool isUpdatedInPostDominators(const NamedDecl *ND, CFGBlock &CurrBB, const CFGP
       for (CFGElement &CFGElem : *OtherBB) {
 
         // we only care about Statements as the assignment would be done as part of a Statement
-        if(CFGElem.getKind() == CFGElement::Kind::Statement){
+        if (CFGElem.getKind() == CFGElement::Kind::Statement) {
           const Stmt *CurrStmt = CFGElem.getAs<CFGStmt>()->getStmt();
-          if(const BinaryOperator *BinOp = dyn_cast<BinaryOperator>(CurrStmt)){
-            if (BinOp->getOpcode() == BinaryOperator::Opcode::BO_Assign){
+          if (const BinaryOperator *BinOp =
+                  dyn_cast<BinaryOperator>(CurrStmt)) {
+            if (BinOp->getOpcode() == BinaryOperator::Opcode::BO_Assign) {
               const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(BinOp->getLHS());
               if (DRE) {
                 const DeclRefExpr *UpdatedDRE = getDeclRefExpr(DRE);
@@ -104,3 +122,43 @@ bool isUpdatedInPostDominators(const NamedDecl *ND, CFGBlock &CurrBB, const CFGP
   return false;
 }
 
+bool isLastStmtInBB(const Stmt &ST, const CFGBlock &BB) {
+  // iterate over all the stmts in the BB and check the last one against
+  // the given stmt
+
+  if (BB.empty()) {
+    return false;
+  }
+
+  auto it = BB.rbegin();
+  if (it != BB.rend()) {
+    const Stmt *LastStmt = (*it).getAs<CFGStmt>()->getStmt();
+    return LastStmt == &ST;
+  }
+}
+
+bool isEHFCallExpr(const CallExpr *CE, const std::set<std::string> &EHFList,
+                   ASTContext *Context) {
+  const Decl *CalledDecl = CE->getCalleeDecl();
+  if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(CalledDecl)) {
+    std::string calledFnName = FD->getNameInfo().getAsString();
+    // if the called function is a known exit function
+    if (EHFList.find(calledFnName) != EHFList.end()) {
+      // special case: exit(0) call is not a "exit" function
+      if (calledFnName == "exit") {
+        if (CE->getNumArgs() == 0) {
+          // exit() => exit(0)?
+          return false;
+        }
+
+        // exit(0)
+        const Expr* arg0 = CE->getArg(0);
+        if (isZero(arg0, *Context)) {
+          return false;
+        }
+      }
+      return true;
+    }
+  }
+  return false;
+}

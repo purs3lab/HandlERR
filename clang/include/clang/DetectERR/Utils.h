@@ -41,4 +41,14 @@ const DeclRefExpr *getDeclRefExpr(const clang::Expr *E);
 /// in the Post-Dominator BasicBlocks of a particular BasicBlock
 bool isUpdatedInPostDominators(const NamedDecl *ND, CFGBlock &CurrBB, const CFGPostDomTree* PDTree, const CFG &Cfg);
 
+/// Checks whether there is a post-dominated CFGBlock for the given block
+bool hasPostDominators(CFGBlock &CurrBB, const CFGPostDomTree* PDTree, const CFG &Cfg);
+
+/// Checks if the given statement is the last statement in the given CFGBlock
+bool isLastStmtInBB(const Stmt &ST, const CFGBlock &BB);
+
+/// Checks if the given CallExpr calls an EHF
+bool isEHFCallExpr(const CallExpr *CE, const std::set<std::string> &EHFList,
+                   ASTContext *Context);
+
 #endif //LLVM_CLANG_DETECTERR_UTILS_H

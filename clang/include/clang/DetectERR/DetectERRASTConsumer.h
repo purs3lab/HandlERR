@@ -29,7 +29,7 @@ public:
 private:
   // This function takes care of calling various helper functions
   // on the given function decl.
-  void handleFuncDecl(ASTContext &C, const FunctionDecl *FD);
+  void handleFuncDecl(ASTContext &C, const FunctionDecl *FD, const std::set<std::string> &EHFList);
   ProjectInfo &Info;
   struct DetectERROptions Opts;
 };

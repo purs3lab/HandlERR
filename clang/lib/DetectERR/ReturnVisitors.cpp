@@ -15,6 +15,8 @@
 /// H04 - if a "return NULL" statement is control dependent upon one or more
 /// "if" checks
 bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *S) {
+  llvm::errs() << "processing fn: " << FnDecl->getNameInfo().getAsString()
+               << '\n';
   if (FnDecl->getReturnType()->isPointerType()) {
     CFGBlock *CurBB;
     if (isNULLExpr(S->getRetValue(), *Context)) {
@@ -124,6 +126,9 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
       // is a IfStmt and the condition of that IfStmt is a NULL check
       // against the value being returned
 
+      llvm::errs() << "processing fn: " << FnDecl->getNameInfo().getAsString()
+                   << '\n';
+
       // return stmt is a 'return var'
       if (isDeclExpr(S->getRetValue())) { // return val
         ReturnBB = StMap[S];
@@ -145,19 +150,21 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
 
             // IF Stmt
             if (IfStmt *IfCheck = dyn_cast_or_null<IfStmt>(TStmt)) {
+//              llvm::errs() << "IfStmt\n";
               Cond = IfCheck->getCond();
             }
 
             // While Stmt
             else if (WhileStmt *WhileCheck =
                          dyn_cast_or_null<WhileStmt>(TStmt)) {
+//              llvm::errs() << "WhileStmt\n";
               Cond = WhileCheck->getCond();
             }
 
             if (Cond) {
               // I: cond: x != NULL
               if (BinaryOperator *BinaryOp = dyn_cast<BinaryOperator>(Cond)) {
-                // we only care about !=
+                // we only care about '!='
                 if (BinaryOp->getOpcode() == BinaryOperator::Opcode::BO_NE) {
                   if (isNULLExpr(BinaryOp->getLHS(), *Context)) {
                     DRE = BinaryOp->getRHS();
@@ -170,7 +177,7 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
 
               // II: cond: !x
               else if (UnaryOperator *UnaryOp = dyn_cast<UnaryOperator>(Cond)) {
-                // we only care about !
+                // we only care about '!'
                 if (UnaryOp->getOpcode() == UnaryOperator::Opcode::UO_LNot) {
                   DRE = UnaryOp->getSubExpr();
                 }
@@ -178,23 +185,36 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
             }
 
             if (DRE && Cond) {
+              // llvm::errs() << "TStmt loc: ";
+              // SourceRange srcRange = TStmt->getSourceRange();
+              // srcRange.dump(Context->getSourceManager());
+
+              // llvm::errs() << "DRE: ";
+              // DRE->dump();
+
               const DeclRefExpr *CheckedDRE = getDeclRefExpr(DRE);
-              const auto *CheckedNamedDecl =
-                  CheckedDRE->getFoundDecl()->getUnderlyingDecl();
 
-              // check this against the NamedDecl for the return stmt
-              if (ReturnNamedDecl == CheckedNamedDecl) {
+//              llvm::errs() << "CheckedDRE: ";
+//              CheckedDRE->dump();
 
-                // now check that there was no assignment in between the return and
-                // the error check
-                bool IsUpdated = isUpdatedInPostDominators(
-                    ReturnNamedDecl, *CurrBB, &CDG.getCFGPostDomTree(),
-                    *Cfg.get());
+              if (CheckedDRE) {   // TODO: tmp check for discussion
+                const auto *CheckedNamedDecl =
+                    CheckedDRE->getFoundDecl()->getUnderlyingDecl();
 
-                // finally, note the guarding statement
-                if (!IsUpdated) {
-                  llvm::errs() << "not updated, adding error guarding stmt\n";
-                  Info.addErrorGuardingStmt(FID, TStmt, Context);
+                // check this against the NamedDecl for the return stmt
+                if (ReturnNamedDecl == CheckedNamedDecl) {
+
+                  // now check that there was no assignment in between the return and
+                  // the error check
+                  bool IsUpdated = isUpdatedInPostDominators(
+                      ReturnNamedDecl, *CurrBB, &CDG.getCFGPostDomTree(),
+                      *Cfg.get());
+
+                  // finally, note the guarding statement
+                  if (!IsUpdated) {
+                    llvm::errs() << "not updated, adding error guarding stmt\n";
+                    Info.addErrorGuardingStmt(FID, TStmt, Context);
+                  }
                 }
               }
             }

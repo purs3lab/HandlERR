@@ -10,14 +10,16 @@ Takes 3 arguments:
 """
 
 import argparse
+import json
 import os
+import shutil
 import subprocess
 import sys
-import shutil
 
 
 BEAR_PATH = None
 PROG_PATH = None
+BENCHMARKS_PATH = None
 
 
 def extract_archives(input_path):
@@ -73,7 +75,9 @@ def configure_and_bear_make_single(path):
 
     # bear make
     print("[+] running bear make...")
-    subprocess.check_call(f"{BEAR_PATH} make", shell=True, cwd=path)
+    num_cpu = len(os.sched_getaffinity(0))  # parallelize make
+    subprocess.check_call(
+        f"{BEAR_PATH} make -j{num_cpu}", shell=True, cwd=path)
     print("[+] bear make done")
 
 
@@ -148,7 +152,83 @@ def run_tool_on_all(dirs):
         convert_all_script = os.path.join(d, "convert_all.sh")
         subprocess.check_call(
             f"{convert_individual_script}", shell=True, cwd=d)
-        print(f"[+] running tool done")
+        print("[+] running tool done")
+
+
+def create_cumulative_errblocks_json_for_each(dirs):
+    """
+    Collects the individual errblocks.json files generated for each c file and
+    creates a cumulative json file for entire project.
+
+    The name of the generated file is __project.errblocks.json.
+    """
+    for d in dirs:
+        cumulative_file_ = os.path.join(d, "__project.errblocks.json")
+        print(
+            f"[+] creating cumulative errblocks.json for {d} as {cumulative_file_}")
+        with open(cumulative_file_, "w") as cumulative_file:
+            cumulative_data = []
+            for f in os.listdir(d):
+                if f.endswith("errblocks.json") and f != "__project.errblocks.json":
+                    err_file_ = os.path.join(d, f)
+                    print(f"[+] processing {err_file_}")
+                    with open(err_file_) as err_file:
+                        data = json.load(err_file)
+                        cumulative_data.extend(data["ErrGuardingConditions"])
+            deduplicated = []
+            seen = set()
+            for entry in cumulative_data:
+                file = entry["FunctionInfo"]["File"]
+                if file in seen:
+                    continue
+                deduplicated.append(entry)
+            json.dump(deduplicated, cumulative_file)
+        print("[+] creating cumulative errblocks.json done")
+
+
+def generate_stats(dirs):
+    """
+    Collects the individual projects' errblocks.json files and copies them to
+    the BENCHMARKS_PATH folder.
+    Thereafter it generates a cumulative report for all the projects.
+    """
+
+    # copy the __project.errblocks.json from all dirs to the benchmarks_path
+    project_files = []
+    for d in dirs:
+        cumulative_file_ = os.path.join(d, "__project.errblocks.json")
+        print(
+            f"[+] copying {cumulative_file_} to {BENCHMARKS_PATH}")
+        project_name = os.path.dirname(d)
+        project_filename = os.path.join(
+            project_name, "__project.errblocks.json")
+        shutil.copyfile(cumulative_file_, os.path.join(
+            BENCHMARKS_PATH, project_filename))
+        project_files.append(project_filename)
+        print(
+            f"[+] copying {cumulative_file_} to {BENCHMARKS_PATH} done")
+
+    # TODO: exactly what stats are required to be calculated?
+    # individual file stats
+    stats_filename = "runtool_stats.json"
+    stats = []
+    overall_functions = 0
+    overall_err_conditions = 0
+    for pf in project_files:
+        cumulative_file_ = os.path.join(BENCHMARKS_PATH, pf)
+        with open(cumulative_file_, "r") as cumulative_file:
+            data = json.load(cumulative_file)
+            s = {"project": pf}
+            s["functions"] += len(data)
+            overall_functions += len(data)
+            for record in data:
+                s["err_conditions"] += len(record["ErrConditions"])
+                overall_err_conditions += len(record["ErrConditions"])
+            stats.append(s)
+    stats.insert(0, {"overall_functions": overall_functions, "overall_err_conditions": overall_err_conditions})
+    print(f"[+] cumulative stats: {stats}")
+    with open(os.path.join(BENCHMARKS_PATH, stats_filename)) as stats_f:
+        json.dump(stats, stats_f)
 
 
 def run_main(args):
@@ -165,6 +245,11 @@ def run_main(args):
     run_tool_on_all(build_dirs)
 
     # TODO - collecting the individual err handler jsons
+    create_cumulative_errblocks_json_for_each(build_dirs)
+
+    # print the statistics for the identified error guarding conditions
+    print(f">>>> [+] build_dirs: {build_dirs}")
+    generate_stats(build_dirs)
 
 
 if __name__ == '__main__':
@@ -210,5 +295,6 @@ if __name__ == '__main__':
 
     BEAR_PATH = args.bear_path
     PROG_PATH = args.prog_path
+    BENCHMARKS_PATH = args.benchmarks_path
 
     run_main(args)
