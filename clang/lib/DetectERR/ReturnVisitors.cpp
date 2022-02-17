@@ -15,8 +15,8 @@
 /// H04 - if a "return NULL" statement is control dependent upon one or more
 /// "if" checks
 bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *S) {
-  llvm::errs() << "processing fn: " << FnDecl->getNameInfo().getAsString()
-               << '\n';
+  //  llvm::errs() << "processing fn: " << FnDecl->getNameInfo().getAsString()
+  //               << '\n';
   if (FnDecl->getReturnType()->isPointerType()) {
     CFGBlock *CurBB;
     if (isNULLExpr(S->getRetValue(), *Context)) {
@@ -126,8 +126,8 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
       // is a IfStmt and the condition of that IfStmt is a NULL check
       // against the value being returned
 
-      llvm::errs() << "processing fn: " << FnDecl->getNameInfo().getAsString()
-                   << '\n';
+      //      llvm::errs() << "processing fn: " << FnDecl->getNameInfo().getAsString()
+      //                   << '\n';
 
       // return stmt is a 'return var'
       if (isDeclExpr(S->getRetValue())) { // return val
@@ -150,14 +150,14 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
 
             // IF Stmt
             if (IfStmt *IfCheck = dyn_cast_or_null<IfStmt>(TStmt)) {
-//              llvm::errs() << "IfStmt\n";
+              //              llvm::errs() << "IfStmt\n";
               Cond = IfCheck->getCond();
             }
 
             // While Stmt
             else if (WhileStmt *WhileCheck =
                          dyn_cast_or_null<WhileStmt>(TStmt)) {
-//              llvm::errs() << "WhileStmt\n";
+              //              llvm::errs() << "WhileStmt\n";
               Cond = WhileCheck->getCond();
             }
 
@@ -194,10 +194,10 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
 
               const DeclRefExpr *CheckedDRE = getDeclRefExpr(DRE);
 
-//              llvm::errs() << "CheckedDRE: ";
-//              CheckedDRE->dump();
+              //              llvm::errs() << "CheckedDRE: ";
+              //              CheckedDRE->dump();
 
-              if (CheckedDRE) {   // TODO: tmp check for discussion
+              if (CheckedDRE) { // TODO: tmp check for discussion
                 const auto *CheckedNamedDecl =
                     CheckedDRE->getFoundDecl()->getUnderlyingDecl();
 

@@ -58,8 +58,8 @@ void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
   for (const auto &D : TUD->decls()) {
     if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
       // Is this a function?
-      llvm::errs() << "handleFuncDecl for: " << FD->getNameInfo().getAsString()
-                   << '\n';
+      //      llvm::errs() << "handleFuncDecl for: " << FD->getNameInfo().getAsString()
+      //                   << '\n';
       handleFuncDecl(C, FD, EHFList);
     }
   }
