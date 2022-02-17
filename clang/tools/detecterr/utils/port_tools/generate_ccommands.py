@@ -73,7 +73,6 @@ def getCheckedCArgs(argument_list):
     # that might need to be made absolute here.
     clang_x_args = []
     source_filename = argument_list[-1]
-    print(f"source_filename: {source_filename}")
     assert source_filename.endswith('.c')
     # By default; may be overwritten below.
     output_filename = source_filename[:-len('.c')] + '.o'

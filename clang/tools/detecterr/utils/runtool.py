@@ -20,6 +20,7 @@ import sys
 BEAR_PATH = None
 PROG_PATH = None
 BENCHMARKS_PATH = None
+NAMES_LIKE = None
 
 
 def extract_archives(input_path):
@@ -30,9 +31,14 @@ def extract_archives(input_path):
     """
     archives = []
     for f in os.listdir(input_path):
-        # expected archives are tar.gz files
+        # in case we are looking for some specific files
+        if NAMES_LIKE and not any(n in f for n in NAMES_LIKE):
+            print(f"[+] skipping {f} as it does not match {NAMES_LIKE}")
+            continue
+
         base_dir = os.path.realpath(input_path)
-        if f.endswith('tar.gz'):
+        # expected archives are tar.gz files
+        if f.endswith("tar.gz"):
             # TODO - parallelize this
             f = os.path.join(base_dir, f)
             archives.append(f)
@@ -47,15 +53,14 @@ def extract_archives(input_path):
         )
 
         if os.path.isdir(output_dir):
-            print('[+] found existing directory, removing it')
+            print("[+] found existing directory, removing it")
             shutil.rmtree(output_dir)
-            print('[+] removed existing directory')
+            print("[+] removed existing directory")
 
         print(f"[+] extracting {f} to {output_dir}")
         # TODO - input sanitization??
         subprocess.check_call(f"mkdir -p {output_dir}", shell=True)
-        subprocess.check_call(
-            f"tar xf {f} --directory={output_dir}", shell=True)
+        subprocess.check_call(f"tar xf {f} --directory={output_dir}", shell=True)
         print(f"[+] extracting complete")
         extracted_dirs.append(output_dir)
 
@@ -68,7 +73,7 @@ def configure_and_bear_make_single(path):
     """
     print(f"running configure_and_bear_make_single on {path}")
     # configure file
-    if 'configure' in os.listdir(path):
+    if "configure" in os.listdir(path):
         print("[+] running configure...")
         subprocess.check_call(f"./configure", shell=True, cwd=path)
         print("[+] configure done")
@@ -76,8 +81,7 @@ def configure_and_bear_make_single(path):
     # bear make
     print("[+] running bear make...")
     num_cpu = len(os.sched_getaffinity(0))  # parallelize make
-    subprocess.check_call(
-        f"{BEAR_PATH} make -j{num_cpu}", shell=True, cwd=path)
+    subprocess.check_call(f"{BEAR_PATH} make -j{num_cpu}", shell=True, cwd=path)
     print("[+] bear make done")
 
 
@@ -126,14 +130,16 @@ def convert_project(build_dirs):
     build_dirs.
     """
     convert_project_bin = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "port_tools", "convert_project.py")
+        os.path.dirname(os.path.realpath(__file__)), "port_tools", "convert_project.py"
+    )
     for d in build_dirs:
         print(f"[+] converting project {d}")
         if "compile_commands.json" in os.listdir(d):
             print("[+] compile_commands.json found")
             print(f"[+] running {convert_project_bin}")
             subprocess.check_call(
-                f"{convert_project_bin} -dr -pr {d} -p {PROG_PATH}", shell=True)
+                f"{convert_project_bin} -dr -pr {d} -p {PROG_PATH}", shell=True
+            )
         else:
             print("[+] compile_commands.json not found. skipping this one.")
         print(f"[+] converting project done")
@@ -150,8 +156,7 @@ def run_tool_on_all(dirs):
         print(f"[+] running tool on {d}")
         convert_individual_script = os.path.join(d, "convert_individual.sh")
         convert_all_script = os.path.join(d, "convert_all.sh")
-        subprocess.check_call(
-            f"{convert_individual_script}", shell=True, cwd=d)
+        subprocess.check_call(f"{convert_individual_script}", shell=True, cwd=d)
         print("[+] running tool done")
 
 
@@ -164,8 +169,7 @@ def create_cumulative_errblocks_json_for_each(dirs):
     """
     for d in dirs:
         cumulative_file_ = os.path.join(d, "__project.errblocks.json")
-        print(
-            f"[+] creating cumulative errblocks.json for {d} as {cumulative_file_}")
+        print(f"[+] creating cumulative errblocks.json for {d} as {cumulative_file_}")
         with open(cumulative_file_, "w") as cumulative_file:
             cumulative_data = []
             for f in os.listdir(d):
@@ -197,16 +201,17 @@ def generate_stats(dirs):
     project_files = []
     for d in dirs:
         cumulative_file_ = os.path.join(d, "__project.errblocks.json")
-        print(
-            f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)}")
+        print(f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)}")
         project_name = os.path.dirname(d)
-        project_filename = os.path.join(
-            project_name, "__project.errblocks.json")
-        shutil.copyfile(cumulative_file_, os.path.join(os.path.abspath(
-            BENCHMARKS_PATH), project_filename))
+        project_filename = os.path.join(project_name, "__project.errblocks.json")
+        shutil.copyfile(
+            cumulative_file_,
+            os.path.join(os.path.abspath(BENCHMARKS_PATH), project_filename),
+        )
         project_files.append(project_filename)
         print(
-            f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)} done")
+            f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)} done"
+        )
 
     # TODO: exactly what stats are required to be calculated?
     # individual file stats
@@ -225,10 +230,17 @@ def generate_stats(dirs):
                 s["err_conditions"] += len(record["ErrConditions"])
                 overall_err_conditions += len(record["ErrConditions"])
             stats.append(s)
-    stats.insert(0, {"overall_functions": overall_functions,
-                 "overall_err_conditions": overall_err_conditions})
+    stats.insert(
+        0,
+        {
+            "overall_functions": overall_functions,
+            "overall_err_conditions": overall_err_conditions,
+        },
+    )
     print(f"[+] cumulative stats: {stats}")
-    with open(os.path.join(os.path.abspath(BENCHMARKS_PATH), stats_filename), "w") as stats_f:
+    with open(
+        os.path.join(os.path.abspath(BENCHMARKS_PATH), stats_filename), "w"
+    ) as stats_f:
         json.dump(stats, stats_f)
 
 
@@ -241,37 +253,65 @@ def run_main(args):
     #   create a cumulative json file for the entire project.
     # - Finally, have a single csv file with summaries for each project
 
-    # build_dirs = extract_and_configure_archives(args.input_path)
-    # convert_project(build_dirs)
-    # run_tool_on_all(build_dirs)
+    build_dirs = extract_and_configure_archives(args.input_path)
+    convert_project(build_dirs)
+    run_tool_on_all(build_dirs)
 
-    # # TODO - collecting the individual err handler jsons
-    # create_cumulative_errblocks_json_for_each(build_dirs)
+    # TODO - collecting the individual err handler jsons
+    create_cumulative_errblocks_json_for_each(build_dirs)
 
     # print the statistics for the identified error guarding conditions
-    build_dirs = ['/workdisk/shank/dev/detecterr_input/zlib_v1.2.11/zlib-1.2.11',
-                  '/workdisk/shank/dev/detecterr_input/libpng_v1.6.35/libpng-1.6.35']
+    # build_dirs = ['/workdisk/shank/dev/detecterr_input/zlib_v1.2.11/zlib-1.2.11',
+    #               '/workdisk/shank/dev/detecterr_input/libpng_v1.6.35/libpng-1.6.35']
     print(f">>>> [+] build_dirs: {build_dirs}")
     generate_stats(build_dirs)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(__file__, description="Tool that converts the compilation commands into"
-                                     " the commands for 3c tool and also "
-                                     " runs the tool.")
+    parser = argparse.ArgumentParser(
+        __file__,
+        description="Tool that converts the compilation commands into"
+        " the commands for 3c tool and also "
+        " runs the tool.",
+    )
 
-    parser.add_argument("-p", "--prog_path", dest='prog_path', type=str,
-                        help='Program path to run. i.e., path to detecterr')
+    parser.add_argument(
+        "-p",
+        "--prog_path",
+        dest="prog_path",
+        type=str,
+        help="Program path to run. i.e., path to detecterr",
+    )
 
-    parser.add_argument("-i", "--input_path", dest='input_path', type=str,
-                        help='Path to input folder containing archives')
+    parser.add_argument(
+        "-i",
+        "--input_path",
+        dest="input_path",
+        type=str,
+        help="Path to input folder containing archives",
+    )
 
-    parser.add_argument("-m", "--benchmarks_path", dest='benchmarks_path', type=str,
-                        help='Path to benchmarks folder where the output is to be stored')
+    parser.add_argument(
+        "-m",
+        "--benchmarks_path",
+        dest="benchmarks_path",
+        type=str,
+        help="Path to benchmarks folder where the output is to be stored",
+    )
 
-    parser.add_argument("-b", "--bear_path", dest='bear_path', type=str,
-                        help='Path to bear binary')
+    parser.add_argument(
+        "-b", "--bear_path", dest="bear_path", type=str, help="Path to bear binary"
+    )
+
+    parser.add_argument(
+        "-k",
+        "--names_like",
+        dest="names_like",
+        nargs="*",
+        type=str,
+        help="substrings to match in names of the archives",
+    )
 
     args = parser.parse_args()
 
@@ -287,8 +327,7 @@ if __name__ == '__main__':
 
     if not args.benchmarks_path or not os.path.isdir(args.benchmarks_path):
         print("Error: Path to the benchmarks folder is invalid.")
-        print("Provided argument: {} is not a directory.".format(
-            args.benchmarks_path))
+        print("Provided argument: {} is not a directory.".format(args.benchmarks_path))
         sys.exit(1)
 
     if not args.bear_path or not os.path.isfile(args.bear_path):
@@ -299,5 +338,6 @@ if __name__ == '__main__':
     BEAR_PATH = args.bear_path
     PROG_PATH = args.prog_path
     BENCHMARKS_PATH = args.benchmarks_path
+    NAMES_LIKE = args.names_like
 
     run_main(args)
