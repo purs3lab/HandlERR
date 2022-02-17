@@ -227,19 +227,18 @@ def generate_stats(dirs):
     the BENCHMARKS_PATH folder.
     Thereafter it generates a cumulative report for all the projects.
     """
-
     # copy the __project.errblocks.json from all dirs to the benchmarks_path
     project_files = []
     for d in dirs:
         cumulative_file_ = os.path.join(d, "__project.errblocks.json")
         print(f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)}")
-        project_name = os.path.dirname(d)
-        project_filename = os.path.join(project_name, "__project.errblocks.json")
-        shutil.copyfile(
-            cumulative_file_,
-            os.path.join(os.path.abspath(BENCHMARKS_PATH), project_filename),
+        project_name = os.path.basename(os.path.dirname(d))
+        project_filename = f"{project_name}__project.errblocks.json"
+        bench_project_filename = os.path.join(
+            os.path.abspath(BENCHMARKS_PATH), project_filename
         )
-        project_files.append(project_filename)
+        shutil.copyfile(cumulative_file_, bench_project_filename)
+        project_files.append(bench_project_filename)
         print(
             f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)} done"
         )
