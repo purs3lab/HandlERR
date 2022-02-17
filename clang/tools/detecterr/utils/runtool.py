@@ -198,15 +198,15 @@ def generate_stats(dirs):
     for d in dirs:
         cumulative_file_ = os.path.join(d, "__project.errblocks.json")
         print(
-            f"[+] copying {cumulative_file_} to {BENCHMARKS_PATH}")
+            f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)}")
         project_name = os.path.dirname(d)
         project_filename = os.path.join(
             project_name, "__project.errblocks.json")
-        shutil.copyfile(cumulative_file_, os.path.join(
-            BENCHMARKS_PATH, project_filename))
+        shutil.copyfile(cumulative_file_, os.path.join(os.path.abspath(
+            BENCHMARKS_PATH), project_filename))
         project_files.append(project_filename)
         print(
-            f"[+] copying {cumulative_file_} to {BENCHMARKS_PATH} done")
+            f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)} done")
 
     # TODO: exactly what stats are required to be calculated?
     # individual file stats
@@ -215,19 +215,20 @@ def generate_stats(dirs):
     overall_functions = 0
     overall_err_conditions = 0
     for pf in project_files:
-        cumulative_file_ = os.path.join(BENCHMARKS_PATH, pf)
+        cumulative_file_ = os.path.join(os.path.abspath(BENCHMARKS_PATH), pf)
         with open(cumulative_file_, "r") as cumulative_file:
             data = json.load(cumulative_file)
-            s = {"project": pf}
+            s = {"project": pf, "functions": 0, "err_conditions": 0}
             s["functions"] += len(data)
             overall_functions += len(data)
             for record in data:
                 s["err_conditions"] += len(record["ErrConditions"])
                 overall_err_conditions += len(record["ErrConditions"])
             stats.append(s)
-    stats.insert(0, {"overall_functions": overall_functions, "overall_err_conditions": overall_err_conditions})
+    stats.insert(0, {"overall_functions": overall_functions,
+                 "overall_err_conditions": overall_err_conditions})
     print(f"[+] cumulative stats: {stats}")
-    with open(os.path.join(BENCHMARKS_PATH, stats_filename)) as stats_f:
+    with open(os.path.join(os.path.abspath(BENCHMARKS_PATH), stats_filename), "w") as stats_f:
         json.dump(stats, stats_f)
 
 
@@ -240,14 +241,16 @@ def run_main(args):
     #   create a cumulative json file for the entire project.
     # - Finally, have a single csv file with summaries for each project
 
-    build_dirs = extract_and_configure_archives(args.input_path)
-    convert_project(build_dirs)
-    run_tool_on_all(build_dirs)
+    # build_dirs = extract_and_configure_archives(args.input_path)
+    # convert_project(build_dirs)
+    # run_tool_on_all(build_dirs)
 
-    # TODO - collecting the individual err handler jsons
-    create_cumulative_errblocks_json_for_each(build_dirs)
+    # # TODO - collecting the individual err handler jsons
+    # create_cumulative_errblocks_json_for_each(build_dirs)
 
     # print the statistics for the identified error guarding conditions
+    build_dirs = ['/workdisk/shank/dev/detecterr_input/zlib_v1.2.11/zlib-1.2.11',
+                  '/workdisk/shank/dev/detecterr_input/libpng_v1.6.35/libpng-1.6.35']
     print(f">>>> [+] build_dirs: {build_dirs}")
     generate_stats(build_dirs)
 
