@@ -160,6 +160,44 @@ def run_tool_on_all(dirs):
         print("[+] running tool done")
 
 
+def process_errblocks_for_dir(dir):
+    """
+    processes errblocks.jsons in the dir (recursively) and returns the
+    cumulative data as a dictionary
+
+    Args:
+        dir: the absolute path to the directory to be processed
+
+    Retuns:
+        the list of maps contianing the cumulative errblocks.json data
+    """
+    if not os.path.isdir(dir):
+        print(f"[+] {dir} is not a dir, ignoring")
+        return []
+
+    cumulative_data = []
+
+    for f in os.listdir(dir):
+        f_abspath = os.path.join(dir, f)
+
+        # process files
+        if (
+            os.path.isfile(f_abspath)
+            and f.endswith("errblocks.json")
+            and f != "__project.errblocks.json"
+        ):
+            print(f"[+] processing {f_abspath}")
+            with open(f_abspath) as err_file:
+                data = json.load(err_file)
+                cumulative_data.extend(data["ErrGuardingConditions"])
+
+        # process dirs
+        elif os.path.isdir(f_abspath):
+            cumulative_data.extend(process_errblocks_for_dir(f_abspath))
+
+    return cumulative_data
+
+
 def create_cumulative_errblocks_json_for_each(dirs):
     """
     Collects the individual errblocks.json files generated for each c file and
@@ -171,14 +209,7 @@ def create_cumulative_errblocks_json_for_each(dirs):
         cumulative_file_ = os.path.join(d, "__project.errblocks.json")
         print(f"[+] creating cumulative errblocks.json for {d} as {cumulative_file_}")
         with open(cumulative_file_, "w") as cumulative_file:
-            cumulative_data = []
-            for f in os.listdir(d):
-                if f.endswith("errblocks.json") and f != "__project.errblocks.json":
-                    err_file_ = os.path.join(d, f)
-                    print(f"[+] processing {err_file_}")
-                    with open(err_file_) as err_file:
-                        data = json.load(err_file)
-                        cumulative_data.extend(data["ErrGuardingConditions"])
+            cumulative_data = process_errblocks_for_dir(d)
             deduplicated = []
             seen = set()
             for entry in cumulative_data:
@@ -338,6 +369,6 @@ if __name__ == "__main__":
     BEAR_PATH = args.bear_path
     PROG_PATH = args.prog_path
     BENCHMARKS_PATH = args.benchmarks_path
-    NAMES_LIKE = args.names_like
+    NAMES_LIKE = args.names_like or []
 
     run_main(args)
