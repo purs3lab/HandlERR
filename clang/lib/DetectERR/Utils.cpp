@@ -144,19 +144,6 @@ bool isEHFCallExpr(const CallExpr *CE, const std::set<std::string> &EHFList,
     std::string calledFnName = FD->getNameInfo().getAsString();
     // if the called function is a known exit function
     if (EHFList.find(calledFnName) != EHFList.end()) {
-      // special case: exit(0) call is not a "exit" function
-      if (calledFnName == "exit") {
-        if (CE->getNumArgs() == 0) {
-          // exit() => exit(0)?
-          return false;
-        }
-
-        // exit(0)
-        const Expr* arg0 = CE->getArg(0);
-        if (isZero(arg0, *Context)) {
-          return false;
-        }
-      }
       return true;
     }
   }
