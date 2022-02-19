@@ -31,7 +31,7 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *S) {
             Stmt *TStmt = CDGNode->getTerminatorStmt();
             // check if this is an if statement.
             if (dyn_cast_or_null<IfStmt>(TStmt)) {
-              Info.addErrorGuardingStmt(FID, TStmt, Context);
+              Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
             }
           }
         }
@@ -41,6 +41,7 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *S) {
   return true;
 }
 
+/// H02
 bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *S) {
   if (FnDecl->getReturnType()->isIntegerType()) {
     CFGBlock *CurBB;
@@ -56,7 +57,7 @@ bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *S) {
             Stmt *TStmt = CDGNode->getTerminatorStmt();
             // check if this is an if statement.
             if (dyn_cast_or_null<IfStmt>(TStmt)) {
-              Info.addErrorGuardingStmt(FID, TStmt, Context);
+              Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
             }
           }
         }
@@ -88,7 +89,7 @@ bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *S) {
           Stmt *TStmt = CDGNode->getTerminatorStmt();
           // check if this is an if statement.
           if (dyn_cast_or_null<IfStmt>(TStmt)) {
-            Info.addErrorGuardingStmt(FID, TStmt, Context);
+            Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
           }
         }
       }
@@ -213,7 +214,7 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
                   // finally, note the guarding statement
                   if (!IsUpdated) {
                     llvm::errs() << "not updated, adding error guarding stmt\n";
-                    Info.addErrorGuardingStmt(FID, TStmt, Context);
+                    Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
                   }
                 }
               }

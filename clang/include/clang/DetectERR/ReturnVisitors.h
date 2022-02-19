@@ -29,7 +29,7 @@ public:
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
-        CDG(Cfg.get()) {
+        CDG(Cfg.get()), Heuristic("H04") {
     for (auto *CBlock : *(Cfg.get())) {
       for (auto &CfgElem : *CBlock) {
         if (CfgElem.getKind() == clang::CFGElement::Statement) {
@@ -51,6 +51,8 @@ private:
   std::unique_ptr<CFG> Cfg;
   ControlDependencyCalculator CDG;
   std::map<const Stmt *, CFGBlock *> StMap;
+
+  std::string Heuristic;
 };
 
 // Condition guarding return negative value is error guarding.
@@ -62,7 +64,7 @@ public:
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
-        CDG(Cfg.get()) {
+        CDG(Cfg.get()), Heuristic("H02") {
     for (auto *CBlock : *(Cfg.get())) {
       for (auto &CfgElem : *CBlock) {
         if (CfgElem.getKind() == clang::CFGElement::Statement) {
@@ -84,6 +86,8 @@ private:
   std::unique_ptr<CFG> Cfg;
   ControlDependencyCalculator CDG;
   std::map<const Stmt *, CFGBlock *> StMap;
+
+  std::string Heuristic;
 };
 
 // Condition guarding return 0 value is error guarding.
@@ -94,7 +98,7 @@ public:
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
-        CDG(Cfg.get()) {
+        CDG(Cfg.get()), Heuristic("H05") {
     for (auto *CBlock : *(Cfg.get())) {
       for (auto &CfgElem : *CBlock) {
         if (CfgElem.getKind() == clang::CFGElement::Statement) {
@@ -116,6 +120,8 @@ private:
   std::unique_ptr<CFG> Cfg;
   ControlDependencyCalculator CDG;
   std::map<const Stmt *, CFGBlock *> StMap;
+
+  std::string Heuristic;
 };
 
 // Condition guarding return 0 value is error guarding.
@@ -126,7 +132,7 @@ public:
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
-        CDG(Cfg.get()), DomTree(Cfg.get()) {
+        CDG(Cfg.get()), DomTree(Cfg.get()), Heuristic("H06") {
     for (auto *CBlock : *(Cfg.get())) {
       for (auto &CfgElem : *CBlock) {
         if (CfgElem.getKind() == clang::CFGElement::Statement) {
@@ -149,6 +155,8 @@ private:
   ControlDependencyCalculator CDG;
   CFGDomTree DomTree;
   std::map<const Stmt *, CFGBlock *> StMap;
+
+  std::string Heuristic;
 };
 
 #endif //LLVM_CLANG_DETECTERR_RETURNVISITORS_H

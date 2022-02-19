@@ -28,6 +28,9 @@ public:
   }
 
   bool addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *ST,
+                            ASTContext *C, std::string Heuristic);
+
+  bool addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *ST,
                             ASTContext *C);
 
   // Convert error conditions to json string.

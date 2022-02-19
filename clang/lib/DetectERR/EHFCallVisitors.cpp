@@ -31,7 +31,7 @@ bool EHFCallVisitor::VisitCallExpr(CallExpr *CE) {
           Stmt *TStmt = CDGNode->getTerminatorStmt();
           // check if this is an if statement.
           if (dyn_cast_or_null<IfStmt>(TStmt)) {
-            Info.addErrorGuardingStmt(FID, TStmt, Context);
+            Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
           }
         }
       }

@@ -29,7 +29,7 @@ public:
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
-        CDG(Cfg.get()), EHFList_(EHFList) {
+        CDG(Cfg.get()), EHFList_(EHFList), Heuristic("H03") {
     for (auto *CBlock : *(Cfg.get())) {
       for (auto &CfgElem : *CBlock) {
         if (CfgElem.getKind() == clang::CFGElement::Statement) {
@@ -52,6 +52,8 @@ private:
   ControlDependencyCalculator CDG;
   const std::set<std::string>* EHFList_;
   std::map<const Stmt *, CFGBlock *> StMap;
+
+  std::string Heuristic;
 };
 
 #endif //LLVM_CLANG_DETECTERR_EHFCALLVISITORS_H

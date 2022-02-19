@@ -107,11 +107,6 @@ void DetectERRASTConsumer::handleFuncDecl(
     RVV.TraverseDecl(const_cast<FunctionDecl *>(FD));
 
     // EHF Call Visitor
-    //    auto arg1 = &C;
-    //    auto arg2 = Info;
-    //    auto arg3 = const_cast<FunctionDecl *>(FD);
-    //    auto arg4 = FID;
-    //    auto arg5 = &EHFList;
     EHFCallVisitor EHFCV(&C, Info, const_cast<FunctionDecl *>(FD), FID,
                          &EHFList);
     if (Opts.Verbose) {
