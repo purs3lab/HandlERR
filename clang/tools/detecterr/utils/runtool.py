@@ -27,7 +27,8 @@ def extract_archives(input_path):
     """Extracts the archives present in the folder `input_path`
 
     Retuns:
-        the list of extracted directories
+        the list of tuples of (extracted dir, build inst) for the extracted
+        directories
     """
     archives = []
     for f in os.listdir(input_path):
@@ -60,18 +61,41 @@ def extract_archives(input_path):
         print(f"[+] extracting {f} to {output_dir}")
         # TODO - input sanitization??
         subprocess.check_call(f"mkdir -p {output_dir}", shell=True)
-        subprocess.check_call(f"tar xf {f} --directory={output_dir}", shell=True)
+        subprocess.check_call(
+            f"tar xf {f} --directory={output_dir}", shell=True)
         print(f"[+] extracting complete")
-        extracted_dirs.append(output_dir)
+
+        # custom instructions provided?
+        build_inst = None
+        if os.path.isfile(f + ".build.inst"):
+            build_inst = f + ".build.inst"
+
+        extracted_dirs.append((output_dir, build_inst))
 
     return extracted_dirs
 
 
-def configure_and_bear_make_single(path):
+def configure_and_bear_make_single(path, build_inst=None):
     """
-    Runs `configure` and `bear make` on the `path` directory
+    Runs `configure` and `bear make` on the `path` directory.
+
+    If build_inst is not None, then the steps mentioned in the build_inst file
+    are executed before doing 'configure' and 'make'.
     """
     print(f"running configure_and_bear_make_single on {path}")
+
+    # custom build_inst
+    # TODO - shank : do stuff if build_inst is not None
+    if build_inst:
+        print(f"running custome build_inst first")
+        with open(build_inst) as inst_f:
+            # execute one instruction at a time
+            inst = inst_f.readline().strip()
+            print(f"[+] running: {inst}")
+            subprocess.check_call(f"{inst}", shell=True, cwd=path)
+            print("[+] configure done")
+
+
     # configure file
     if "configure" in os.listdir(path):
         print("[+] running configure...")
@@ -81,19 +105,23 @@ def configure_and_bear_make_single(path):
     # bear make
     print("[+] running bear make...")
     num_cpu = len(os.sched_getaffinity(0))  # parallelize make
-    subprocess.check_call(f"{BEAR_PATH} make -j{num_cpu}", shell=True, cwd=path)
+    subprocess.check_call(
+        f"{BEAR_PATH} make -j{num_cpu}", shell=True, cwd=path)
     print("[+] bear make done")
 
 
-def configure_and_bear_make_all(input_path):
+def configure_and_bear_make_all(extracted):
     """
     Runs `configure` and `bear make` on each of the extracted archives
+
+    Args:
+        extracted: list of tuples of (dir, build_inst)
 
     Returns:
         the directories where `bear make` was run for each input
     """
     build_dirs = []
-    for p in input_path:
+    for (p, build_inst) in extracted:
         # its possible that the extracted library is in a sub-folder of the
         # current directory. Hence we will use the heuristic that if the
         # given directory contains only a single directory, then that directory
@@ -103,10 +131,10 @@ def configure_and_bear_make_all(input_path):
             if os.path.isdir(os.path.join(p, d)):
                 probable_dirs.append(os.path.join(p, d))
         if len(probable_dirs) == 1:
-            configure_and_bear_make_single(probable_dirs[0])
+            configure_and_bear_make_single(probable_dirs[0], build_inst)
             build_dirs.append(probable_dirs[0])
         else:
-            configure_and_bear_make_single(p)
+            configure_and_bear_make_single(p, build_inst)
             build_dirs.append(p)
 
     return build_dirs
@@ -130,7 +158,8 @@ def convert_project(build_dirs):
     build_dirs.
     """
     convert_project_bin = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "port_tools", "convert_project.py"
+        os.path.dirname(os.path.realpath(__file__)
+                        ), "port_tools", "convert_project.py"
     )
     for d in build_dirs:
         print(f"[+] converting project {d}")
@@ -156,7 +185,8 @@ def run_tool_on_all(dirs):
         print(f"[+] running tool on {d}")
         convert_individual_script = os.path.join(d, "convert_individual.sh")
         convert_all_script = os.path.join(d, "convert_all.sh")
-        subprocess.check_call(f"{convert_individual_script}", shell=True, cwd=d)
+        subprocess.check_call(
+            f"{convert_individual_script}", shell=True, cwd=d)
         print("[+] running tool done")
 
 
@@ -207,7 +237,8 @@ def create_cumulative_errblocks_json_for_each(dirs):
     """
     for d in dirs:
         cumulative_file_ = os.path.join(d, "__project.errblocks.json")
-        print(f"[+] creating cumulative errblocks.json for {d} as {cumulative_file_}")
+        print(
+            f"[+] creating cumulative errblocks.json for {d} as {cumulative_file_}")
         with open(cumulative_file_, "w") as cumulative_file:
             cumulative_data = process_errblocks_for_dir(d)
             deduplicated = []
@@ -231,7 +262,8 @@ def generate_stats(dirs):
     project_files = []
     for d in dirs:
         cumulative_file_ = os.path.join(d, "__project.errblocks.json")
-        print(f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)}")
+        print(
+            f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)}")
         project_name = os.path.basename(os.path.dirname(d))
         project_filename = f"{project_name}__project.errblocks.json"
         bench_project_filename = os.path.join(
@@ -287,7 +319,6 @@ def run_main(args):
     convert_project(build_dirs)
     run_tool_on_all(build_dirs)
 
-    # TODO - collecting the individual err handler jsons
     create_cumulative_errblocks_json_for_each(build_dirs)
 
     # print the statistics for the identified error guarding conditions
@@ -357,7 +388,8 @@ if __name__ == "__main__":
 
     if not args.benchmarks_path or not os.path.isdir(args.benchmarks_path):
         print("Error: Path to the benchmarks folder is invalid.")
-        print("Provided argument: {} is not a directory.".format(args.benchmarks_path))
+        print("Provided argument: {} is not a directory.".format(
+            args.benchmarks_path))
         sys.exit(1)
 
     if not args.bear_path or not os.path.isfile(args.bear_path):
