@@ -28,6 +28,15 @@ bool isNULLExpr(const clang::Expr *E, ASTContext &C);
 // Is the expression a negative integer expression?
 bool isNegativeNumber(const clang::Expr *E, ASTContext &C);
 
+/// Is the expression a deref to the given Decl?
+bool isDerefToDeclRef(const clang::Expr *E, const NamedDecl *D);
+
+/// Is the Expr a wrapper around the given NamedDecl?
+bool hasDeclRefExprTo(const clang::Expr *E, const NamedDecl *D);
+
+/// Get the underlying expression for a Deref Expression (UnaryOperator)
+Expr* getDerefExpr(const clang::Expr *E);
+
 /// Is the expression a zero
 bool isZero(const clang::Expr *E, ASTContext &C);
 

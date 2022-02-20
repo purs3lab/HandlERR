@@ -135,6 +135,8 @@ bool isLastStmtInBB(const Stmt &ST, const CFGBlock &BB) {
     const Stmt *LastStmt = (*it).getAs<CFGStmt>()->getStmt();
     return LastStmt == &ST;
   }
+
+  return false;
 }
 
 bool isEHFCallExpr(const CallExpr *CE, const std::set<std::string> &EHFList,
@@ -146,6 +148,64 @@ bool isEHFCallExpr(const CallExpr *CE, const std::set<std::string> &EHFList,
     if (EHFList.find(calledFnName) != EHFList.end()) {
       return true;
     }
+  }
+  return false;
+}
+
+/// Is the expression a deref to the given Decl?
+bool isDerefToDeclRef(const clang::Expr *E, const NamedDecl *D) {
+  // is the expr a pointer type?
+
+  // This is what a sample dump for *a == x looks like (for *a part)
+  // ImplicitCastExpr 0x55555de82a40 'int' <LValueToRValue>
+  // `-UnaryOperator 0x55555de829e8 'int' lvalue prefix '*' cannot overflow
+  //   `-ImplicitCastExpr 0x55555de829b0 'int *' <LValueToRValue>
+  //     `-DeclRefExpr 0x55555de82980 'int *' lvalue Var 0x55555de826c0 'a' 'int *'
+
+  // so we can:
+  // - remove the implicit cast(s)
+  // - check that we have a UnaryOperator (*)
+  // - again remove the implicit cast(s)
+  // - get the underlying DeclRef
+
+  const Expr *CurrE = removeAuxillaryCasts(E);
+  if (const UnaryOperator *UO = dyn_cast<UnaryOperator>(CurrE)) {
+    if (UO->getOpcode() == UnaryOperator::Opcode::UO_Deref) {
+      for (const Stmt *child : UO->children()) {
+        // there would be only one child
+        if (const DeclRefExpr *ActualDRE =
+                getDeclRefExpr(dyn_cast<Expr>(child))) {
+          return ActualDRE->getFoundDecl()->getUnderlyingDecl() == D;
+        }
+      }
+    }
+  }
+
+  // is the underlying Decl same as the one passed in the argument?
+
+  return false;
+}
+
+/// Get the underlying expression for a Deref Expression (UnaryOperator)
+Expr *getDerefExpr(const clang::Expr *E) {
+  Expr *Result = nullptr;
+  const Expr *CE = removeAuxillaryCasts(E);
+  if (const UnaryOperator *UO = dyn_cast<UnaryOperator>(CE)) {
+    if (UO->getOpcode() == UnaryOperator::Opcode::UO_Deref) {
+      for (const Stmt *child : UO->children()) {
+        // there would be only one child
+        Result = (Expr *)dyn_cast_or_null<Expr>(child);
+      }
+    }
+  }
+
+  return Result;
+}
+
+/// Is the Expr a wrapper around the given NamedDecl?
+bool hasDeclRefExprTo(const clang::Expr *E, const NamedDecl *D){
+  if(const DeclRefExpr *DRE = getDeclRefExpr(E)){
+    return DRE->getFoundDecl()->getUnderlyingDecl() == D;
   }
   return false;
 }

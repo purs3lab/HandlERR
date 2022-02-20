@@ -30,7 +30,9 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *S) {
             // Collect the possible length bounds keys.
             Stmt *TStmt = CDGNode->getTerminatorStmt();
             // check if this is an if statement.
-            if (dyn_cast_or_null<IfStmt>(TStmt)) {
+            if (dyn_cast_or_null<IfStmt>(TStmt) ||
+                dyn_cast_or_null<WhileStmt>(TStmt) ||
+                dyn_cast_or_null<SwitchStmt>(TStmt)) {
               Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
             }
           }
@@ -56,7 +58,9 @@ bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *S) {
             // Collect the possible length bounds keys.
             Stmt *TStmt = CDGNode->getTerminatorStmt();
             // check if this is an if statement.
-            if (dyn_cast_or_null<IfStmt>(TStmt)) {
+            if (dyn_cast_or_null<IfStmt>(TStmt) ||
+                dyn_cast_or_null<WhileStmt>(TStmt) ||
+                dyn_cast_or_null<SwitchStmt>(TStmt)) {
               Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
             }
           }
@@ -88,7 +92,9 @@ bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *S) {
           // Collect the possible length bounds keys.
           Stmt *TStmt = CDGNode->getTerminatorStmt();
           // check if this is an if statement.
-          if (dyn_cast_or_null<IfStmt>(TStmt)) {
+          if (dyn_cast_or_null<IfStmt>(TStmt) ||
+              dyn_cast_or_null<WhileStmt>(TStmt) ||
+              dyn_cast_or_null<SwitchStmt>(TStmt)) {
             Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
           }
         }
@@ -127,9 +133,6 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
       // is a IfStmt and the condition of that IfStmt is a NULL check
       // against the value being returned
 
-      //      llvm::errs() << "processing fn: " << FnDecl->getNameInfo().getAsString()
-      //                   << '\n';
-
       // return stmt is a 'return var'
       if (isDeclExpr(S->getRetValue())) { // return val
         ReturnBB = StMap[S];
@@ -162,16 +165,35 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
               Cond = WhileCheck->getCond();
             }
 
-            if (Cond) {
-              // I: cond: x != NULL
-              if (BinaryOperator *BinaryOp = dyn_cast<BinaryOperator>(Cond)) {
-                // we only care about '!='
-                if (BinaryOp->getOpcode() == BinaryOperator::Opcode::BO_NE) {
-                  if (isNULLExpr(BinaryOp->getLHS(), *Context)) {
-                    DRE = BinaryOp->getRHS();
+            // Switch Stmt
+            else if (SwitchStmt *SwitchCheck =
+                         dyn_cast_or_null<SwitchStmt>(TStmt)) {
+              //              llvm::errs() << "WhileStmt\n";
+              Cond = SwitchCheck->getCond();
+            }
 
-                  } else if (isNULLExpr(BinaryOp->getRHS(), *Context)) {
-                    DRE = BinaryOp->getLHS();
+            if (Cond) {
+              // I: cond: x != something OR x == something
+              if (BinaryOperator *BinaryOp = dyn_cast<BinaryOperator>(Cond)) {
+                // we only care about '!=' OR '==
+                if (BinaryOp->getOpcode() == BinaryOperator::Opcode::BO_NE ||
+                    BinaryOp->getOpcode() == BinaryOperator::Opcode::BO_EQ ||
+                    BinaryOp->getOpcode() == BinaryOperator::Opcode::BO_Cmp) {
+
+                  Expr *LHS = BinaryOp->getLHS();
+                  Expr *RHS = BinaryOp->getRHS();
+
+                  if (hasDeclRefExprTo(LHS, ReturnNamedDecl)) {
+                    DRE = (Expr *)getDeclRefExpr(LHS);
+
+                  } else if (hasDeclRefExprTo(RHS, ReturnNamedDecl)) {
+                    DRE = (Expr *)getDeclRefExpr(RHS);
+
+                  } else if (isDerefToDeclRef(LHS, ReturnNamedDecl)) {
+                    DRE = getDerefExpr(LHS);
+
+                  } else if (isDerefToDeclRef(RHS, ReturnNamedDecl)) {
+                    DRE = getDerefExpr(RHS);
                   }
                 }
               }
@@ -183,6 +205,8 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
                   DRE = UnaryOp->getSubExpr();
                 }
               }
+
+              // III: cond: x
             }
 
             if (DRE && Cond) {
@@ -190,15 +214,9 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
               // SourceRange srcRange = TStmt->getSourceRange();
               // srcRange.dump(Context->getSourceManager());
 
-              // llvm::errs() << "DRE: ";
-              // DRE->dump();
-
               const DeclRefExpr *CheckedDRE = getDeclRefExpr(DRE);
 
-              //              llvm::errs() << "CheckedDRE: ";
-              //              CheckedDRE->dump();
-
-              if (CheckedDRE) { // TODO: tmp check for discussion
+              if (CheckedDRE) {
                 const auto *CheckedNamedDecl =
                     CheckedDRE->getFoundDecl()->getUnderlyingDecl();
 
@@ -213,7 +231,6 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
 
                   // finally, note the guarding statement
                   if (!IsUpdated) {
-                    llvm::errs() << "not updated, adding error guarding stmt\n";
                     Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
                   }
                 }
