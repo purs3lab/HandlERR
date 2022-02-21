@@ -30,7 +30,9 @@ bool EHFCallVisitor::VisitCallExpr(CallExpr *CE) {
           // Collect the possible length bounds keys.
           Stmt *TStmt = CDGNode->getTerminatorStmt();
           // check if this is an if statement.
-          if (dyn_cast_or_null<IfStmt>(TStmt)) {
+          if (dyn_cast_or_null<IfStmt>(TStmt) ||
+              dyn_cast_or_null<WhileStmt>(TStmt) ||
+              dyn_cast_or_null<SwitchStmt>(TStmt)) {
             Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
           }
         }
