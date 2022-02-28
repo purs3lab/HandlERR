@@ -238,3 +238,15 @@ bool hasPreDominators(CFGBlock &CurrBB, ControlDependencyCalculator *CDG,
   }
   return foundDominator;
 }
+
+/// debug util: dumps the statements in the stmap
+void __dbg_print_statements(std::map<const Stmt *, CFGBlock *> &StMap){
+  llvm::errs() << "__dbg_print_statements >>>\n";
+  auto it = StMap.begin();
+  while(it != StMap.end()){
+    llvm::errs() << "- Stmt:\n";
+    it->first->dump();
+    it++;
+  }
+  llvm::errs() << "__dbg_print_statements <<<\n";
+}

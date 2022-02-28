@@ -14,6 +14,7 @@
 #include "clang/DetectERR/EHFCallVisitors.h"
 #include "clang/DetectERR/EHFCollectors.h"
 #include "clang/DetectERR/ReturnVisitors.h"
+#include "clang/DetectERR/GotoVisitors.h"
 #include "clang/DetectERR/Utils.h"
 
 using namespace llvm;
@@ -22,7 +23,6 @@ using namespace clang;
 void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
   TranslationUnitDecl *TUD = C.getTranslationUnitDecl();
 
-  // TODO: shank - implement this
   // Fixed point computation for exit functions
   // populate EHFList with known error functions.
   std::set<std::string> EHFList;
@@ -125,6 +125,14 @@ void DetectERRASTConsumer::handleFuncDecl(
       llvm::outs() << "[+] Running ReturnEarlyVisitor call handler.\n";
     }
     REV.TraverseDecl(const_cast<FunctionDecl *>(FD));
+
+    // Goto Visitor
+    GotoVisitor GV(&C, Info, const_cast<FunctionDecl *>(FD), FID);
+    if (Opts.Verbose) {
+      llvm::outs() << "[+] Running GotoVisitor call handler.\n";
+    }
+    GV.TraverseDecl(const_cast<FunctionDecl *>(FD));
+
     if (Opts.Verbose) {
       llvm::outs() << "[+] Finished handling function:" << FID.first << "\n";
     }

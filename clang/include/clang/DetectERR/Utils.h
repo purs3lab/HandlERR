@@ -69,4 +69,8 @@ bool hasPostDominators(CFGBlock &CurrBB, const CFGPostDomTree *PDTree,
 bool hasPreDominators(CFGBlock &CurrBB, const ControlDependencyCalculator *CDG,
                       const CFG &Cfg);
 
+
+/// debug util: dumps the statements in the stmap
+void __dbg_print_statements(std::map<const Stmt *, CFGBlock *> &StMap);
+
 #endif //LLVM_CLANG_DETECTERR_UTILS_H
