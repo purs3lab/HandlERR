@@ -1,4 +1,4 @@
-#include <malloc.h>
+#include <stdlib.h>
 
 int *baz(int a) {
   int *x = NULL;

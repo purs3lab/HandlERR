@@ -23,9 +23,10 @@ using namespace clang;
 
 
 // ErrorHandlingFunction Visitor to try and collect all the error handling functions
-class EHFCategoryOneVisitor : public RecursiveASTVisitor<EHFCategoryOneVisitor> {
+class EHFCategoryOneCollector
+    : public RecursiveASTVisitor<EHFCategoryOneCollector> {
 public:
-  explicit EHFCategoryOneVisitor(ASTContext *Context, FunctionDecl *FD, std::set<std::string> &EHFList)
+  explicit EHFCategoryOneCollector(ASTContext *Context, FunctionDecl *FD, std::set<std::string> &EHFList)
       : Context(Context), FnDecl(FD),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
@@ -52,5 +53,35 @@ private:
   std::set<std::string>* EHFList_;
 };
 
+
+class EHFCategoryTwoCollector
+    : public RecursiveASTVisitor<EHFCategoryTwoCollector> {
+public:
+  explicit EHFCategoryTwoCollector(ASTContext *Context, FunctionDecl *FD, std::set<std::string> &EHFList)
+      : Context(Context), FnDecl(FD),
+        Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
+                          CFG::BuildOptions())),
+        CDG(Cfg.get()), EHFList_(&EHFList) {
+    for (auto *CBlock : *(Cfg.get())) {
+      for (auto &CfgElem : *CBlock) {
+        if (CfgElem.getKind() == clang::CFGElement::Statement) {
+          const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
+          StMap[TmpSt] = CBlock;
+        }
+      }
+    }
+  }
+
+  bool VisitFunctionDecl(FunctionDecl *FD);
+
+private:
+  ASTContext *Context;
+  FunctionDecl *FnDecl;
+
+  std::unique_ptr<CFG> Cfg;
+  ControlDependencyCalculator CDG;
+  std::map<const Stmt *, CFGBlock *> StMap;
+  std::set<std::string>* EHFList_;
+};
 
 #endif //LLVM_CLANG_DETECTERR_RETURNVISITORS_H

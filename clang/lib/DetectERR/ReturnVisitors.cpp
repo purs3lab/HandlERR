@@ -103,6 +103,7 @@ bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *S) {
   }
   return true;
 }
+
 /// H06 - a "return <val>" statement is dominated by a check for that particular
 /// value but is not control dependent on the check
 ///
@@ -236,6 +237,51 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
                 }
               }
             }
+          }
+        }
+      }
+    }
+  }
+  return true;
+}
+
+/// H07 - early return based on a check for a function having void return type
+///
+/// Checks for conditions like:
+///
+///     void myfunc(<args>) {
+///         ...
+///         if (<cond>){
+///             return;         // <---- early return
+///         }
+///         ...
+///         ...
+///         return; // <----
+///     }
+///
+/// Conditions:
+/// - function has void return type
+/// - a check is directly followed by an early return
+bool ReturnEarlyVisitor::VisitReturnStmt(ReturnStmt *S) {
+  if (FnDecl->getReturnType()->isVoidType()) {  // return type = void
+    // - BB for the return statement does not contain any other statements
+    // - the immediate dominator BB has a terminator statement that is a check
+    //    (if, while, switch)
+
+    CFGBlock *ReturnBB = StMap[S];
+    if (ReturnBB->size() == 1){
+      auto &CDNodes = CDG.getControlDependencies(ReturnBB);
+      if (!CDNodes.empty()) {
+        // We should use all CDs
+        // Get the last statement from the list of control dependencies.
+        for (auto &CDGNode : CDNodes) {
+          // Collect the possible length bounds keys.
+          Stmt *TStmt = CDGNode->getTerminatorStmt();
+          // check if this is an if statement.
+          if (dyn_cast_or_null<IfStmt>(TStmt) ||
+              dyn_cast_or_null<WhileStmt>(TStmt) ||
+              dyn_cast_or_null<SwitchStmt>(TStmt)) {
+            Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
           }
         }
       }

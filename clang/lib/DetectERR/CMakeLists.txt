@@ -9,7 +9,7 @@ add_clang_library(clangdetecterr
   DetectERRASTConsumer.cpp
   PersistentSourceLoc.cpp
   ProjectInfo.cpp
-  EHFVisitor.cpp
+        EHFCollectors.cpp
   ReturnVisitors.cpp
   EHFCallVisitors.cpp
   Utils.cpp

@@ -12,7 +12,7 @@
 #include "clang/DetectERR/DetectERRASTConsumer.h"
 #include "clang/Analysis/CFG.h"
 #include "clang/DetectERR/EHFCallVisitors.h"
-#include "clang/DetectERR/EHFVisitor.h"
+#include "clang/DetectERR/EHFCollectors.h"
 #include "clang/DetectERR/ReturnVisitors.h"
 #include "clang/DetectERR/Utils.h"
 
@@ -43,11 +43,16 @@ void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
           if (EHFList.find(FnName) != EHFList.end()) {
             continue;
           }
-          // check this function for possibly being a category one exit
-          // function
-          EHFCategoryOneVisitor ECV(&C, const_cast<FunctionDecl *>(FD),
+
+          // cat 1 exit fn?
+          EHFCategoryOneCollector ECVOne(&C, const_cast<FunctionDecl *>(FD),
                                     EHFList);
-          ECV.TraverseDecl(const_cast<FunctionDecl *>(FD));
+          ECVOne.TraverseDecl(const_cast<FunctionDecl *>(FD));
+
+          // cat 2 exit fn?
+          EHFCategoryTwoCollector ECVTwo(&C, const_cast<FunctionDecl *>(FD),
+                                      EHFList);
+          ECVTwo.TraverseDecl(const_cast<FunctionDecl *>(FD));
         }
       }
     }
@@ -114,6 +119,12 @@ void DetectERRASTConsumer::handleFuncDecl(
     }
     EHFCV.TraverseDecl(const_cast<FunctionDecl *>(FD));
 
+    // Return Early Visitor
+    ReturnEarlyVisitor REV(&C, Info, const_cast<FunctionDecl *>(FD), FID);
+    if (Opts.Verbose) {
+      llvm::outs() << "[+] Running ReturnEarlyVisitor call handler.\n";
+    }
+    REV.TraverseDecl(const_cast<FunctionDecl *>(FD));
     if (Opts.Verbose) {
       llvm::outs() << "[+] Finished handling function:" << FID.first << "\n";
     }

@@ -48,6 +48,17 @@ bool isNegativeNumber(const clang::Expr *E, ASTContext &C) {
   return false;
 }
 
+bool isInt(int i, const clang::Expr *E, ASTContext &C) {
+  E = removeAuxillaryCasts(E);
+  if (E->isIntegerConstantExpr(C)) {
+    auto NewAPI = E->getIntegerConstantExpr(C);
+    if (NewAPI.hasValue()) {
+      return (NewAPI->getSExtValue() == i);
+    }
+  }
+  return false;
+}
+
 /// Is the expression a zero
 bool isZero(const clang::Expr *E, ASTContext &C) {
   E = removeAuxillaryCasts(E);
@@ -66,23 +77,6 @@ bool isDeclExpr(const clang::Expr *E) {
 const DeclRefExpr *getDeclRefExpr(const clang::Expr *E) {
   auto *Exp = removeAuxillaryCasts(E);
   return dyn_cast<DeclRefExpr>(Exp);
-}
-
-bool hasPostDominators(CFGBlock &CurrBB, const CFGPostDomTree *PDTree,
-                       const CFG &Cfg) {
-  bool foundDominator = false;
-  // iterate over all the BasicBlocks of the given CFG
-  for (CFGBlock *OtherBB : Cfg) {
-    // if otherBB properly dominates CurrBB
-    if (PDTree->properlyDominates(OtherBB, &CurrBB)) {
-      // if the dominator is ExitBB, ignore it
-      if (OtherBB != &Cfg.getExit()) {
-        foundDominator = true;
-        break;
-      }
-    }
-  }
-  return foundDominator;
 }
 
 bool isUpdatedInPostDominators(const NamedDecl *ND, CFGBlock &CurrBB,
@@ -203,9 +197,44 @@ Expr *getDerefExpr(const clang::Expr *E) {
 }
 
 /// Is the Expr a wrapper around the given NamedDecl?
-bool hasDeclRefExprTo(const clang::Expr *E, const NamedDecl *D){
-  if(const DeclRefExpr *DRE = getDeclRefExpr(E)){
+bool hasDeclRefExprTo(const clang::Expr *E, const NamedDecl *D) {
+  if (const DeclRefExpr *DRE = getDeclRefExpr(E)) {
     return DRE->getFoundDecl()->getUnderlyingDecl() == D;
   }
   return false;
+}
+
+/// Checks whether there is a post-dominated CFGBlock for the given block
+bool hasPostDominators(CFGBlock &CurrBB, const CFGPostDomTree *PDTree,
+                       const CFG &Cfg) {
+  bool foundDominator = false;
+  // iterate over all the BasicBlocks of the given CFG
+  for (CFGBlock *OtherBB : Cfg) {
+    // if otherBB properly dominates CurrBB
+    if (PDTree->properlyDominates(OtherBB, &CurrBB)) {
+      // if the dominator is ExitBB, ignore it
+      if (OtherBB != &Cfg.getExit()) {
+        foundDominator = true;
+        break;
+      }
+    }
+  }
+  return foundDominator;
+}
+
+/// Checks if the given CFGBlock has any dominators
+bool hasPreDominators(CFGBlock &CurrBB, ControlDependencyCalculator *CDG,
+                      const CFG &Cfg) {
+  bool foundDominator = false;
+  auto &CDNodes = CDG->getControlDependencies(&CurrBB);
+  // iterate over all the BasicBlocks of the given CFG
+  for (CFGBlock *OtherBB : CDNodes) {
+    // if otherBB properly dominates CurrBB
+    // if the dominator is EntryBB, ignore it
+    if (OtherBB != &Cfg.getEntry()) {
+      foundDominator = true;
+      break;
+    }
+  }
+  return foundDominator;
 }
