@@ -20,17 +20,19 @@ public:
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
         CDG(Cfg.get()), Heuristic("H08") {
-    for (auto *CBlock : *(Cfg.get())) {
-      if(CBlock->size() == 0){
-        if(Stmt *St = CBlock->getTerminatorStmt()){
-          StMap[St] = CBlock;
-        }
-      }
 
+    for (auto *CBlock : *(Cfg.get())) {
       for (auto &CfgElem : *CBlock) {
         if (CfgElem.getKind() == clang::CFGElement::Statement) {
           const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
           StMap[TmpSt] = CBlock;
+        }
+      }
+
+      // add goto statements to the statement map
+      if(Stmt *St = CBlock->getTerminatorStmt()){
+        if(GotoStmt *GotoSt = dyn_cast_or_null<GotoStmt>(St)){
+          StMap[St] = CBlock;
         }
       }
     }
