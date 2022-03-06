@@ -102,6 +102,13 @@ def configure_and_bear_make_single(path, build_inst=None):
             subprocess.check_call(
                 f"./configure --enable-maintainer-mode", shell=True, cwd=path
             )
+
+        elif "glibc" in path:
+            # custom for glibc
+            subprocess.check_call(f"mkdir -p build", shell=True, cwd=path)
+            path = os.path.join(path, "build")
+            subprocess.check_call(f"../configure --prefix=/usr", shell=True, cwd=path)
+
         else:
             # normal libraries, just do ./configure
             subprocess.check_call(f"./configure", shell=True, cwd=path)
