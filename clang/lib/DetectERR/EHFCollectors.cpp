@@ -117,10 +117,12 @@ bool EHFCategoryTwoCollector::VisitFunctionDecl(FunctionDecl *FD) {
           int nArgs = CE->getNumArgs();
           const Expr *LastArg = CE->getArg(nArgs-1);
           const DeclRefExpr *DRE = getDeclRefExpr(LastArg);
-          if(DRE->getNameInfo().getAsString() == "stderr"){
-            writesToStderr = true;
-            WritingStmt = CurrStmt;
-            break;
+          if(DRE){
+            if(DRE->getNameInfo().getAsString() == "stderr"){
+              writesToStderr = true;
+              WritingStmt = CurrStmt;
+              break;
+            }
           }
         }
       }
