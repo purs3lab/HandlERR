@@ -21,15 +21,13 @@ public:
                           CFG::BuildOptions())),
         CDG(Cfg.get()), Heuristic("H08") {
     for (auto *CBlock : *(Cfg.get())) {
-      llvm::errs() << "- CBlock:\n";
-      CBlock->dump();
-      for (auto &CfgElem : *CBlock) {
-
-        if(FnDecl->getNameInfo().getAsString() == "foo"){
-        llvm::errs() << "- CfgElem:\n";
-        CfgElem.dump();
+      if(CBlock->size() == 0){
+        if(Stmt *St = CBlock->getTerminatorStmt()){
+          StMap[St] = CBlock;
         }
+      }
 
+      for (auto &CfgElem : *CBlock) {
         if (CfgElem.getKind() == clang::CFGElement::Statement) {
           const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
           StMap[TmpSt] = CBlock;

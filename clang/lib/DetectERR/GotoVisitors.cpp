@@ -11,24 +11,6 @@ std::set<std::string> GotoVisitor::ErrorLabels = {
 bool GotoVisitor::VisitGotoStmt(GotoStmt *S) {
   std::string LabelName = S->getLabel()->getName().lower();
   if (ErrorLabels.find(LabelName) != ErrorLabels.end()) {
-
-    if(FnDecl->getNameInfo().getAsString() == "foo"){
-      __dbg_print_statements(StMap);
-    }
-
-    auto Parents = Context->getParents(*S);
-    if (!Parents.empty()){
-      auto Parent = Parents[0];
-      Parent.dump(llvm::errs(), *Context);
-      const Stmt *St = Parent.get<Stmt>();
-      if (StMap.find(S) != StMap.end()) {
-        llvm::errs() << "found parent of Goto!!\n";
-      }else{
-        llvm::errs() << "No luck bruh :(\n";
-      }
-
-      llvm::errs() << "here";
-    }
     if (StMap.find(S) != StMap.end()) {
       CFGBlock *CurBB = StMap[S];
       auto &CDNodes = CDG.getControlDependencies(CurBB);

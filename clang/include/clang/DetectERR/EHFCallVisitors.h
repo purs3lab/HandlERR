@@ -24,13 +24,18 @@ using namespace clang;
 // Condition guarding return NULL is error guarding.
 class EHFCallVisitor : public RecursiveASTVisitor<EHFCallVisitor> {
 public:
-  explicit EHFCallVisitor(ASTContext *Context, ProjectInfo &I,
-                             FunctionDecl *FD, FuncId &FnID, const std::set<std::string> *EHFList)
+  explicit EHFCallVisitor(ASTContext *Context, ProjectInfo &I, FunctionDecl *FD,
+                          FuncId &FnID, const std::set<std::string> *EHFList)
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
         CDG(Cfg.get()), EHFList_(EHFList), Heuristic("H03") {
     for (auto *CBlock : *(Cfg.get())) {
+      if (CBlock->size() == 0) {
+        if (Stmt *St = CBlock->getTerminatorStmt()) {
+          StMap[St] = CBlock;
+        }
+      }
       for (auto &CfgElem : *CBlock) {
         if (CfgElem.getKind() == clang::CFGElement::Statement) {
           const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
@@ -50,7 +55,7 @@ private:
 
   std::unique_ptr<CFG> Cfg;
   ControlDependencyCalculator CDG;
-  const std::set<std::string>* EHFList_;
+  const std::set<std::string> *EHFList_;
   std::map<const Stmt *, CFGBlock *> StMap;
 
   std::string Heuristic;

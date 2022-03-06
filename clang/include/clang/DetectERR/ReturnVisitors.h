@@ -31,6 +31,11 @@ public:
                           CFG::BuildOptions())),
         CDG(Cfg.get()), Heuristic("H04") {
     for (auto *CBlock : *(Cfg.get())) {
+      if (CBlock->size() == 0) {
+        if (Stmt *St = CBlock->getTerminatorStmt()) {
+          StMap[St] = CBlock;
+        }
+      }
       for (auto &CfgElem : *CBlock) {
         if (CfgElem.getKind() == clang::CFGElement::Statement) {
           const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
@@ -66,6 +71,11 @@ public:
                           CFG::BuildOptions())),
         CDG(Cfg.get()), Heuristic("H02") {
     for (auto *CBlock : *(Cfg.get())) {
+      if (CBlock->size() == 0) {
+        if (Stmt *St = CBlock->getTerminatorStmt()) {
+          StMap[St] = CBlock;
+        }
+      }
       for (auto &CfgElem : *CBlock) {
         if (CfgElem.getKind() == clang::CFGElement::Statement) {
           const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
@@ -100,6 +110,11 @@ public:
                           CFG::BuildOptions())),
         CDG(Cfg.get()), Heuristic("H05") {
     for (auto *CBlock : *(Cfg.get())) {
+      if (CBlock->size() == 0) {
+        if (Stmt *St = CBlock->getTerminatorStmt()) {
+          StMap[St] = CBlock;
+        }
+      }
       for (auto &CfgElem : *CBlock) {
         if (CfgElem.getKind() == clang::CFGElement::Statement) {
           const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
@@ -134,6 +149,11 @@ public:
                           CFG::BuildOptions())),
         CDG(Cfg.get()), DomTree(Cfg.get()), Heuristic("H06") {
     for (auto *CBlock : *(Cfg.get())) {
+      if (CBlock->size() == 0) {
+        if (Stmt *St = CBlock->getTerminatorStmt()) {
+          StMap[St] = CBlock;
+        }
+      }
       for (auto &CfgElem : *CBlock) {
         if (CfgElem.getKind() == clang::CFGElement::Statement) {
           const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
@@ -164,12 +184,17 @@ private:
 class ReturnEarlyVisitor : public RecursiveASTVisitor<ReturnEarlyVisitor> {
 public:
   explicit ReturnEarlyVisitor(ASTContext *Context, ProjectInfo &I,
-                             FunctionDecl *FD, FuncId &FnID)
+                              FunctionDecl *FD, FuncId &FnID)
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
         CDG(Cfg.get()), Heuristic("H07") {
     for (auto *CBlock : *(Cfg.get())) {
+      if (CBlock->size() == 0) {
+        if (Stmt *St = CBlock->getTerminatorStmt()) {
+          StMap[St] = CBlock;
+        }
+      }
       for (auto &CfgElem : *CBlock) {
         if (CfgElem.getKind() == clang::CFGElement::Statement) {
           const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
