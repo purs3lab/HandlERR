@@ -51,15 +51,11 @@ bool EHFCategoryOneCollector::VisitCallExpr(CallExpr *S) {
 
 /// - the function has a 'noreturn' attribute
 bool EHFCategoryOneCollector::VisitFunctionDecl(FunctionDecl *FD) {
-  std::string calledFnName = FD->getNameInfo().getAsString();
-  auto RType = FD->getReturnType();
-  llvm::errs() << "FnName: " << calledFnName << "\t"
-               << "RType: ";
-  RType.dump();
-
   if (FD->isNoReturn()) {
     EHFList_->insert(FD->getNameInfo().getAsString());
   }
+
+  return true;
 }
 
 /// EHF Cat 2 functions are identified based on the following heuristics
@@ -74,7 +70,7 @@ bool EHFCategoryOneCollector::VisitFunctionDecl(FunctionDecl *FD) {
 bool EHFCategoryTwoCollector::VisitFunctionDecl(FunctionDecl *FD) {
   /// 1. name contains "err"
   std::string FnName = FD->getNameInfo().getAsString();
-  if (FnName.find("err") != -1) {
+  if (FnName.find("err") != std::string::npos) {
     EHFList_->insert(FnDecl->getNameInfo().getAsString());
     return true;
   }
