@@ -176,6 +176,10 @@ def convert_project(build_dirs):
                         ), "port_tools", "convert_project.py"
     )
     for d in build_dirs:
+        # libc - special case
+        if 'libc' in d:
+            d = os.path.join(d, 'build')
+
         print(f"[+] converting project {d}")
         if "compile_commands.json" in os.listdir(d):
             print("[+] compile_commands.json found")
@@ -196,6 +200,10 @@ def run_tool_on_all(dirs):
     from convert_project.py).
     """
     for d in dirs:
+        # libc - special case
+        if 'libc' in d:
+            d = os.path.join(d, "build")
+
         print(f"[+] running tool on {d}")
         convert_individual_script = os.path.join(d, "convert_individual.sh")
         convert_all_script = os.path.join(d, "convert_all.sh")
