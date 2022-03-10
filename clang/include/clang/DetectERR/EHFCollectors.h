@@ -21,12 +21,12 @@ using namespace clang;
 #ifndef LLVM_CLANG_DETECTERR_EHFVISITOR_H
 #define LLVM_CLANG_DETECTERR_EHFVISITOR_H
 
-
 // ErrorHandlingFunction Visitor to try and collect all the error handling functions
 class EHFCategoryOneCollector
     : public RecursiveASTVisitor<EHFCategoryOneCollector> {
 public:
-  explicit EHFCategoryOneCollector(ASTContext *Context, FunctionDecl *FD, std::set<std::string> &EHFList)
+  explicit EHFCategoryOneCollector(ASTContext *Context, FunctionDecl *FD,
+                                   std::set<std::string> &EHFList)
       : Context(Context), FnDecl(FD),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
@@ -42,6 +42,7 @@ public:
   }
 
   bool VisitCallExpr(CallExpr *S);
+  bool VisitFunctionDecl(FunctionDecl *FD);
 
 private:
   ASTContext *Context;
@@ -50,14 +51,14 @@ private:
   std::unique_ptr<CFG> Cfg;
   ControlDependencyCalculator CDG;
   std::map<const Stmt *, CFGBlock *> StMap;
-  std::set<std::string>* EHFList_;
+  std::set<std::string> *EHFList_;
 };
-
 
 class EHFCategoryTwoCollector
     : public RecursiveASTVisitor<EHFCategoryTwoCollector> {
 public:
-  explicit EHFCategoryTwoCollector(ASTContext *Context, FunctionDecl *FD, std::set<std::string> &EHFList)
+  explicit EHFCategoryTwoCollector(ASTContext *Context, FunctionDecl *FD,
+                                   std::set<std::string> &EHFList)
       : Context(Context), FnDecl(FD),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
@@ -81,7 +82,7 @@ private:
   std::unique_ptr<CFG> Cfg;
   ControlDependencyCalculator CDG;
   std::map<const Stmt *, CFGBlock *> StMap;
-  std::set<std::string>* EHFList_;
+  std::set<std::string> *EHFList_;
 };
 
 #endif //LLVM_CLANG_DETECTERR_RETURNVISITORS_H

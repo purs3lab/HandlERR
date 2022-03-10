@@ -13,8 +13,8 @@
 #include "clang/Analysis/CFG.h"
 #include "clang/DetectERR/EHFCallVisitors.h"
 #include "clang/DetectERR/EHFCollectors.h"
-#include "clang/DetectERR/ReturnVisitors.h"
 #include "clang/DetectERR/GotoVisitors.h"
+#include "clang/DetectERR/ReturnVisitors.h"
 #include "clang/DetectERR/Utils.h"
 
 using namespace llvm;
@@ -46,17 +46,22 @@ void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
 
           // cat 1 exit fn?
           EHFCategoryOneCollector ECVOne(&C, const_cast<FunctionDecl *>(FD),
-                                    EHFList);
+                                         EHFList);
           ECVOne.TraverseDecl(const_cast<FunctionDecl *>(FD));
 
           // cat 2 exit fn?
           EHFCategoryTwoCollector ECVTwo(&C, const_cast<FunctionDecl *>(FD),
-                                      EHFList);
+                                         EHFList);
           ECVTwo.TraverseDecl(const_cast<FunctionDecl *>(FD));
         }
       }
     }
     is_changed = EHFList.size() != num_exit_func;
+  }
+
+  llvm::errs() << "EHFList >> \n";
+  for (auto Item : EHFList) {
+    llvm::errs() << Item << '\n';
   }
 
   // Iterate through all function declarations.

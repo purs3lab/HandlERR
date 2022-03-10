@@ -12,6 +12,7 @@
 #include "clang/DetectERR/EHFCollectors.h"
 #include "clang/DetectERR/Utils.h"
 
+/// - a call to a known exit function is the last statement of the function
 bool EHFCategoryOneCollector::VisitCallExpr(CallExpr *S) {
   CFGBlock *CurrBB = nullptr;
   auto Parents = Context->getParents(*S);
@@ -22,11 +23,11 @@ bool EHFCategoryOneCollector::VisitCallExpr(CallExpr *S) {
     }
   }
 
-  if(CurrBB){
+  if (CurrBB) {
     Decl *CalledDecl = S->getCalleeDecl();
     if (FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(CalledDecl)) {
       std::string calledFnName = FD->getNameInfo().getAsString();
-      // if the called function is a known exit function
+      // - a call to a known exit function is the last statement of the function
       if (EHFList_->find(calledFnName) != EHFList_->end()) {
         // the call stmt should be the last statement of the function
         // in other words, it should:
@@ -48,6 +49,19 @@ bool EHFCategoryOneCollector::VisitCallExpr(CallExpr *S) {
   return true;
 }
 
+/// - the function has a 'noreturn' attribute
+bool EHFCategoryOneCollector::VisitFunctionDecl(FunctionDecl *FD) {
+  std::string calledFnName = FD->getNameInfo().getAsString();
+  auto RType = FD->getReturnType();
+  llvm::errs() << "FnName: " << calledFnName << "\t"
+               << "RType: ";
+  RType.dump();
+
+  if (FD->isNoReturn()) {
+    EHFList_->insert(FD->getNameInfo().getAsString());
+  }
+}
+
 /// EHF Cat 2 functions are identified based on the following heuristics
 ///
 /// 1. name contains "err"
@@ -60,9 +74,6 @@ bool EHFCategoryOneCollector::VisitCallExpr(CallExpr *S) {
 bool EHFCategoryTwoCollector::VisitFunctionDecl(FunctionDecl *FD) {
   /// 1. name contains "err"
   std::string FnName = FD->getNameInfo().getAsString();
-  if (FnName == "mystaticlogger") {
-    std::string tmp = "here";
-  }
   if (FnName.find("err") != -1) {
     EHFList_->insert(FnDecl->getNameInfo().getAsString());
     return true;
@@ -93,9 +104,9 @@ bool EHFCategoryTwoCollector::VisitFunctionDecl(FunctionDecl *FD) {
         if (CalledFnName == "fprintf" || CalledFnName == "vfprintf") {
           // fprintf(stderr, ...)
           // vfprintf(stderr, ...)
-          if(const Expr *Arg0 = CE->getArg(0)){
+          if (const Expr *Arg0 = CE->getArg(0)) {
             const DeclRefExpr *DRE = getDeclRefExpr(Arg0);
-            if(DRE->getNameInfo().getAsString() == "stderr"){
+            if (DRE->getNameInfo().getAsString() == "stderr") {
               writesToStderr = true;
               WritingStmt = CurrStmt;
               break;
@@ -104,8 +115,8 @@ bool EHFCategoryTwoCollector::VisitFunctionDecl(FunctionDecl *FD) {
 
         } else if (CalledFnName == "dprintf") {
           // dprintf(STDERR_FILENO, ...)
-          if(const Expr *Arg0 = CE->getArg(0)) {
-            if(isInt(2, Arg0, *Context)){
+          if (const Expr *Arg0 = CE->getArg(0)) {
+            if (isInt(2, Arg0, *Context)) {
               writesToStderr = true;
               WritingStmt = CurrStmt;
               break;
@@ -115,10 +126,10 @@ bool EHFCategoryTwoCollector::VisitFunctionDecl(FunctionDecl *FD) {
         } else if (CalledFnName == "fwrite") {
           // fwrite(..., stderr)
           int nArgs = CE->getNumArgs();
-          const Expr *LastArg = CE->getArg(nArgs-1);
+          const Expr *LastArg = CE->getArg(nArgs - 1);
           const DeclRefExpr *DRE = getDeclRefExpr(LastArg);
-          if(DRE){
-            if(DRE->getNameInfo().getAsString() == "stderr"){
+          if (DRE) {
+            if (DRE->getNameInfo().getAsString() == "stderr") {
               writesToStderr = true;
               WritingStmt = CurrStmt;
               break;
@@ -134,7 +145,7 @@ bool EHFCategoryTwoCollector::VisitFunctionDecl(FunctionDecl *FD) {
   // this would mean that the function always writes to stderr and hence
   // is an error logging function (EHF Cat2 function)
   bool isIndependentWriteToStderr = writesToStderr;
-  if(writesToStderr){
+  if (writesToStderr) {
     CFGBlock *CurBB = StMap[WritingStmt];
     auto &CDNodes = CDG.getControlDependencies(CurBB);
     if (!CDNodes.empty()) {
@@ -158,7 +169,7 @@ bool EHFCategoryTwoCollector::VisitFunctionDecl(FunctionDecl *FD) {
   bool isShortFunction = (StMap.size() <= 10);
 
   // 2 && 3 && 4 -> EHF Cat 2 function
-  if (isVoidReturn && isIndependentWriteToStderr && isShortFunction){
+  if (isVoidReturn && isIndependentWriteToStderr && isShortFunction) {
     EHFList_->insert(FnDecl->getNameInfo().getAsString());
   }
 
