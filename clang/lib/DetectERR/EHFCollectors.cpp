@@ -23,28 +23,28 @@ bool EHFCategoryOneCollector::VisitCallExpr(CallExpr *S) {
     }
   }
 
-  if (CurrBB) {
-    Decl *CalledDecl = S->getCalleeDecl();
-    if (FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(CalledDecl)) {
-      std::string calledFnName = FD->getNameInfo().getAsString();
-      // - a call to a known exit function is the last statement of the function
-      if (EHFList_->find(calledFnName) != EHFList_->end()) {
-        // the call stmt should be the last statement of the function
-        // in other words, it should:
-        // - not have any post dominator nodes
-        // AND
-        // - in the currBB, it should be the last statement
+  //  if (CurrBB) {
+  Decl *CalledDecl = S->getCalleeDecl();
+  if (FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(CalledDecl)) {
+    std::string calledFnName = FD->getNameInfo().getAsString();
+    // - a call to a known exit function is the last statement of the function
+    if (EHFList_->find(calledFnName) != EHFList_->end()) {
+      // the call stmt should be the last statement of the function
+      // in other words, it should:
+      // - not have any post dominator nodes
+      // AND
+      // - in the currBB, it should be the last statement
 
-        // check if CurrBB has any post-dominators
-        if (!hasPostDominators(*CurrBB, &CDG.getCFGPostDomTree(), *Cfg.get())) {
-          if (isLastStmtInBB(*S, *CurrBB)) {
-            // now we are certain that this function is an error handling function (cat-1)
-            EHFList_->insert(FnDecl->getNameInfo().getAsString());
-          }
+      // check if CurrBB has any post-dominators
+      if (!hasPostDominators(*CurrBB, &CDG.getCFGPostDomTree(), *Cfg.get())) {
+        if (isLastStmtInBB(*S, *CurrBB)) {
+          // now we are certain that this function is an error handling function (cat-1)
+          EHFList_->insert(FnDecl->getNameInfo().getAsString());
         }
       }
     }
   }
+  //    }
 
   return true;
 }
