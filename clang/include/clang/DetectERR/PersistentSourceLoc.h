@@ -31,19 +31,15 @@ using namespace clang;
 class PersistentSourceLoc {
 protected:
   PersistentSourceLoc(std::string F, uint32_t L, uint32_t C, uint32_t E)
-      : FileName(F), LineNo(L), ColNoS(C), ColNoE(E),  Heuristic(""), IsValid(true) {}
-
-  PersistentSourceLoc(std::string F, uint32_t L, uint32_t C, uint32_t E, std::string H)
-      : FileName(F), LineNo(L), ColNoS(C), ColNoE(E), Heuristic(H), IsValid(true) {}
+      : FileName(F), LineNo(L), ColNoS(C), ColNoE(E), IsValid(true) {}
 
 public:
   PersistentSourceLoc()
-      : FileName(""), LineNo(0), ColNoS(0), ColNoE(0), Heuristic(""), IsValid(false) {}
+      : FileName(""), LineNo(0), ColNoS(0), ColNoE(0), IsValid(false) {}
   std::string getFileName() const { return FileName; }
   uint32_t getLineNo() const { return LineNo; }
   uint32_t getColSNo() const { return ColNoS; }
   uint32_t getColENo() const { return ColNoE; }
-  std::string getHeuristic() const { return Heuristic; }
   bool valid() const { return IsValid; }
 
   bool operator<(const PersistentSourceLoc &O) const {
@@ -64,34 +60,22 @@ public:
 
   std::string toString() const {
     return FileName + ":" + std::to_string(LineNo) + ":" +
-           std::to_string(ColNoS) + ":" + std::to_string(ColNoE) + ":" + Heuristic;
+           std::to_string(ColNoS) + ":" + std::to_string(ColNoE);
   }
 
   std::string toJsonString() const {
-    return "{\"File\":\"" + FileName + "\", \"LineNo\":" +
-           std::to_string(LineNo) + ", \"ColNo\":" + std::to_string(ColNoS) +
-           ", \"Heuristic\":\"" + Heuristic + "\"" +
-           "}";
+    return "{\"File\":\"" + FileName +
+           "\", \"LineNo\":" + std::to_string(LineNo) +
+           ", \"ColNo\":" + std::to_string(ColNoS) + "}";
   }
 
-  void toJsonString(llvm::raw_ostream &O) const {
-    O << toJsonString();
-  }
+  void toJsonString(llvm::raw_ostream &O) const { O << toJsonString(); }
 
   void print(llvm::raw_ostream &O) const { O << toString(); }
 
   void dump() const { print(llvm::errs()); }
 
-  static PersistentSourceLoc mkPSL(const Decl *D,
-                                   const ASTContext &C,
-                                   const std::string Heuristic);
-
-  static PersistentSourceLoc mkPSL(const Decl *D,
-                                   const ASTContext &C);
-
-  static PersistentSourceLoc mkPSL(const clang::Stmt *S,
-                                   const clang::ASTContext &Context,
-                                   const std::string Heuristic);
+  static PersistentSourceLoc mkPSL(const Decl *D, const ASTContext &C);
 
   static PersistentSourceLoc mkPSL(const clang::Stmt *S,
                                    const clang::ASTContext &Context);
@@ -99,11 +83,6 @@ public:
 private:
   // Create a PersistentSourceLoc based on absolute file path
   // from the given SourceRange and SourceLocation.
-  static PersistentSourceLoc mkPSL(clang::SourceRange SR,
-                                   clang::SourceLocation SL,
-                                   const clang::ASTContext &Context,
-                                   std::string Heuristic);
-
   static PersistentSourceLoc mkPSL(clang::SourceRange SR,
                                    clang::SourceLocation SL,
                                    const clang::ASTContext &Context);
@@ -116,8 +95,6 @@ private:
   uint32_t ColNoS;
   // Column number end.
   uint32_t ColNoE;
-  // Heuristic
-  std::string Heuristic;
   bool IsValid;
 };
 

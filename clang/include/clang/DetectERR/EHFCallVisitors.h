@@ -21,7 +21,8 @@ using namespace clang;
 #ifndef LLVM_CLANG_DETECTERR_EHFCALLVISITORS_H
 #define LLVM_CLANG_DETECTERR_EHFCALLVISITORS_H
 
-// Condition guarding return NULL is error guarding.
+/// H03 - call to an exit function is control dependent on one or more
+/// if checks
 class EHFCallVisitor : public RecursiveASTVisitor<EHFCallVisitor> {
 public:
   explicit EHFCallVisitor(ASTContext *Context, ProjectInfo &I, FunctionDecl *FD,
@@ -29,7 +30,7 @@ public:
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
-        CDG(Cfg.get()), EHFList_(EHFList), Heuristic("H03") {
+        CDG(Cfg.get()), EHFList_(EHFList), Heuristic(HeuristicID::H03) {
     for (auto *CBlock : *(Cfg.get())) {
       if (CBlock->size() == 0) {
         if (Stmt *St = CBlock->getTerminatorStmt()) {
@@ -58,7 +59,7 @@ private:
   const std::set<std::string> *EHFList_;
   std::map<const Stmt *, CFGBlock *> StMap;
 
-  std::string Heuristic;
+  HeuristicID Heuristic;
 };
 
 #endif //LLVM_CLANG_DETECTERR_EHFCALLVISITORS_H

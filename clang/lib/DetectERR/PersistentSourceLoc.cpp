@@ -14,28 +14,19 @@ using namespace clang;
 using namespace llvm;
 
 PersistentSourceLoc PersistentSourceLoc::mkPSL(const Decl *D,
-                                               const ASTContext &C,
-                                               std::string Heuristic) {
-  if (D == nullptr) return PersistentSourceLoc();
-  SourceLocation SL = C.getSourceManager().getExpansionLoc(D->getLocation());
-  return mkPSL(D->getSourceRange(), SL, C, Heuristic);
-}
-PersistentSourceLoc PersistentSourceLoc::mkPSL(const Decl *D,
                                                const ASTContext &C) {
-  return mkPSL(D, C, "");
+  if (D == nullptr)
+    return PersistentSourceLoc();
+  SourceLocation SL = C.getSourceManager().getExpansionLoc(D->getLocation());
+  return mkPSL(D->getSourceRange(), SL, C);
 }
 
 // Create a PersistentSourceLoc for a Stmt.
 PersistentSourceLoc PersistentSourceLoc::mkPSL(const Stmt *S,
-                                               const ASTContext &Context,
-                                               std::string Heuristic) {
-  if (S == nullptr) return PersistentSourceLoc();
-  return mkPSL(S->getSourceRange(), S->getBeginLoc(), Context, Heuristic);
-}
-
-PersistentSourceLoc PersistentSourceLoc::mkPSL(const Stmt *S,
                                                const ASTContext &Context) {
-  return mkPSL(S, Context, "");
+  if (S == nullptr)
+    return PersistentSourceLoc();
+  return mkPSL(S->getSourceRange(), S->getBeginLoc(), Context);
 }
 
 // Use the PresumedLoc infrastructure to get a file name and expansion
@@ -43,13 +34,6 @@ PersistentSourceLoc PersistentSourceLoc::mkPSL(const Stmt *S,
 PersistentSourceLoc PersistentSourceLoc::mkPSL(clang::SourceRange SR,
                                                SourceLocation SL,
                                                const ASTContext &Context) {
-  return mkPSL(SR, SL, Context, "");
-}
-
-PersistentSourceLoc PersistentSourceLoc::mkPSL(clang::SourceRange SR,
-                                               SourceLocation SL,
-                                               const ASTContext &Context,
-                                               std::string Heuristic) {
   const SourceManager &SM = Context.getSourceManager();
   PresumedLoc PL = SM.getPresumedLoc(SL);
 
@@ -87,7 +71,7 @@ PersistentSourceLoc PersistentSourceLoc::mkPSL(clang::SourceRange SR,
     Fn = std::string(sys::path::remove_leading_dotslash(FeAbsS));
   }
   PersistentSourceLoc PSL(Fn, FESL.getExpansionLineNumber(),
-                          FESL.getExpansionColumnNumber(), EndCol, Heuristic);
+                          FESL.getExpansionColumnNumber(), EndCol);
 
   return PSL;
 }

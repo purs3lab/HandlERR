@@ -14,12 +14,12 @@ using namespace clang;
 /// H08 - goto to an error label is control dependent on a check
 class GotoVisitor : public RecursiveASTVisitor<GotoVisitor> {
 public:
-  explicit GotoVisitor(ASTContext *Context, ProjectInfo &I,
-                             FunctionDecl *FD, FuncId &FnID)
+  explicit GotoVisitor(ASTContext *Context, ProjectInfo &I, FunctionDecl *FD,
+                       FuncId &FnID)
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
-        CDG(Cfg.get()), Heuristic("H08") {
+        CDG(Cfg.get()), Heuristic(HeuristicID::H08) {
 
     for (auto *CBlock : *(Cfg.get())) {
       for (auto &CfgElem : *CBlock) {
@@ -30,8 +30,8 @@ public:
       }
 
       // add goto statements to the statement map
-      if(Stmt *St = CBlock->getTerminatorStmt()){
-        if(GotoStmt *GotoSt = dyn_cast_or_null<GotoStmt>(St)){
+      if (Stmt *St = CBlock->getTerminatorStmt()) {
+        if (GotoStmt *GotoSt = dyn_cast_or_null<GotoStmt>(St)) {
           StMap[St] = CBlock;
         }
       }
@@ -50,7 +50,7 @@ private:
   ControlDependencyCalculator CDG;
   std::map<const Stmt *, CFGBlock *> StMap;
 
-  std::string Heuristic;
+  HeuristicID Heuristic;
 
   static std::set<std::string> ErrorLabels;
 };

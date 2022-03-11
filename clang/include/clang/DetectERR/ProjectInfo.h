@@ -9,7 +9,7 @@
 // collected by the detecterr.
 //===----------------------------------------------------------------------===//
 
-#include "clang/DetectERR/PersistentSourceLoc.h"
+#include "clang/DetectERR/ErrGruard.h"
 #include "clang/DetectERR/Utils.h"
 
 #ifndef LLVM_CLANG_DETECTERR_PROJECTINFO_H
@@ -18,9 +18,7 @@
 // This stores global information about the project.
 class ProjectInfo {
 public:
-  ProjectInfo() {
-
-  }
+  ProjectInfo() {}
 
   ~ProjectInfo() {
     // clear up all elements.
@@ -28,10 +26,7 @@ public:
   }
 
   bool addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *ST,
-                            ASTContext *C, std::string Heuristic);
-
-  bool addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *ST,
-                            ASTContext *C);
+                            ASTContext *C, HeuristicID Heuristic);
 
   // Convert error conditions to json string.
   std::string errCondsToJsonString() const;
@@ -41,7 +36,8 @@ public:
 
 private:
   // map of function id and set of error guarding conditions.
-  std::map<FuncId, std::set<PersistentSourceLoc>> ErrGuardingConds;
+  //  std::map<FuncId, std::set<PersistentSourceLoc>> ErrGuardingConds;
+  std::map<FuncId, std::set<ErrGuard>> ErrGuardingConds;
 };
 
 #endif //LLVM_CLANG_DETECTERR_PROJECTINFO_H

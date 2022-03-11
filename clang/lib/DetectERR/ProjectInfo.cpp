@@ -9,25 +9,19 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/DetectERR/ProjectInfo.h"
+#include "clang/DetectERR/ErrGruard.h"
 
 using namespace clang;
 
-bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID,
-                                       const clang::Stmt *ST,
-                                       ASTContext *C,
-                                       std::string Heuristic) {
+bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *ST,
+                                       ASTContext *C, HeuristicID Heuristic) {
   bool RetVal = false;
-  PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(ST, *C, Heuristic);
+  PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(ST, *C);
   if (PSL.valid()) {
-    RetVal = ErrGuardingConds[FID].insert(PSL).second;
+    ErrGuard EG = ErrGuard::mkErrGuard(PSL, Heuristic);
+    RetVal = ErrGuardingConds[FID].insert(EG).second;
   }
   return RetVal;
-}
-
-bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID,
-                                       const clang::Stmt *ST,
-                                       ASTContext *C) {
-  return addErrorGuardingStmt(FID, ST, C, "");
 }
 
 std::string ProjectInfo::errCondsToJsonString() const {
@@ -37,7 +31,8 @@ std::string ProjectInfo::errCondsToJsonString() const {
     if (AddComma) {
       RetVal += ",\n";
     }
-    RetVal += "{\"FunctionInfo\":{\"Name\":\"" + FC.first.first + "\", \"File\":\"" + FC.first.second + "\"}";
+    RetVal += "{\"FunctionInfo\":{\"Name\":\"" + FC.first.first +
+              "\", \"File\":\"" + FC.first.second + "\"}";
     RetVal += ",\"ErrConditions\":[";
     bool AddComma1 = false;
     for (auto &ED : FC.second) {

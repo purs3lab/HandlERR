@@ -59,17 +59,9 @@ void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
     is_changed = EHFList.size() != num_exit_func;
   }
 
-  llvm::errs() << "EHFList >> \n";
-  for (auto Item : EHFList) {
-    llvm::errs() << Item << '\n';
-  }
-
   // Iterate through all function declarations.
   for (const auto &D : TUD->decls()) {
     if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
-      // Is this a function?
-      //      llvm::errs() << "handleFuncDecl for: " << FD->getNameInfo().getAsString()
-      //                   << '\n';
       handleFuncDecl(C, FD, EHFList);
     }
   }

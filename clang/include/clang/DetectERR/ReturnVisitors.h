@@ -29,7 +29,7 @@ public:
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
-        CDG(Cfg.get()), Heuristic("H04") {
+        CDG(Cfg.get()), Heuristic(HeuristicID::H04) {
     for (auto *CBlock : *(Cfg.get())) {
       if (CBlock->size() == 0) {
         if (Stmt *St = CBlock->getTerminatorStmt()) {
@@ -57,7 +57,7 @@ private:
   ControlDependencyCalculator CDG;
   std::map<const Stmt *, CFGBlock *> StMap;
 
-  std::string Heuristic;
+  HeuristicID Heuristic;
 };
 
 /// H02 - Condition guarding return negative value is error guarding.
@@ -69,7 +69,7 @@ public:
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
-        CDG(Cfg.get()), Heuristic("H02") {
+        CDG(Cfg.get()), Heuristic(HeuristicID::H02) {
     for (auto *CBlock : *(Cfg.get())) {
       if (CBlock->size() == 0) {
         if (Stmt *St = CBlock->getTerminatorStmt()) {
@@ -97,7 +97,7 @@ private:
   ControlDependencyCalculator CDG;
   std::map<const Stmt *, CFGBlock *> StMap;
 
-  std::string Heuristic;
+  HeuristicID Heuristic;
 };
 
 /// H05 - Condition guarding return 0 value is error guarding.
@@ -108,7 +108,7 @@ public:
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
-        CDG(Cfg.get()), Heuristic("H05") {
+        CDG(Cfg.get()), Heuristic(HeuristicID::H05) {
     for (auto *CBlock : *(Cfg.get())) {
       if (CBlock->size() == 0) {
         if (Stmt *St = CBlock->getTerminatorStmt()) {
@@ -136,7 +136,7 @@ private:
   ControlDependencyCalculator CDG;
   std::map<const Stmt *, CFGBlock *> StMap;
 
-  std::string Heuristic;
+  HeuristicID Heuristic;
 };
 
 /// H06 - Condition guarding return 0 value is error guarding.
@@ -147,7 +147,7 @@ public:
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
-        CDG(Cfg.get()), DomTree(Cfg.get()), Heuristic("H06") {
+        CDG(Cfg.get()), DomTree(Cfg.get()), Heuristic(HeuristicID::H06) {
     for (auto *CBlock : *(Cfg.get())) {
       if (CBlock->size() == 0) {
         if (Stmt *St = CBlock->getTerminatorStmt()) {
@@ -176,7 +176,7 @@ private:
   CFGDomTree DomTree;
   std::map<const Stmt *, CFGBlock *> StMap;
 
-  std::string Heuristic;
+  HeuristicID Heuristic;
 };
 
 /// H07 - For a function having a void return type, early return based on a
@@ -188,7 +188,7 @@ public:
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
-        CDG(Cfg.get()), Heuristic("H07") {
+        CDG(Cfg.get()), Heuristic(HeuristicID::H07) {
     for (auto *CBlock : *(Cfg.get())) {
       if (CBlock->size() == 0) {
         if (Stmt *St = CBlock->getTerminatorStmt()) {
@@ -216,6 +216,6 @@ private:
   ControlDependencyCalculator CDG;
   std::map<const Stmt *, CFGBlock *> StMap;
 
-  std::string Heuristic;
+  HeuristicID Heuristic;
 };
 #endif //LLVM_CLANG_DETECTERR_RETURNVISITORS_H

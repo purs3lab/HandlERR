@@ -8,6 +8,7 @@ add_clang_library(clangdetecterr
         DetectERR.cpp
         DetectERRASTConsumer.cpp
         PersistentSourceLoc.cpp
+        ErrGuard.cpp
         ProjectInfo.cpp
         EHFCollectors.cpp
         ReturnVisitors.cpp
