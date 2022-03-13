@@ -16,12 +16,15 @@ import shutil
 import subprocess
 import sys
 import datetime
-
+import multiprocessing
 
 BEAR_PATH = None
 PROG_PATH = None
 BENCHMARKS_PATH = None
 NAMES_LIKE = None
+
+# number of usable cpus
+NUM_CPUS = len(os.sched_getaffinity(0))
 
 
 def extract_archives(input_path):
@@ -62,8 +65,7 @@ def extract_archives(input_path):
         print(f"[+] extracting {f} to {output_dir}")
         # TODO - input sanitization??
         subprocess.check_call(f"mkdir -p {output_dir}", shell=True)
-        subprocess.check_call(
-            f"tar xf {f} --directory={output_dir}", shell=True)
+        subprocess.check_call(f"tar xf {f} --directory={output_dir}", shell=True)
         print(f"[+] extracting complete")
 
         # custom instructions provided?
@@ -109,7 +111,8 @@ def configure_and_bear_make_single(path, build_inst=None):
             subprocess.check_call(f"mkdir -p build", shell=True, cwd=path)
             path = os.path.join(path, "build")
             subprocess.check_call(
-                f"CC=gcc CXX=g++ ../configure --prefix=/tmp/glibc", shell=True, cwd=path)
+                f"CC=gcc CXX=g++ ../configure --prefix=/tmp/glibc", shell=True, cwd=path
+            )
 
         else:
             # normal libraries, just do ./configure
@@ -118,9 +121,7 @@ def configure_and_bear_make_single(path, build_inst=None):
 
     # bear make
     print("[+] running bear make...")
-    num_cpu = len(os.sched_getaffinity(0))  # parallelize make
-    subprocess.check_call(
-        f"{BEAR_PATH} make -j{num_cpu}", shell=True, cwd=path)
+    subprocess.check_call(f"{BEAR_PATH} make -j{NUM_CPUS}", shell=True, cwd=path)
     print("[+] bear make done")
 
 
@@ -172,13 +173,12 @@ def convert_project(build_dirs):
     build_dirs.
     """
     convert_project_bin = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)
-                        ), "port_tools", "convert_project.py"
+        os.path.dirname(os.path.realpath(__file__)), "port_tools", "convert_project.py"
     )
     for d in build_dirs:
         # libc - special case
-        if 'libc' in d:
-            d = os.path.join(d, 'build')
+        if "libc" in d:
+            d = os.path.join(d, "build")
 
         print(f"[+] converting project {d}")
         if "compile_commands.json" in os.listdir(d):
@@ -192,6 +192,11 @@ def convert_project(build_dirs):
         print(f"[+] converting project done")
 
 
+def process(cmd):
+    print(f"subprocessing cmd: {cmd}")
+    return subprocess.check_call(cmd, shell=True)
+
+
 def run_tool_on_all(dirs):
     """
     Runs the convert_individual.sh script present in each of the directories in
@@ -199,16 +204,38 @@ def run_tool_on_all(dirs):
     contain a compile_individual.sh and a convert_all.sh script (generated
     from convert_project.py).
     """
+
     for d in dirs:
+        cmds = []
+        curr = ""
+        pool = multiprocessing.Pool(max(NUM_CPUS - 2, 1))
+
         # libc - special case
-        if 'libc' in d:
+        if "libc" in d:
             d = os.path.join(d, "build")
 
         print(f"[+] running tool on {d}")
         convert_individual_script = os.path.join(d, "convert_individual.sh")
         convert_all_script = os.path.join(d, "convert_all.sh")
-        subprocess.check_call(
-            f"{convert_individual_script}", shell=True, cwd=d)
+
+        # >> existing - we have now parallized this stuff
+        # subprocess.check_call(f"{convert_individual_script}", shell=True, cwd=d)
+
+        # parallelize the process of running detecterr on individual files
+        with open(convert_individual_script, "r") as f:
+            lines = list(line.strip() for line in f.readlines())
+            for (i, line) in enumerate(lines[1:]):  # skip first line (shebang)
+                if line.startswith("cd"):
+                    if i != 0:
+                        cmds.append(curr)
+                    curr = line.rstrip("\\")
+                else:
+                    curr += line.rstrip("\\")
+
+        pool.imap(process, cmds)
+        pool.close()
+        pool.join()
+
         print("[+] running tool done")
 
 
@@ -259,8 +286,7 @@ def create_cumulative_errblocks_json_for_each(dirs):
     """
     for d in dirs:
         cumulative_file_ = os.path.join(d, "__project.errblocks.json")
-        print(
-            f"[+] creating cumulative errblocks.json for {d} as {cumulative_file_}")
+        print(f"[+] creating cumulative errblocks.json for {d} as {cumulative_file_}")
         with open(cumulative_file_, "w") as cumulative_file:
             cumulative_data = process_errblocks_for_dir(d)
             deduplicated = []
@@ -292,8 +318,7 @@ def generate_stats(dirs):
     project_files = []
     for d in dirs:
         cumulative_file_ = os.path.join(d, "__project.errblocks.json")
-        print(
-            f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)}")
+        print(f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)}")
         project_name = os.path.basename(os.path.dirname(d))
         project_filename = f"{project_name}__project.errblocks.json"
         bench_project_filename = os.path.join(
@@ -418,8 +443,7 @@ if __name__ == "__main__":
 
     if not args.benchmarks_path or not os.path.isdir(args.benchmarks_path):
         print("Error: Path to the benchmarks folder is invalid.")
-        print("Provided argument: {} is not a directory.".format(
-            args.benchmarks_path))
+        print("Provided argument: {} is not a directory.".format(args.benchmarks_path))
         sys.exit(1)
 
     if not args.bear_path or not os.path.isfile(args.bear_path):
