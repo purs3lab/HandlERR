@@ -13,19 +13,16 @@ bool GotoVisitor::VisitGotoStmt(GotoStmt *S) {
   if (ErrorLabels.find(LabelName) != ErrorLabels.end()) {
     if (StMap.find(S) != StMap.end()) {
       CFGBlock *CurBB = StMap[S];
-      auto &CDNodes = CDG.getControlDependencies(CurBB);
-      if (!CDNodes.empty()) {
-        // We should use all CDs
-        // Get the last statement from the list of control dependencies.
-        for (auto &CDGNode : CDNodes) {
-          // Collect the possible length bounds keys.
-          Stmt *TStmt = CDGNode->getTerminatorStmt();
-          // check if this is an if statement.
-          if (dyn_cast_or_null<IfStmt>(TStmt) ||
-              dyn_cast_or_null<WhileStmt>(TStmt) ||
-              dyn_cast_or_null<SwitchStmt>(TStmt)) {
-            Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
-          }
+      std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
+      collectChecks(Checks, *CurBB, &CDG);
+      sortIntoInnerAndOuterChecks(Checks, &CDG);
+      for (unsigned long I = 0; I < Checks.size(); I++) {
+        if (I == 0) {
+          Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
+                                    GuardLevel::Inner);
+        } else {
+          Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
+                                    GuardLevel::Outer);
         }
       }
     }

@@ -11,7 +11,6 @@
 
 #include "clang/DetectERR/ReturnVisitors.h"
 #include "clang/DetectERR/Utils.h"
-#include "clang/DetectERR/VisitorUtils.h"
 
 /// H04 - if a "return NULL" statement is control dependent upon one or more
 /// "if" checks
@@ -23,28 +22,24 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *S) {
     if (isNULLExpr(S->getRetValue(), *Context)) {
       if (StMap.find(S) != StMap.end()) {
         CurBB = StMap[S];
-        auto &CDNodes = CDG.getControlDependencies(CurBB);
 
-        // TODO: shank -> inner and outer checks
-        //
         // collect all checks with their CFGBlocks into an array
         // do one round of bubble sort so that the one CFGBlock that is
         // dominated by all others is found at position 0
         // the one at postion 0 is the "inner" check and all others are
         // "outer" checks
         std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
-        for (auto &CDGNode : CDNodes) {
-          // Collect the possible length bounds keys.
-          Stmt *TStmt = CDGNode->getTerminatorStmt();
-          // check if this is an if statement.
-          if (dyn_cast_or_null<IfStmt>(TStmt) ||
-              dyn_cast_or_null<WhileStmt>(TStmt) ||
-              dyn_cast_or_null<SwitchStmt>(TStmt)) {
-            Checks.push_back(std::pair<Stmt *, CFGBlock *>(TStmt, CDGNode));
+        collectChecks(Checks, *CurBB, &CDG);
+        sortIntoInnerAndOuterChecks(Checks, &CDG);
+        for (unsigned long I = 0; I < Checks.size(); I++) {
+          if (I == 0) {
+            Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
+                                      GuardLevel::Inner);
+          } else {
+            Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
+                                      GuardLevel::Outer);
           }
         }
-        sortIntoInnerAndOuterChecks(Checks, &CDG);
-        addErrorGuardsToProjectInfo(getProjectInfo(), &Checks);
       }
     }
   }
@@ -58,19 +53,16 @@ bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *S) {
     if (isNegativeNumber(S->getRetValue(), *Context)) {
       if (StMap.find(S) != StMap.end()) {
         CurBB = StMap[S];
-        auto &CDNodes = CDG.getControlDependencies(CurBB);
-        if (!CDNodes.empty()) {
-          // We should use all CDs
-          // Get the last statement from the list of control dependencies.
-          for (auto &CDGNode : CDNodes) {
-            // Collect the possible length bounds keys.
-            Stmt *TStmt = CDGNode->getTerminatorStmt();
-            // check if this is an if statement.
-            if (dyn_cast_or_null<IfStmt>(TStmt) ||
-                dyn_cast_or_null<WhileStmt>(TStmt) ||
-                dyn_cast_or_null<SwitchStmt>(TStmt)) {
-              Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
-            }
+        std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
+        collectChecks(Checks, *CurBB, &CDG);
+        sortIntoInnerAndOuterChecks(Checks, &CDG);
+        for (unsigned long I = 0; I < Checks.size(); I++) {
+          if (I == 0) {
+            Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
+                                      GuardLevel::Inner);
+          } else {
+            Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
+                                      GuardLevel::Outer);
           }
         }
       }
@@ -92,19 +84,16 @@ bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *S) {
     CFGBlock *CurBB;
     if (isZero(S->getRetValue(), *Context)) {
       CurBB = StMap[S];
-      auto &CDNodes = CDG.getControlDependencies(CurBB);
-      if (!CDNodes.empty()) {
-        // We should use all CDs
-        // Get the last statement from the list of control dependencies.
-        for (auto &CDGNode : CDNodes) {
-          // Collect the possible length bounds keys.
-          Stmt *TStmt = CDGNode->getTerminatorStmt();
-          // check if this is an if statement.
-          if (dyn_cast_or_null<IfStmt>(TStmt) ||
-              dyn_cast_or_null<WhileStmt>(TStmt) ||
-              dyn_cast_or_null<SwitchStmt>(TStmt)) {
-            Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
-          }
+      std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
+      collectChecks(Checks, *CurBB, &CDG);
+      sortIntoInnerAndOuterChecks(Checks, &CDG);
+      for (unsigned long I = 0; I < Checks.size(); I++) {
+        if (I == 0) {
+          Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
+                                    GuardLevel::Inner);
+        } else {
+          Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
+                                    GuardLevel::Outer);
         }
       }
     }
@@ -278,19 +267,16 @@ bool ReturnEarlyVisitor::VisitReturnStmt(ReturnStmt *S) {
 
     CFGBlock *ReturnBB = StMap[S];
     if (ReturnBB->size() == 1) {
-      auto &CDNodes = CDG.getControlDependencies(ReturnBB);
-      if (!CDNodes.empty()) {
-        // We should use all CDs
-        // Get the last statement from the list of control dependencies.
-        for (auto &CDGNode : CDNodes) {
-          // Collect the possible length bounds keys.
-          Stmt *TStmt = CDGNode->getTerminatorStmt();
-          // check if this is an if statement.
-          if (dyn_cast_or_null<IfStmt>(TStmt) ||
-              dyn_cast_or_null<WhileStmt>(TStmt) ||
-              dyn_cast_or_null<SwitchStmt>(TStmt)) {
-            Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
-          }
+      std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
+      collectChecks(Checks, *ReturnBB, &CDG);
+      sortIntoInnerAndOuterChecks(Checks, &CDG);
+      for (unsigned long I = 0; I < Checks.size(); I++) {
+        if (I == 0) {
+          Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
+                                    GuardLevel::Inner);
+        } else {
+          Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
+                                    GuardLevel::Outer);
         }
       }
     }

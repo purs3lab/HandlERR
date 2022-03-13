@@ -79,8 +79,9 @@ void sortIntoInnerAndOuterChecks(
     std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
     ControlDependencyCalculator *CDG);
 
-// /// adds the error guarding statements to the project info
-// void addErrorGuardsToProjectInfo(
-//     ProjectInfo &Info, std::vector<std::pair<Stmt *, CFGBlock *>> &Checks);
+/// Iterates over the base blocks on which the given block is control dependent
+/// and collects all the terminator checks from those blocks
+void collectChecks(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
+                   CFGBlock &CurBB, ControlDependencyCalculator *CDG);
 
 #endif //LLVM_CLANG_DETECTERR_UTILS_H

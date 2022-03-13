@@ -270,16 +270,18 @@ void sortIntoInnerAndOuterChecks(
   }
 }
 
-// /// adds the error guarding statements to the project info
-// void addErrorGuardsToProjectInfo(
-//     ProjectInfo &Info, std::vector<std::pair<Stmt *, CFGBlock *>> &Checks) {
-//   for (unsigned long i = 0; i < Checks.size(); i++) {
-//     if (i == 0) {
-//       Info.addErrorGuardingStmt(FID, Checks[i].first, Context, Heuristic,
-//                                 GuardLevel::Inner);
-//     } else {
-//       Info.addErrorGuardingStmt(FID, Checks[i].first, Context, Heuristic,
-//                                 GuardLevel::Outer);
-//     }
-//   }
-// }
+/// Iterates over the base blocks on which the given block is control dependent
+/// and collects all the terminator checks from those blocks
+void collectChecks(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
+                   CFGBlock &CurBB, ControlDependencyCalculator *CDG) {
+  auto &CDNodes = CDG->getControlDependencies(&CurBB);
+  for (auto &CDGNode : CDNodes) {
+    // Collect the possible length bounds keys.
+    Stmt *TStmt = CDGNode->getTerminatorStmt();
+    // check if this is an if statement.
+    if (dyn_cast_or_null<IfStmt>(TStmt) || dyn_cast_or_null<WhileStmt>(TStmt) ||
+        dyn_cast_or_null<SwitchStmt>(TStmt)) {
+      Checks.push_back(std::pair<Stmt *, CFGBlock *>(TStmt, CDGNode));
+    }
+  }
+}
