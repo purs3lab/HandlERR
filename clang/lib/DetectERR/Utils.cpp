@@ -240,13 +240,32 @@ bool hasPreDominators(CFGBlock &CurrBB, ControlDependencyCalculator *CDG,
 }
 
 /// debug util: dumps the statements in the stmap
-void __dbg_print_statements(std::map<const Stmt *, CFGBlock *> &StMap){
+void __dbg_print_statements(std::map<const Stmt *, CFGBlock *> &StMap) {
   llvm::errs() << "__dbg_print_statements >>>\n";
   auto it = StMap.begin();
-  while(it != StMap.end()){
+  while (it != StMap.end()) {
     llvm::errs() << "- Stmt:\n";
     it->first->dump();
     it++;
   }
   llvm::errs() << "__dbg_print_statements <<<\n";
+}
+
+/// Bubbles the inner dominating check at 0th position so that appropriate
+/// 'level' related info can be added whiled creating the ErrGuard instance
+void sortIntoInnerAndOuterChecks(
+    std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
+    ControlDependencyCalculator *CDG) {
+  if (Checks.size() <= 1) {
+    return;
+  }
+
+  // one trip of bubbling the inner most check
+  for (unsigned long J = 1; J < Checks.size(); J++) {
+    CFGBlock *BB0 = Checks[0].second;
+    CFGBlock *BBJ = Checks[J].second;
+    if (!CDG->isControlDependent(BB0, BBJ)) {
+      std::swap(Checks[0], Checks[J]);
+    }
+  }
 }

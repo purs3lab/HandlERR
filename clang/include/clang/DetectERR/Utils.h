@@ -69,8 +69,13 @@ bool hasPostDominators(CFGBlock &CurrBB, const CFGPostDomTree *PDTree,
 bool hasPreDominators(CFGBlock &CurrBB, const ControlDependencyCalculator *CDG,
                       const CFG &Cfg);
 
-
 /// debug util: dumps the statements in the stmap
 void __dbg_print_statements(std::map<const Stmt *, CFGBlock *> &StMap);
+
+/// Bubbles the inner dominating check at 0th position so that appropriate
+/// 'level' related info can be added whiled creating the ErrGuard instance
+void sortIntoInnerAndOuterChecks(
+    std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
+    ControlDependencyCalculator *CDG);
 
 #endif //LLVM_CLANG_DETECTERR_UTILS_H

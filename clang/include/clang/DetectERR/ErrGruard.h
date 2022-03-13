@@ -53,6 +53,9 @@ enum HeuristicID {
   H08
 };
 
+/// The level at which the given check occurs (inner/outer)
+enum GuardLevel { Inner, Outer };
+
 class ErrGuard {
 public:
   static ErrGuard mkErrGuard(PersistentSourceLoc PSL, HeuristicID HID) {
@@ -78,6 +81,7 @@ private:
 
   PersistentSourceLoc PSL;
   HeuristicID HID;
+  GuardLevel Level;
   static std::map<HeuristicID, std::string> HeuristicLabel;
 };
 

@@ -23,6 +23,28 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *S) {
       if (StMap.find(S) != StMap.end()) {
         CurBB = StMap[S];
         auto &CDNodes = CDG.getControlDependencies(CurBB);
+
+        // TODO: shank -> inner and outer checks
+        //
+        // collect all checks with their CFGBlocks into an array
+        // do one round of bubble sort so that the one CFGBlock that is
+        // dominated by all others is found at position 0
+        // the one at postion 0 is the "inner" check and all others are
+        // "outer" checks
+        std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
+        for (auto &CDGNode : CDNodes) {
+          // Collect the possible length bounds keys.
+          Stmt *TStmt = CDGNode->getTerminatorStmt();
+          // check if this is an if statement.
+          if (dyn_cast_or_null<IfStmt>(TStmt) ||
+              dyn_cast_or_null<WhileStmt>(TStmt) ||
+              dyn_cast_or_null<SwitchStmt>(TStmt)) {
+            Checks.push_back(std::pair<Stmt *, CFGBlock *>(TStmt, CDGNode));
+          }
+        }
+        sortIntoInnerAndOuterChecks(Checks, &CDG);
+
+        // >>>> existing code
         if (!CDNodes.empty()) {
           // We should use all CDs
           // Get the last statement from the list of control dependencies.
@@ -263,13 +285,13 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
 /// - function has void return type
 /// - a check is directly followed by an early return
 bool ReturnEarlyVisitor::VisitReturnStmt(ReturnStmt *S) {
-  if (FnDecl->getReturnType()->isVoidType()) {  // return type = void
+  if (FnDecl->getReturnType()->isVoidType()) { // return type = void
     // - BB for the return statement does not contain any other statements
     // - the immediate dominator BB has a terminator statement that is a check
     //    (if, while, switch)
 
     CFGBlock *ReturnBB = StMap[S];
-    if (ReturnBB->size() == 1){
+    if (ReturnBB->size() == 1) {
       auto &CDNodes = CDG.getControlDependencies(ReturnBB);
       if (!CDNodes.empty()) {
         // We should use all CDs
