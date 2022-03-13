@@ -1,5 +1,16 @@
 #include <stdio.h>
 
+int *foo1(int a) {
+  if (a != 2) {
+    if (a != 3) {
+      if (a < 0) {
+        return &a;
+      }
+    }
+  }
+  return NULL;
+}
+
 int *foo(int a) {
   if (a != -2) {
     printf("Hello\n");

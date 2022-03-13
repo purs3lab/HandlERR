@@ -14,14 +14,20 @@
 using namespace clang;
 
 bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *ST,
-                                       ASTContext *C, HeuristicID Heuristic) {
+                                       ASTContext *C, HeuristicID Heuristic,
+                                       GuardLevel Lvl) {
   bool RetVal = false;
   PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(ST, *C);
   if (PSL.valid()) {
-    ErrGuard EG = ErrGuard::mkErrGuard(PSL, Heuristic);
+    ErrGuard EG = ErrGuard::mkErrGuard(PSL, Heuristic, Lvl);
     RetVal = ErrGuardingConds[FID].insert(EG).second;
   }
   return RetVal;
+}
+
+bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *ST,
+                                       ASTContext *C, HeuristicID Heuristic) {
+  return addErrorGuardingStmt(FID, ST, C, Heuristic, GuardLevel::Default);
 }
 
 std::string ProjectInfo::errCondsToJsonString() const {

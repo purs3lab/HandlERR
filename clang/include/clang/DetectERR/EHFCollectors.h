@@ -8,6 +8,9 @@
 // This class represents the visitor dealing with the ErrorHandlingFunction utils
 //===----------------------------------------------------------------------===//
 
+#ifndef LLVM_CLANG_DETECTERR_EHFVISITOR_H
+#define LLVM_CLANG_DETECTERR_EHFVISITOR_H
+
 #include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/Analysis/Analyses/Dominators.h"
 #include "clang/Analysis/CFG.h"
@@ -17,9 +20,6 @@
 
 using namespace llvm;
 using namespace clang;
-
-#ifndef LLVM_CLANG_DETECTERR_EHFVISITOR_H
-#define LLVM_CLANG_DETECTERR_EHFVISITOR_H
 
 // ErrorHandlingFunction Visitor to try and collect all the error handling functions
 class EHFCategoryOneCollector

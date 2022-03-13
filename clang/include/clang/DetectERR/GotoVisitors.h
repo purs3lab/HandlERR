@@ -1,3 +1,6 @@
+#ifndef LLVM_CLANG_DETECTERR_GOTOVISITORS_H
+#define LLVM_CLANG_DETECTERR_GOTOVISITORS_H
+
 #include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/Analysis/Analyses/Dominators.h"
 #include "clang/Analysis/CFG.h"
@@ -7,9 +10,6 @@
 
 using namespace llvm;
 using namespace clang;
-
-#ifndef LLVM_CLANG_DETECTERR_GOTOVISITORS_H
-#define LLVM_CLANG_DETECTERR_GOTOVISITORS_H
 
 /// H08 - goto to an error label is control dependent on a check
 class GotoVisitor : public RecursiveASTVisitor<GotoVisitor> {

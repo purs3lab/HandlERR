@@ -11,6 +11,7 @@
 
 #include "clang/DetectERR/ReturnVisitors.h"
 #include "clang/DetectERR/Utils.h"
+#include "clang/DetectERR/VisitorUtils.h"
 
 /// H04 - if a "return NULL" statement is control dependent upon one or more
 /// "if" checks
@@ -43,22 +44,7 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *S) {
           }
         }
         sortIntoInnerAndOuterChecks(Checks, &CDG);
-
-        // >>>> existing code
-        if (!CDNodes.empty()) {
-          // We should use all CDs
-          // Get the last statement from the list of control dependencies.
-          for (auto &CDGNode : CDNodes) {
-            // Collect the possible length bounds keys.
-            Stmt *TStmt = CDGNode->getTerminatorStmt();
-            // check if this is an if statement.
-            if (dyn_cast_or_null<IfStmt>(TStmt) ||
-                dyn_cast_or_null<WhileStmt>(TStmt) ||
-                dyn_cast_or_null<SwitchStmt>(TStmt)) {
-              Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
-            }
-          }
-        }
+        addErrorGuardsToProjectInfo(getProjectInfo(), &Checks);
       }
     }
   }

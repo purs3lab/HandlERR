@@ -8,12 +8,13 @@
 // Type declarations for map data structures and other general helper methods.
 //===----------------------------------------------------------------------===//
 
+#ifndef LLVM_CLANG_DETECTERR_UTILS_H
+#define LLVM_CLANG_DETECTERR_UTILS_H
+
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/Analysis/Analyses/Dominators.h"
-
-#ifndef LLVM_CLANG_DETECTERR_UTILS_H
-#define LLVM_CLANG_DETECTERR_UTILS_H
+// #include "clang/DetectERR/ProjectInfo.h"
 
 using namespace clang;
 
@@ -77,5 +78,9 @@ void __dbg_print_statements(std::map<const Stmt *, CFGBlock *> &StMap);
 void sortIntoInnerAndOuterChecks(
     std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
     ControlDependencyCalculator *CDG);
+
+// /// adds the error guarding statements to the project info
+// void addErrorGuardsToProjectInfo(
+//     ProjectInfo &Info, std::vector<std::pair<Stmt *, CFGBlock *>> &Checks);
 
 #endif //LLVM_CLANG_DETECTERR_UTILS_H

@@ -9,11 +9,11 @@
 // collected by the detecterr.
 //===----------------------------------------------------------------------===//
 
-#include "clang/DetectERR/ErrGruard.h"
-#include "clang/DetectERR/Utils.h"
-
 #ifndef LLVM_CLANG_DETECTERR_PROJECTINFO_H
 #define LLVM_CLANG_DETECTERR_PROJECTINFO_H
+
+#include "clang/DetectERR/ErrGruard.h"
+#include "clang/DetectERR/Utils.h"
 
 // This stores global information about the project.
 class ProjectInfo {
@@ -24,6 +24,10 @@ public:
     // clear up all elements.
     ErrGuardingConds.clear();
   }
+
+  bool addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *ST,
+                            ASTContext *C, HeuristicID Heuristic,
+                            GuardLevel Lvl);
 
   bool addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *ST,
                             ASTContext *C, HeuristicID Heuristic);

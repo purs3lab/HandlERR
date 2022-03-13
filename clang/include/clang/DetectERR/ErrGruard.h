@@ -54,18 +54,23 @@ enum HeuristicID {
 };
 
 /// The level at which the given check occurs (inner/outer)
-enum GuardLevel { Inner, Outer };
+enum GuardLevel { Inner, Outer, Default };
 
 class ErrGuard {
 public:
+  static ErrGuard mkErrGuard(PersistentSourceLoc PSL, HeuristicID HID,
+                             GuardLevel Lvl) {
+    return ErrGuard(PSL, HID, Lvl);
+  };
+
   static ErrGuard mkErrGuard(PersistentSourceLoc PSL, HeuristicID HID) {
-    return ErrGuard(PSL, HID);
+    return ErrGuard(PSL, HID, GuardLevel::Default);
   };
 
   bool operator<(const ErrGuard &O) const { return PSL < O.PSL; }
 
   std::string toString() const {
-    return PSL.toString() + ":" + HeuristicLabel[HID];
+    return PSL.toString() + ":" + HeuristicLabel[HID] + ":" + GuardLevelLabel[Level];
   }
 
   std::string toJsonString() const;
@@ -77,12 +82,13 @@ public:
   void dump() const { print(llvm::errs()); }
 
 private:
-  ErrGuard(PersistentSourceLoc PSL_, HeuristicID HID_) : PSL(PSL_), HID(HID_) {}
+  ErrGuard(PersistentSourceLoc PSL_, HeuristicID HID_, GuardLevel Lvl) : PSL(PSL_), HID(HID_), Level(Lvl) {}
 
   PersistentSourceLoc PSL;
   HeuristicID HID;
   GuardLevel Level;
   static std::map<HeuristicID, std::string> HeuristicLabel;
+  static std::map<GuardLevel, std::string> GuardLevelLabel;
 };
 
 #endif //LLVM_CLANG_DETECTERR_ERRGUARD_H

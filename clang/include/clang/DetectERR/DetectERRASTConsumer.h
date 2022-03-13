@@ -8,12 +8,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/DetectERR/ProjectInfo.h"
-#include "clang/DetectERR/DetectERR.h"
-#include "clang/AST/ASTConsumer.h"
-
 #ifndef LLVM_CLANG_DETECTERR_DETECTERRASTCONSUMER_H
 #define LLVM_CLANG_DETECTERR_DETECTERRASTCONSUMER_H
+
+#include "clang/AST/ASTConsumer.h"
+#include "clang/DetectERR/DetectERR.h"
+#include "clang/DetectERR/ProjectInfo.h"
 
 using namespace clang;
 
@@ -29,7 +29,8 @@ public:
 private:
   // This function takes care of calling various helper functions
   // on the given function decl.
-  void handleFuncDecl(ASTContext &C, const FunctionDecl *FD, const std::set<std::string> &EHFList);
+  void handleFuncDecl(ASTContext &C, const FunctionDecl *FD,
+                      const std::set<std::string> &EHFList);
   ProjectInfo &Info;
   struct DetectERROptions Opts;
 };

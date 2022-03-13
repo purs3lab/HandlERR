@@ -8,6 +8,9 @@
 // This class represents all the visitors dealing with EHF Calls.
 //===----------------------------------------------------------------------===//
 
+#ifndef LLVM_CLANG_DETECTERR_EHFCALLVISITORS_H
+#define LLVM_CLANG_DETECTERR_EHFCALLVISITORS_H
+
 #include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/Analysis/Analyses/Dominators.h"
 #include "clang/Analysis/CFG.h"
@@ -17,9 +20,6 @@
 
 using namespace llvm;
 using namespace clang;
-
-#ifndef LLVM_CLANG_DETECTERR_EHFCALLVISITORS_H
-#define LLVM_CLANG_DETECTERR_EHFCALLVISITORS_H
 
 /// H03 - call to an exit function is control dependent on one or more
 /// if checks

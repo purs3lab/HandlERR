@@ -242,11 +242,11 @@ bool hasPreDominators(CFGBlock &CurrBB, ControlDependencyCalculator *CDG,
 /// debug util: dumps the statements in the stmap
 void __dbg_print_statements(std::map<const Stmt *, CFGBlock *> &StMap) {
   llvm::errs() << "__dbg_print_statements >>>\n";
-  auto it = StMap.begin();
-  while (it != StMap.end()) {
+  auto It = StMap.begin();
+  while (It != StMap.end()) {
     llvm::errs() << "- Stmt:\n";
-    it->first->dump();
-    it++;
+    It->first->dump();
+    It++;
   }
   llvm::errs() << "__dbg_print_statements <<<\n";
 }
@@ -269,3 +269,17 @@ void sortIntoInnerAndOuterChecks(
     }
   }
 }
+
+// /// adds the error guarding statements to the project info
+// void addErrorGuardsToProjectInfo(
+//     ProjectInfo &Info, std::vector<std::pair<Stmt *, CFGBlock *>> &Checks) {
+//   for (unsigned long i = 0; i < Checks.size(); i++) {
+//     if (i == 0) {
+//       Info.addErrorGuardingStmt(FID, Checks[i].first, Context, Heuristic,
+//                                 GuardLevel::Inner);
+//     } else {
+//       Info.addErrorGuardingStmt(FID, Checks[i].first, Context, Heuristic,
+//                                 GuardLevel::Outer);
+//     }
+//   }
+// }
