@@ -417,7 +417,9 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "-b", "--bear_path", dest="bear_path", type=str, help="Path to bear binary"
+        "-b", "--bear_path", dest="bear_path", type=str, 
+        default=shutil.which("bear"),
+        help="Path to bear binary"
     )
 
     parser.add_argument(
