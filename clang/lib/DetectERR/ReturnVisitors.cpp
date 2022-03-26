@@ -14,14 +14,12 @@
 
 /// H04 - if a "return NULL" statement is control dependent upon one or more
 /// "if" checks
-bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *S) {
-  //  llvm::errs() << "processing fn: " << FnDecl->getNameInfo().getAsString()
-  //               << '\n';
+bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
   if (FnDecl->getReturnType()->isPointerType()) {
     CFGBlock *CurBB;
-    if (isNULLExpr(S->getRetValue(), *Context)) {
-      if (StMap.find(S) != StMap.end()) {
-        CurBB = StMap[S];
+    if (isNULLExpr(ReturnST->getRetValue(), *Context)) {
+      if (StMap.find(ReturnST) != StMap.end()) {
+        CurBB = StMap[ReturnST];
 
         // collect all checks with their CFGBlocks into an array
         // do one round of bubble sort so that the one CFGBlock that is
@@ -33,11 +31,11 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *S) {
         sortIntoInnerAndOuterChecks(Checks, &CDG);
         for (unsigned long I = 0; I < Checks.size(); I++) {
           if (I == 0) {
-            Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
-                                      GuardLevel::Inner);
+            Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
+                                      Heuristic, GuardLevel::Inner);
           } else {
-            Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
-                                      GuardLevel::Outer);
+            Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
+                                      Heuristic, GuardLevel::Outer);
           }
         }
       }
@@ -47,22 +45,22 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *S) {
 }
 
 /// H02
-bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *S) {
+bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
   if (FnDecl->getReturnType()->isIntegerType()) {
     CFGBlock *CurBB;
-    if (isNegativeNumber(S->getRetValue(), *Context)) {
-      if (StMap.find(S) != StMap.end()) {
-        CurBB = StMap[S];
+    if (isNegativeNumber(ReturnST->getRetValue(), *Context)) {
+      if (StMap.find(ReturnST) != StMap.end()) {
+        CurBB = StMap[ReturnST];
         std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
         collectChecks(Checks, *CurBB, &CDG);
         sortIntoInnerAndOuterChecks(Checks, &CDG);
         for (unsigned long I = 0; I < Checks.size(); I++) {
           if (I == 0) {
-            Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
-                                      GuardLevel::Inner);
+            Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
+                                      Heuristic, GuardLevel::Inner);
           } else {
-            Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
-                                      GuardLevel::Outer);
+            Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
+                                      Heuristic, GuardLevel::Outer);
           }
         }
       }
@@ -78,22 +76,22 @@ bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *S) {
 /// - function has pointer return type
 /// - return stmt returns a zero
 /// - the return stmt is dominated by one or more checks
-bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *S) {
+bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
   // is the return type a pointer type?
   if (FnDecl->getReturnType()->isPointerType()) {
     CFGBlock *CurBB;
-    if (isZero(S->getRetValue(), *Context)) {
-      CurBB = StMap[S];
+    if (isZero(ReturnST->getRetValue(), *Context)) {
+      CurBB = StMap[ReturnST];
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *CurBB, &CDG);
       sortIntoInnerAndOuterChecks(Checks, &CDG);
       for (unsigned long I = 0; I < Checks.size(); I++) {
         if (I == 0) {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
-                                    GuardLevel::Inner);
+          Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
+                                    Heuristic, GuardLevel::Inner);
         } else {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
-                                    GuardLevel::Outer);
+          Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
+                                    Heuristic, GuardLevel::Outer);
         }
       }
     }
@@ -122,21 +120,21 @@ bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *S) {
 /// - returns stmt returns a variable (DeclRef)
 /// - there is a check for this returned variable which dominates the return
 ///     stmt but the return is not control dependent on the check
-bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
+bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
   CFGBlock *ReturnBB;
-  if (FnDecl->getReturnType()->isPointerType()) {  // return type = pointer
-    if (!isNULLExpr(S->getRetValue(), *Context)) { // not return NULL
+  if (FnDecl->getReturnType()->isPointerType()) { // return type = pointer
+    if (!isNULLExpr(ReturnST->getRetValue(), *Context)) { // not return NULL
       // find all the blocks that dominate the exit block (containing the return stmt)
       // for each of these dominating blocks, check if their terminator stmt
       // is a IfStmt and the condition of that IfStmt is a NULL check
       // against the value being returned
 
       // return stmt is a 'return var'
-      if (isDeclExpr(S->getRetValue())) { // return val
-        ReturnBB = StMap[S];
+      if (isDeclExpr(ReturnST->getRetValue())) { // return val
+        ReturnBB = StMap[ReturnST];
 
         // store the underlying NamedDecl for comparing against later
-        const Expr *E = S->getRetValue();
+        const Expr *E = ReturnST->getRetValue();
         const DeclRefExpr *ReturnDRE = getDeclRefExpr(E);
         const NamedDecl *ReturnNamedDecl =
             ReturnDRE->getFoundDecl()->getUnderlyingDecl();
@@ -229,7 +227,8 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
 
                   // finally, note the guarding statement
                   if (!IsUpdated) {
-                    Info.addErrorGuardingStmt(FID, TStmt, Context, Heuristic);
+                    Info.addErrorGuardingStmt(FID, TStmt, ReturnST, Context,
+                                              Heuristic);
                   }
                 }
               }
@@ -259,24 +258,24 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *S) {
 /// Conditions:
 /// - function has void return type
 /// - a check is directly followed by an early return
-bool ReturnEarlyVisitor::VisitReturnStmt(ReturnStmt *S) {
+bool ReturnEarlyVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
   if (FnDecl->getReturnType()->isVoidType()) { // return type = void
     // - BB for the return statement does not contain any other statements
     // - the immediate dominator BB has a terminator statement that is a check
     //    (if, while, switch)
 
-    CFGBlock *ReturnBB = StMap[S];
+    CFGBlock *ReturnBB = StMap[ReturnST];
     if (ReturnBB->size() == 1) {
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *ReturnBB, &CDG);
       sortIntoInnerAndOuterChecks(Checks, &CDG);
       for (unsigned long I = 0; I < Checks.size(); I++) {
         if (I == 0) {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
-                                    GuardLevel::Inner);
+          Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
+                                    Heuristic, GuardLevel::Inner);
         } else {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
-                                    GuardLevel::Outer);
+          Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
+                                    Heuristic, GuardLevel::Outer);
         }
       }
     }

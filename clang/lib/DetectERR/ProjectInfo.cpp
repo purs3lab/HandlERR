@@ -13,21 +13,26 @@
 
 using namespace clang;
 
-bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *ST,
-                                       ASTContext *C, HeuristicID Heuristic,
-                                       GuardLevel Lvl) {
+bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID,
+                                       const clang::Stmt *GuardST,
+                                       const clang::Stmt *ErrST, ASTContext *C,
+                                       HeuristicID Heuristic, GuardLevel Lvl) {
   bool RetVal = false;
-  PersistentSourceLoc PSL = PersistentSourceLoc::mkPSL(ST, *C);
-  if (PSL.valid()) {
-    ErrGuard EG = ErrGuard::mkErrGuard(PSL, Heuristic, Lvl);
+  PersistentSourceLoc GuardL = PersistentSourceLoc::mkPSL(GuardST, *C);
+  PersistentSourceLoc ErrL = PersistentSourceLoc::mkPSL(ErrST, *C);
+  if (GuardL.valid()) {
+    ErrGuard EG = ErrGuard::mkErrGuard(GuardL, ErrL, Heuristic, Lvl);
     RetVal = ErrGuardingConds[FID].insert(EG).second;
   }
   return RetVal;
 }
 
-bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *ST,
-                                       ASTContext *C, HeuristicID Heuristic) {
-  return addErrorGuardingStmt(FID, ST, C, Heuristic, GuardLevel::Default);
+bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID,
+                                       const clang::Stmt *GuardST,
+                                       const clang::Stmt *ErrST, ASTContext *C,
+                                       HeuristicID Heuristic) {
+  return addErrorGuardingStmt(FID, GuardST, ErrST, C, Heuristic,
+                              GuardLevel::Default);
 }
 
 std::string ProjectInfo::errCondsToJsonString() const {

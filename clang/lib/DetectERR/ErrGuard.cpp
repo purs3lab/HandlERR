@@ -1,9 +1,9 @@
 #include "clang/DetectERR/ErrGruard.h"
 
 std::map<GuardLevel, std::string> ErrGuard::GuardLevelLabel = {
-    {GuardLevel::Inner, "Inner"}, {GuardLevel::Outer, "Outer"},
-    {GuardLevel::Default, "Default"}
-};
+    {GuardLevel::Inner, "Inner"},
+    {GuardLevel::Outer, "Outer"},
+    {GuardLevel::Default, "Default"}};
 
 std::map<HeuristicID, std::string> ErrGuard::HeuristicLabel = {
     {HeuristicID::H02, "H02"}, {HeuristicID::H03, "H03"},
@@ -13,10 +13,30 @@ std::map<HeuristicID, std::string> ErrGuard::HeuristicLabel = {
 };
 
 std::string ErrGuard::toJsonString() const {
-  return "{\"File\":\"" + PSL.getFileName() +
-         "\", \"LineNo\":" + std::to_string(PSL.getLineNo()) +
-         ", \"ColNo\":" + std::to_string(PSL.getColSNo()) +
-         ", \"Heuristic\":\"" + HeuristicLabel[HID] + "\"" +
-        ", \"Level\":\"" + GuardLevelLabel[Level] + "\"" +
+  // {
+  //     "FunctionInfo": {
+  //         "Name": "bar",
+  //         "File": "/home/shank/code/research/HandlERR/clang/tools/detecterr/utils/tests/retnull.c"
+  //     },
+  //     "ErrConditions": [
+  //         {
+  //             "File": "/home/shank/code/research/HandlERR/clang/tools/detecterr/utils/tests/retnull.c",
+  //             "LineNo": 25,
+  //             "ColNo": 3,
+  //             "Heuristic": "H04",
+  //             "Level": "Inner",
+  //             "ErrorLoc": {
+  //                 "File": "/home/shank/code/research/HandlERR/clang/tools/detecterr/utils/tests/retnull.c",
+  //                 "LineNo": 26,
+  //                 "ColNo": 5
+  //             }
+  //         }
+  //     ]
+  // }
+  return "{\"File\":\"" + GuardLoc.getFileName() +
+         "\", \"LineNo\":" + std::to_string(GuardLoc.getLineNo()) +
+         ", \"ColNo\":" + std::to_string(GuardLoc.getColSNo()) +
+         ", \"Heuristic\":\"" + HeuristicLabel[HID] + "\"" + ", \"Level\":\"" +
+         GuardLevelLabel[Level] + "\", \"ErrorLoc\":" + ErrLoc.toJsonString() +
          "}";
 }

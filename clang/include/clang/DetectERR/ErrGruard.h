@@ -58,19 +58,22 @@ enum GuardLevel { Inner, Outer, Default };
 
 class ErrGuard {
 public:
-  static ErrGuard mkErrGuard(PersistentSourceLoc PSL, HeuristicID HID,
+  static ErrGuard mkErrGuard(PersistentSourceLoc GuardL,
+                             PersistentSourceLoc ErrL, HeuristicID HID,
                              GuardLevel Lvl) {
-    return ErrGuard(PSL, HID, Lvl);
+    return ErrGuard(GuardL, ErrL, HID, Lvl);
   };
 
-  static ErrGuard mkErrGuard(PersistentSourceLoc PSL, HeuristicID HID) {
-    return ErrGuard(PSL, HID, GuardLevel::Default);
+  static ErrGuard mkErrGuard(PersistentSourceLoc GuardL,
+                             PersistentSourceLoc ErrL, HeuristicID HID) {
+    return ErrGuard(GuardL, ErrL, HID, GuardLevel::Default);
   };
 
-  bool operator<(const ErrGuard &O) const { return PSL < O.PSL; }
+  bool operator<(const ErrGuard &O) const { return GuardLoc < O.GuardLoc; }
 
   std::string toString() const {
-    return PSL.toString() + ":" + HeuristicLabel[HID] + ":" + GuardLevelLabel[Level];
+    return GuardLoc.toString() + ":" + ErrLoc.toString() + ":" +
+           HeuristicLabel[HID] + ":" + GuardLevelLabel[Level];
   }
 
   std::string toJsonString() const;
@@ -82,9 +85,12 @@ public:
   void dump() const { print(llvm::errs()); }
 
 private:
-  ErrGuard(PersistentSourceLoc PSL_, HeuristicID HID_, GuardLevel Lvl) : PSL(PSL_), HID(HID_), Level(Lvl) {}
+  ErrGuard(PersistentSourceLoc GuardL, PersistentSourceLoc ErrL,
+           HeuristicID Hid, GuardLevel Lvl)
+      : GuardLoc(GuardL), ErrLoc(ErrL), HID(Hid), Level(Lvl) {}
 
-  PersistentSourceLoc PSL;
+  PersistentSourceLoc GuardLoc;
+  PersistentSourceLoc ErrLoc;
   HeuristicID HID;
   GuardLevel Level;
   static std::map<HeuristicID, std::string> HeuristicLabel;

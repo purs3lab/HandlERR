@@ -8,21 +8,21 @@ std::set<std::string> GotoVisitor::ErrorLabels = {
 };
 
 /// H08 - goto to an error label is control dependent on a check
-bool GotoVisitor::VisitGotoStmt(GotoStmt *S) {
-  std::string LabelName = S->getLabel()->getName().lower();
+bool GotoVisitor::VisitGotoStmt(GotoStmt *GotoST) {
+  std::string LabelName = GotoST->getLabel()->getName().lower();
   if (ErrorLabels.find(LabelName) != ErrorLabels.end()) {
-    if (StMap.find(S) != StMap.end()) {
-      CFGBlock *CurBB = StMap[S];
+    if (StMap.find(GotoST) != StMap.end()) {
+      CFGBlock *CurBB = StMap[GotoST];
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *CurBB, &CDG);
       sortIntoInnerAndOuterChecks(Checks, &CDG);
       for (unsigned long I = 0; I < Checks.size(); I++) {
         if (I == 0) {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
-                                    GuardLevel::Inner);
+          Info.addErrorGuardingStmt(FID, Checks[I].first, GotoST, Context,
+                                    Heuristic, GuardLevel::Inner);
         } else {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
-                                    GuardLevel::Outer);
+          Info.addErrorGuardingStmt(FID, Checks[I].first, GotoST, Context,
+                                    Heuristic, GuardLevel::Outer);
         }
       }
     }

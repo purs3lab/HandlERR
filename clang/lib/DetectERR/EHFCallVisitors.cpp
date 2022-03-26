@@ -27,11 +27,11 @@ bool EHFCallVisitor::VisitCallExpr(CallExpr *CE) {
       sortIntoInnerAndOuterChecks(Checks, &CDG);
       for (unsigned long I = 0; I < Checks.size(); I++) {
         if (I == 0) {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
-                                    GuardLevel::Inner);
+          Info.addErrorGuardingStmt(FID, Checks[I].first, CE, Context,
+                                    Heuristic, GuardLevel::Inner);
         } else {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, Context, Heuristic,
-                                    GuardLevel::Outer);
+          Info.addErrorGuardingStmt(FID, Checks[I].first, CE, Context,
+                                    Heuristic, GuardLevel::Outer);
         }
       }
     }
