@@ -69,7 +69,9 @@ public:
     return ErrGuard(GuardL, ErrL, HID, GuardLevel::Default);
   };
 
-  bool operator<(const ErrGuard &O) const { return GuardLoc < O.GuardLoc; }
+  bool operator<(const ErrGuard &O) const {
+    return GuardLoc < O.GuardLoc || (GuardLoc == O.GuardLoc && Level < O.Level);
+  }
 
   std::string toString() const {
     return GuardLoc.toString() + ":" + ErrLoc.toString() + ":" +

@@ -34,8 +34,15 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
             Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
                                       Heuristic, GuardLevel::Inner);
           } else {
+            // the guard level will either be Outer or Default based on
+            // whether this Guard encloses the first Guard or not
+            GuardLevel Lvl = GuardLevel::Default;
+            if (Checks[I].first->getSourceRange().fullyContains(
+                    Checks[0].first->getSourceRange())) {
+              Lvl = GuardLevel::Outer;
+            }
             Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
-                                      Heuristic, GuardLevel::Outer);
+                                      Heuristic, Lvl);
           }
         }
       }

@@ -42,6 +42,11 @@ public:
   uint32_t getColENo() const { return ColNoE; }
   bool valid() const { return IsValid; }
 
+  bool operator==(const PersistentSourceLoc &O) const {
+    return FileName == O.FileName && LineNo == O.LineNo && ColNoS == O.ColNoS &&
+           ColNoE == O.ColNoE;
+  }
+
   bool operator<(const PersistentSourceLoc &O) const {
     if (FileName == O.FileName)
       if (LineNo == O.LineNo)

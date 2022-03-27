@@ -278,7 +278,7 @@ void collectChecks(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
   for (auto &CDGNode : CDNodes) {
     // Collect the possible length bounds keys.
     Stmt *TStmt = CDGNode->getTerminatorStmt();
-    // check if this is an if statement.
+    // check if this is a guard statement (if/while/switch)
     if (dyn_cast_or_null<IfStmt>(TStmt) || dyn_cast_or_null<WhileStmt>(TStmt) ||
         dyn_cast_or_null<SwitchStmt>(TStmt)) {
       Checks.push_back(std::pair<Stmt *, CFGBlock *>(TStmt, CDGNode));
