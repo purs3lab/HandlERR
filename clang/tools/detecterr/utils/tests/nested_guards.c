@@ -1,15 +1,15 @@
 #include <stdlib.h>
 
-// int *foo1(int A) {
-//   if (A != 2) {
-//     if (A != 3) {
-//       if (A < 0) {
-//         return &A;
-//       }
-//     }
-//   }
-//   return NULL;
-// }
+int *foo1(int A) {
+  if (A != 2) {
+    if (A != 3) {
+      if (A < 0) {
+        return &A;
+      }
+    }
+  }
+  return NULL;
+}
 
 int *foo3(int x) {
   int b = 3;
