@@ -15,25 +15,14 @@
 /// H03 - call to an exit function is control dependent on one or more
 /// if checks
 bool EHFCallVisitor::VisitCallExpr(CallExpr *CE) {
-  //  llvm::errs() << "processing fn: " << FnDecl->getNameInfo().getAsString()
-  //               << '\n';
-
   CFGBlock *CurBB;
-  if (isEHFCallExpr(CE, *EHFList_, Context)) {
+  if (isEHFCallExpr(CE, *EhfList, Context)) {
     if (StMap.find(CE) != StMap.end()) {
       CurBB = StMap[CE];
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *CurBB, &CDG);
       sortIntoInnerAndOuterChecks(Checks, &CDG);
-      for (unsigned long I = 0; I < Checks.size(); I++) {
-        if (I == 0) {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, CE, Context,
-                                    Heuristic, GuardLevel::Inner);
-        } else {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, CE, Context,
-                                    Heuristic, GuardLevel::Outer);
-        }
-      }
+      addErrorGuards(Checks, CE, *this);
     }
   }
   return true;

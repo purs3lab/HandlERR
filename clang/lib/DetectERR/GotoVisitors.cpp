@@ -16,15 +16,7 @@ bool GotoVisitor::VisitGotoStmt(GotoStmt *GotoST) {
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *CurBB, &CDG);
       sortIntoInnerAndOuterChecks(Checks, &CDG);
-      for (unsigned long I = 0; I < Checks.size(); I++) {
-        if (I == 0) {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, GotoST, Context,
-                                    Heuristic, GuardLevel::Inner);
-        } else {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, GotoST, Context,
-                                    Heuristic, GuardLevel::Outer);
-        }
-      }
+      addErrorGuards(Checks, GotoST, *this);
     }
   }
   return true;

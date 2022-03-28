@@ -6,6 +6,7 @@
 #include "clang/Analysis/CFG.h"
 #include "clang/DetectERR/DetectERRASTConsumer.h"
 #include "clang/DetectERR/Utils.h"
+#include "clang/DetectERR/VisitorUtils.h"
 #include <algorithm>
 
 using namespace llvm;
@@ -39,6 +40,10 @@ public:
   }
 
   bool VisitGotoStmt(GotoStmt *S);
+
+  friend void addErrorGuards<GotoVisitor>(
+      std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ReturnST,
+      GotoVisitor &This);
 
 private:
   ASTContext *Context;

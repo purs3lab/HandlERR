@@ -16,6 +16,7 @@
 #include "clang/Analysis/CFG.h"
 #include "clang/DetectERR/DetectERRASTConsumer.h"
 #include "clang/DetectERR/Utils.h"
+#include "clang/DetectERR/VisitorUtils.h"
 #include <algorithm>
 
 using namespace llvm;
@@ -30,7 +31,7 @@ public:
       : Context(Context), Info(I), FnDecl(FD), FID(FnID),
         Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
                           CFG::BuildOptions())),
-        CDG(Cfg.get()), EHFList_(EHFList), Heuristic(HeuristicID::H03) {
+        CDG(Cfg.get()), EhfList(EHFList), Heuristic(HeuristicID::H03) {
     for (auto *CBlock : *(Cfg.get())) {
       if (CBlock->size() == 0) {
         if (Stmt *St = CBlock->getTerminatorStmt()) {
@@ -48,6 +49,10 @@ public:
 
   bool VisitCallExpr(CallExpr *CE);
 
+  friend void addErrorGuards<EHFCallVisitor>(
+      std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ReturnST,
+      EHFCallVisitor &This);
+
 private:
   ASTContext *Context;
   ProjectInfo &Info;
@@ -56,7 +61,7 @@ private:
 
   std::unique_ptr<CFG> Cfg;
   ControlDependencyCalculator CDG;
-  const std::set<std::string> *EHFList_;
+  const std::set<std::string> *EhfList;
   std::map<const Stmt *, CFGBlock *> StMap;
 
   HeuristicID Heuristic;

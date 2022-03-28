@@ -16,6 +16,7 @@
 #include "clang/Analysis/CFG.h"
 #include "clang/DetectERR/DetectERRASTConsumer.h"
 #include "clang/DetectERR/Utils.h"
+#include "clang/DetectERR/VisitorUtils.h"
 #include <algorithm>
 
 using namespace llvm;
@@ -48,6 +49,10 @@ public:
   bool VisitReturnStmt(ReturnStmt *S);
 
   ProjectInfo &getProjectInfo() { return Info; }
+
+  friend void addErrorGuards<ReturnNullVisitor>(
+      std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ReturnST,
+      ReturnNullVisitor &This);
 
 private:
   ASTContext *Context;
@@ -89,6 +94,10 @@ public:
 
   bool VisitReturnStmt(ReturnStmt *S);
 
+  friend void addErrorGuards<ReturnNegativeNumVisitor>(
+      std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ReturnST,
+      ReturnNegativeNumVisitor &This);
+
 private:
   ASTContext *Context;
   ProjectInfo &Info;
@@ -128,6 +137,10 @@ public:
 
   bool VisitReturnStmt(ReturnStmt *S);
 
+  friend void addErrorGuards<ReturnZeroVisitor>(
+      std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ReturnST,
+      ReturnZeroVisitor &This);
+
 private:
   ASTContext *Context;
   ProjectInfo &Info;
@@ -166,6 +179,10 @@ public:
   }
 
   bool VisitReturnStmt(ReturnStmt *S);
+
+  friend void addErrorGuards<ReturnValVisitor>(
+      std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ReturnST,
+      ReturnValVisitor &This);
 
 private:
   ASTContext *Context;
@@ -207,6 +224,10 @@ public:
   }
 
   bool VisitReturnStmt(ReturnStmt *S);
+
+  friend void addErrorGuards<ReturnEarlyVisitor>(
+      std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ReturnST,
+      ReturnEarlyVisitor &This);
 
 private:
   ASTContext *Context;

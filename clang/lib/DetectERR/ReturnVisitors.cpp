@@ -11,12 +11,11 @@
 
 #include "clang/DetectERR/ReturnVisitors.h"
 #include "clang/DetectERR/Utils.h"
+// #include "clang/DetectERR/VisitorUtils.h"
 
 /// H04 - if a "return NULL" statement is control dependent upon one or more
 /// "if" checks
 bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
-  // llvm::errs() << "VisitReturnStmt for ReturnStmt: ";
-
   if (FnDecl->getReturnType()->isPointerType()) {
     CFGBlock *ReturnBB;
     if (isNULLExpr(ReturnST->getRetValue(), *Context)) {
@@ -31,22 +30,7 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
         std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
         collectChecks(Checks, *ReturnBB, &CDG);
         sortIntoInnerAndOuterChecks(Checks, &CDG);
-        for (unsigned long I = 0; I < Checks.size(); I++) {
-          if (I == 0) {
-            Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
-                                      Heuristic, GuardLevel::Inner);
-          } else {
-            // the guard level will either be Outer or Default based on
-            // whether this Guard encloses the first Guard or not
-            GuardLevel Lvl = GuardLevel::Inner;
-            if (Checks[I].first->getSourceRange().fullyContains(
-                    Checks[0].first->getSourceRange())) {
-              Lvl = GuardLevel::Outer;
-            }
-            Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
-                                      Heuristic, Lvl);
-          }
-        }
+        addErrorGuards(Checks, ReturnST, *this);
       }
     }
   }
@@ -63,15 +47,7 @@ bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
         std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
         collectChecks(Checks, *CurBB, &CDG);
         sortIntoInnerAndOuterChecks(Checks, &CDG);
-        for (unsigned long I = 0; I < Checks.size(); I++) {
-          if (I == 0) {
-            Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
-                                      Heuristic, GuardLevel::Inner);
-          } else {
-            Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
-                                      Heuristic, GuardLevel::Outer);
-          }
-        }
+        addErrorGuards(Checks, ReturnST, *this);
       }
     }
   }
@@ -94,15 +70,7 @@ bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *CurBB, &CDG);
       sortIntoInnerAndOuterChecks(Checks, &CDG);
-      for (unsigned long I = 0; I < Checks.size(); I++) {
-        if (I == 0) {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
-                                    Heuristic, GuardLevel::Inner);
-        } else {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
-                                    Heuristic, GuardLevel::Outer);
-        }
-      }
+      addErrorGuards(Checks, ReturnST, *this);
     }
   }
   return true;
@@ -215,10 +183,6 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
             }
 
             if (DRE && Cond) {
-              // llvm::errs() << "TStmt loc: ";
-              // SourceRange srcRange = TStmt->getSourceRange();
-              // srcRange.dump(Context->getSourceManager());
-
               const DeclRefExpr *CheckedDRE = getDeclRefExpr(DRE);
 
               if (CheckedDRE) {
@@ -278,15 +242,7 @@ bool ReturnEarlyVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *ReturnBB, &CDG);
       sortIntoInnerAndOuterChecks(Checks, &CDG);
-      for (unsigned long I = 0; I < Checks.size(); I++) {
-        if (I == 0) {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
-                                    Heuristic, GuardLevel::Inner);
-        } else {
-          Info.addErrorGuardingStmt(FID, Checks[I].first, ReturnST, Context,
-                                    Heuristic, GuardLevel::Outer);
-        }
-      }
+      addErrorGuards(Checks, ReturnST, *this);
     }
   }
   return true;
