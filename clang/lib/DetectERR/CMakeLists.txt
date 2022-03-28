@@ -8,10 +8,11 @@ add_clang_library(
   ErrGuard.cpp
   ProjectInfo.cpp
   EHFCollectors.cpp
-  ReturnVisitors.cpp
-  GotoVisitors.cpp
-  EHFCallVisitors.cpp
   Utils.cpp
+  VisitorUtils.cpp
+  ReturnVisitors.cpp
+  EHFCallVisitors.cpp
+  GotoVisitors.cpp
   LINK_LIBS
   clangAST
   clangAnalysis

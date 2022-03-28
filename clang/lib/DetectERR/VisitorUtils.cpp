@@ -2,7 +2,6 @@
 
 template <typename Visitor>
 void addErrorGuards(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
-#
                     Stmt *ReturnST, Visitor &T) {
   for (unsigned long I = 0; I < Checks.size(); I++) {
     if (I == 0) {
