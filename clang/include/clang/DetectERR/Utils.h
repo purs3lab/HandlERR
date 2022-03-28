@@ -18,6 +18,7 @@
 
 using namespace clang;
 
+/// (function name, file name)
 typedef std::pair<std::string, std::string> FuncId;
 
 /// Get function id for the given function declaration.
