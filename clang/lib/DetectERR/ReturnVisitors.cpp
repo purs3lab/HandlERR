@@ -200,8 +200,14 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
 
                   // finally, note the guarding statement
                   if (!IsUpdated) {
+                    SourceRange CurrSR = TStmt->getSourceRange();
+                    SourceRange ReturnSTSR = ReturnST->getSourceRange();
+                    GuardLevel Lvl = GuardLevel::Default;
+                    if (CurrSR.fullyContains(ReturnSTSR)) {
+                      Lvl = GuardLevel::Inner;
+                    }
                     Info.addErrorGuardingStmt(FID, TStmt, ReturnST, Context,
-                                              Heuristic);
+                                              Heuristic, Lvl);
                   }
                 }
               }
