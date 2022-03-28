@@ -9,7 +9,6 @@ add_clang_library(
   ProjectInfo.cpp
   EHFCollectors.cpp
   Utils.cpp
-  VisitorUtils.cpp
   ReturnVisitors.cpp
   EHFCallVisitors.cpp
   GotoVisitors.cpp
