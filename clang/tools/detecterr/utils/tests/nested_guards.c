@@ -25,3 +25,17 @@ int *foo3(int x) {
     return NULL;
   }
 }
+
+int *foo(int *a) {
+  if (*a == 1) {
+    return (int *)0;
+  }
+
+  a = malloc(sizeof(int));
+
+  if (*a > 2) {
+    return (int *)0;
+  }
+
+  return a;
+}

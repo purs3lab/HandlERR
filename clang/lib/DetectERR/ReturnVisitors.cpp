@@ -15,11 +15,13 @@
 /// H04 - if a "return NULL" statement is control dependent upon one or more
 /// "if" checks
 bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
+  // llvm::errs() << "VisitReturnStmt for ReturnStmt: ";
+
   if (FnDecl->getReturnType()->isPointerType()) {
-    CFGBlock *CurBB;
+    CFGBlock *ReturnBB;
     if (isNULLExpr(ReturnST->getRetValue(), *Context)) {
       if (StMap.find(ReturnST) != StMap.end()) {
-        CurBB = StMap[ReturnST];
+        ReturnBB = StMap[ReturnST];
 
         // collect all checks with their CFGBlocks into an array
         // do one round of bubble sort so that the one CFGBlock that is
@@ -27,7 +29,7 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
         // the one at postion 0 is the "inner" check and all others are
         // "outer" checks
         std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
-        collectChecks(Checks, *CurBB, &CDG);
+        collectChecks(Checks, *ReturnBB, &CDG);
         sortIntoInnerAndOuterChecks(Checks, &CDG);
         for (unsigned long I = 0; I < Checks.size(); I++) {
           if (I == 0) {
@@ -36,7 +38,7 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
           } else {
             // the guard level will either be Outer or Default based on
             // whether this Guard encloses the first Guard or not
-            GuardLevel Lvl = GuardLevel::Default;
+            GuardLevel Lvl = GuardLevel::Inner;
             if (Checks[I].first->getSourceRange().fullyContains(
                     Checks[0].first->getSourceRange())) {
               Lvl = GuardLevel::Outer;
