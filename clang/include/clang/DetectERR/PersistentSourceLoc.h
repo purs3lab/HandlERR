@@ -25,6 +25,8 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include <cstdint>
+#include <utility>
 
 using namespace clang;
 
@@ -84,6 +86,14 @@ public:
 
   static PersistentSourceLoc mkPSL(const clang::Stmt *S,
                                    const clang::ASTContext &Context);
+
+  std::pair<uint32_t, uint32_t> getRowCol() {
+    return std::pair<uint32_t, uint32_t>(LineNo, ColNoS);
+  }
+
+  std::string getRowColStr() {
+    return "(" + std::to_string(LineNo) + "," + std::to_string(ColNoS) + ")";
+  }
 
 private:
   // Create a PersistentSourceLoc based on absolute file path
