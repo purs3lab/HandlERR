@@ -120,6 +120,19 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
         // iterate over all blocks to find which nodes dominate this one
         for (auto &CurrBB : *Cfg.get()) {
           if (DomTree.properlyDominates(CurrBB, ReturnBB)) {
+            // skip the blocks on which the Return is Control Dependent
+            auto &CDNodes = CDG.getControlDependencies(ReturnBB);
+            bool IsReturnCtrlDepOnCurBb = false;
+            for (auto &CDNode : CDNodes) {
+              if (CDNode == CurrBB) {
+                IsReturnCtrlDepOnCurBb = true;
+                break;
+              }
+            }
+            if (IsReturnCtrlDepOnCurBb) {
+              continue;
+            }
+
             Stmt *TStmt = CurrBB->getTerminatorStmt();
 
             Expr *DRE = nullptr;

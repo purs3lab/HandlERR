@@ -124,9 +124,9 @@ bool isLastStmtInBB(const Stmt &ST, const CFGBlock &BB) {
     return false;
   }
 
-  auto it = BB.rbegin();
-  if (it != BB.rend()) {
-    const Stmt *LastStmt = (*it).getAs<CFGStmt>()->getStmt();
+  const auto *It = BB.rbegin();
+  if (It != BB.rend()) {
+    const Stmt *LastStmt = (*It).getAs<CFGStmt>()->getStmt();
     return LastStmt == &ST;
   }
 
@@ -137,9 +137,9 @@ bool isEHFCallExpr(const CallExpr *CE, const std::set<std::string> &EHFList,
                    ASTContext *Context) {
   const Decl *CalledDecl = CE->getCalleeDecl();
   if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(CalledDecl)) {
-    std::string calledFnName = FD->getNameInfo().getAsString();
+    std::string CalledFnName = FD->getNameInfo().getAsString();
     // if the called function is a known exit function
-    if (EHFList.find(calledFnName) != EHFList.end()) {
+    if (EHFList.find(CalledFnName) != EHFList.end()) {
       return true;
     }
   }
@@ -165,10 +165,10 @@ bool isDerefToDeclRef(const clang::Expr *E, const NamedDecl *D) {
   const Expr *CurrE = removeAuxillaryCasts(E);
   if (const UnaryOperator *UO = dyn_cast<UnaryOperator>(CurrE)) {
     if (UO->getOpcode() == UnaryOperator::Opcode::UO_Deref) {
-      for (const Stmt *child : UO->children()) {
+      for (const Stmt *Child : UO->children()) {
         // there would be only one child
         if (const DeclRefExpr *ActualDRE =
-                getDeclRefExpr(dyn_cast<Expr>(child))) {
+                getDeclRefExpr(dyn_cast<Expr>(Child))) {
           return ActualDRE->getFoundDecl()->getUnderlyingDecl() == D;
         }
       }
@@ -186,9 +186,9 @@ Expr *getDerefExpr(const clang::Expr *E) {
   const Expr *CE = removeAuxillaryCasts(E);
   if (const UnaryOperator *UO = dyn_cast<UnaryOperator>(CE)) {
     if (UO->getOpcode() == UnaryOperator::Opcode::UO_Deref) {
-      for (const Stmt *child : UO->children()) {
+      for (const Stmt *Child : UO->children()) {
         // there would be only one child
-        Result = (Expr *)dyn_cast_or_null<Expr>(child);
+        Result = (Expr *)dyn_cast_or_null<Expr>(Child);
       }
     }
   }
