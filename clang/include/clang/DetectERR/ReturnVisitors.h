@@ -154,7 +154,8 @@ private:
   HeuristicID Heuristic;
 };
 
-/// H06 - Condition guarding return 0 value is error guarding.
+/// H06 - a "return <val>" statement is dominated by a check for that
+/// particular value but is not control dependent on the check
 class ReturnValVisitor : public RecursiveASTVisitor<ReturnValVisitor> {
 public:
   explicit ReturnValVisitor(ASTContext *Context, ProjectInfo &I,

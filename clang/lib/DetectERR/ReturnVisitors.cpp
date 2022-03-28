@@ -178,8 +178,6 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
                   DRE = UnaryOp->getSubExpr();
                 }
               }
-
-              // III: cond: x
             }
 
             if (DRE && Cond) {

@@ -42,7 +42,8 @@ enum HeuristicID {
   /// H05 - Condition guarding return 0 value is error guarding.
   H05,
 
-  /// H06 - Condition guarding return 0 value is error guarding.
+  /// H06 - a "return <val>" statement is dominated by a check for that
+  /// particular value but is not control dependent on the check
   H06,
 
   /// H07 - For a function having a void return type, early return based on a
