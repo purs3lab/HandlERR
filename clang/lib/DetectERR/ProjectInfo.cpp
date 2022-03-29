@@ -27,14 +27,6 @@ bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID,
   return RetVal;
 }
 
-bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID,
-                                       const clang::Stmt *GuardST,
-                                       const clang::Stmt *ErrST, ASTContext *C,
-                                       HeuristicID Heuristic) {
-  return addErrorGuardingStmt(FID, GuardST, ErrST, C, Heuristic,
-                              GuardLevel::Default);
-}
-
 std::string ProjectInfo::errCondsToJsonString() const {
   std::string RetVal = "{\"ErrGuardingConditions\":[";
   bool AddComma = false;

@@ -71,7 +71,9 @@ public:
   };
 
   bool operator<(const ErrGuard &O) const {
-    return GuardLoc < O.GuardLoc || (GuardLoc == O.GuardLoc && Level < O.Level);
+    return GuardLoc < O.GuardLoc ||
+           (GuardLoc == O.GuardLoc && ErrLoc < O.ErrLoc) ||
+           (GuardLoc == O.GuardLoc && ErrLoc == O.ErrLoc && Level < O.Level);
   }
 
   std::string toString() const {

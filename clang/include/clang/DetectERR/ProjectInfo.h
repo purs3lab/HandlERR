@@ -29,10 +29,6 @@ public:
                             const clang::Stmt *ErrST, ASTContext *C,
                             HeuristicID Heuristic, GuardLevel Lvl);
 
-  bool addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *GuardST,
-                            const clang::Stmt *ErrST, ASTContext *C,
-                            HeuristicID Heuristic);
-
   // Convert error conditions to json string.
   std::string errCondsToJsonString() const;
 
