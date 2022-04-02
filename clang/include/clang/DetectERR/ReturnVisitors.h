@@ -15,6 +15,7 @@
 #include "clang/Analysis/Analyses/Dominators.h"
 #include "clang/Analysis/CFG.h"
 #include "clang/DetectERR/DetectERRASTConsumer.h"
+#include "clang/DetectERR/DetectERRVisitor.h"
 #include "clang/DetectERR/Utils.h"
 #include "clang/DetectERR/VisitorUtils.h"
 #include <algorithm>
@@ -23,223 +24,59 @@ using namespace llvm;
 using namespace clang;
 
 /// H04 - Condition guarding return NULL is error guarding.
-class ReturnNullVisitor : public RecursiveASTVisitor<ReturnNullVisitor> {
+class ReturnNullVisitor : public DetectERRVisitor {
 public:
-  explicit ReturnNullVisitor(ASTContext *Context, ProjectInfo &I,
-                             FunctionDecl *FD, FuncId &FnID)
-      : Context(Context), Info(I), FnDecl(FD), FID(FnID),
-        Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
-                          CFG::BuildOptions())),
-        CDG(Cfg.get()), Heuristic(HeuristicID::H04) {
-    for (auto *CBlock : *(Cfg.get())) {
-      if (CBlock->size() == 0) {
-        if (Stmt *St = CBlock->getTerminatorStmt()) {
-          StMap[St] = CBlock;
-        }
-      }
-      for (auto &CfgElem : *CBlock) {
-        if (CfgElem.getKind() == clang::CFGElement::Statement) {
-          const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
-          StMap[TmpSt] = CBlock;
-        }
-      }
-    }
-  }
+  ReturnNullVisitor(ASTContext *Context, ProjectInfo &I, FunctionDecl *FD,
+                    FuncId &FnID)
+      : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H04} {};
 
   bool VisitReturnStmt(ReturnStmt *S);
-
-  ProjectInfo &getProjectInfo() { return Info; }
-
-  friend void addErrorGuards<ReturnNullVisitor>(
-      std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ReturnST,
-      ReturnNullVisitor &This);
-
-private:
-  ASTContext *Context;
-  ProjectInfo &Info;
-  FunctionDecl *FnDecl;
-  FuncId &FID;
-
-  std::unique_ptr<CFG> Cfg;
-  ControlDependencyCalculator CDG;
-  std::map<const Stmt *, CFGBlock *> StMap;
-
-  HeuristicID Heuristic;
 };
 
 /// H02 - Condition guarding return negative value is error guarding.
-class ReturnNegativeNumVisitor
-    : public RecursiveASTVisitor<ReturnNegativeNumVisitor> {
+class ReturnNegativeNumVisitor : public DetectERRVisitor {
 public:
-  explicit ReturnNegativeNumVisitor(ASTContext *Context, ProjectInfo &I,
-                                    FunctionDecl *FD, FuncId &FnID)
-      : Context(Context), Info(I), FnDecl(FD), FID(FnID),
-        Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
-                          CFG::BuildOptions())),
-        CDG(Cfg.get()), Heuristic(HeuristicID::H02) {
-    for (auto *CBlock : *(Cfg.get())) {
-      if (CBlock->size() == 0) {
-        if (Stmt *St = CBlock->getTerminatorStmt()) {
-          StMap[St] = CBlock;
-        }
-      }
-      for (auto &CfgElem : *CBlock) {
-        if (CfgElem.getKind() == clang::CFGElement::Statement) {
-          const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
-          StMap[TmpSt] = CBlock;
-        }
-      }
-    }
-  }
+  ReturnNegativeNumVisitor(ASTContext *Context, ProjectInfo &I,
+                           FunctionDecl *FD, FuncId &FnID)
+      : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H02} {};
 
   bool VisitReturnStmt(ReturnStmt *S);
-
-  friend void addErrorGuards<ReturnNegativeNumVisitor>(
-      std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ReturnST,
-      ReturnNegativeNumVisitor &This);
-
-private:
-  ASTContext *Context;
-  ProjectInfo &Info;
-  FunctionDecl *FnDecl;
-  FuncId &FID;
-
-  std::unique_ptr<CFG> Cfg;
-  ControlDependencyCalculator CDG;
-  std::map<const Stmt *, CFGBlock *> StMap;
-
-  HeuristicID Heuristic;
 };
 
 /// H05 - Condition guarding return 0 value is error guarding.
-class ReturnZeroVisitor : public RecursiveASTVisitor<ReturnZeroVisitor> {
+class ReturnZeroVisitor : public DetectERRVisitor {
 public:
-  explicit ReturnZeroVisitor(ASTContext *Context, ProjectInfo &I,
-                             FunctionDecl *FD, FuncId &FnID)
-      : Context(Context), Info(I), FnDecl(FD), FID(FnID),
-        Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
-                          CFG::BuildOptions())),
-        CDG(Cfg.get()), Heuristic(HeuristicID::H05) {
-    for (auto *CBlock : *(Cfg.get())) {
-      if (CBlock->size() == 0) {
-        if (Stmt *St = CBlock->getTerminatorStmt()) {
-          StMap[St] = CBlock;
-        }
-      }
-      for (auto &CfgElem : *CBlock) {
-        if (CfgElem.getKind() == clang::CFGElement::Statement) {
-          const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
-          StMap[TmpSt] = CBlock;
-        }
-      }
-    }
-  }
+  ReturnZeroVisitor(ASTContext *Context, ProjectInfo &I, FunctionDecl *FD,
+                    FuncId &FnID)
+      : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H05} {};
 
   bool VisitReturnStmt(ReturnStmt *S);
-
-  friend void addErrorGuards<ReturnZeroVisitor>(
-      std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ReturnST,
-      ReturnZeroVisitor &This);
-
-private:
-  ASTContext *Context;
-  ProjectInfo &Info;
-  FunctionDecl *FnDecl;
-  FuncId &FID;
-
-  std::unique_ptr<CFG> Cfg;
-  ControlDependencyCalculator CDG;
-  std::map<const Stmt *, CFGBlock *> StMap;
-
-  HeuristicID Heuristic;
 };
 
 /// H06 - a "return <val>" statement is dominated by a check for that
 /// particular value but is not control dependent on the check
-class ReturnValVisitor : public RecursiveASTVisitor<ReturnValVisitor> {
+class ReturnValVisitor : public DetectERRVisitor {
 public:
-  explicit ReturnValVisitor(ASTContext *Context, ProjectInfo &I,
-                            FunctionDecl *FD, FuncId &FnID)
-      : Context(Context), Info(I), FnDecl(FD), FID(FnID),
-        Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
-                          CFG::BuildOptions())),
-        CDG(Cfg.get()), DomTree(Cfg.get()), Heuristic(HeuristicID::H06) {
-    for (auto *CBlock : *(Cfg.get())) {
-      if (CBlock->size() == 0) {
-        if (Stmt *St = CBlock->getTerminatorStmt()) {
-          StMap[St] = CBlock;
-        }
-      }
-      for (auto &CfgElem : *CBlock) {
-        if (CfgElem.getKind() == clang::CFGElement::Statement) {
-          const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
-          StMap[TmpSt] = CBlock;
-        }
-      }
-    }
-  }
+  ReturnValVisitor(ASTContext *Context, ProjectInfo &I, FunctionDecl *FD,
+                   FuncId &FnID)
+      : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H06},
+        DomTree(Cfg.get()){};
 
   bool VisitReturnStmt(ReturnStmt *S);
 
-  friend void addErrorGuards<ReturnValVisitor>(
-      std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ReturnST,
-      ReturnValVisitor &This);
-
 private:
-  ASTContext *Context;
-  ProjectInfo &Info;
-  FunctionDecl *FnDecl;
-  FuncId &FID;
-
-  std::unique_ptr<CFG> Cfg;
-  ControlDependencyCalculator CDG;
   CFGDomTree DomTree;
-  std::map<const Stmt *, CFGBlock *> StMap;
-
-  HeuristicID Heuristic;
 };
 
 /// H07 - For a function having a void return type, early return based on a
 /// check
-class ReturnEarlyVisitor : public RecursiveASTVisitor<ReturnEarlyVisitor> {
+class ReturnEarlyVisitor : public DetectERRVisitor {
 public:
-  explicit ReturnEarlyVisitor(ASTContext *Context, ProjectInfo &I,
-                              FunctionDecl *FD, FuncId &FnID)
-      : Context(Context), Info(I), FnDecl(FD), FID(FnID),
-        Cfg(CFG::buildCFG(nullptr, FD->getBody(), Context,
-                          CFG::BuildOptions())),
-        CDG(Cfg.get()), Heuristic(HeuristicID::H07) {
-    for (auto *CBlock : *(Cfg.get())) {
-      if (CBlock->size() == 0) {
-        if (Stmt *St = CBlock->getTerminatorStmt()) {
-          StMap[St] = CBlock;
-        }
-      }
-      for (auto &CfgElem : *CBlock) {
-        if (CfgElem.getKind() == clang::CFGElement::Statement) {
-          const Stmt *TmpSt = CfgElem.castAs<CFGStmt>().getStmt();
-          StMap[TmpSt] = CBlock;
-        }
-      }
-    }
-  }
+  ReturnEarlyVisitor(ASTContext *Context, ProjectInfo &I, FunctionDecl *FD,
+                     FuncId &FnID)
+      : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H07} {};
 
   bool VisitReturnStmt(ReturnStmt *S);
-
-  friend void addErrorGuards<ReturnEarlyVisitor>(
-      std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ReturnST,
-      ReturnEarlyVisitor &This);
-
-private:
-  ASTContext *Context;
-  ProjectInfo &Info;
-  FunctionDecl *FnDecl;
-  FuncId &FID;
-
-  std::unique_ptr<CFG> Cfg;
-  ControlDependencyCalculator CDG;
-  std::map<const Stmt *, CFGBlock *> StMap;
-
-  HeuristicID Heuristic;
 };
+
 #endif //LLVM_CLANG_DETECTERR_RETURNVISITORS_H
