@@ -22,7 +22,7 @@ bool EHFCallVisitor::VisitCallExpr(CallExpr *CE) {
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *CurBB, &CDG);
       sortIntoInnerAndOuterChecks(Checks, &CDG);
-      addErrorGuards(Checks, CE, *this);
+      addErrorGuards(Checks, CE);
     }
   }
   return true;

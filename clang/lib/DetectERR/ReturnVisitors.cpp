@@ -16,6 +16,7 @@
 /// H04 - if a "return NULL" statement is control dependent upon one or more
 /// "if" checks
 bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
+  llvm::errs() << "running ReturnNullVisitor::VisitReturnStmt\n";
   if (FnDecl->getReturnType()->isPointerType()) {
     CFGBlock *ReturnBB;
     if (isNULLExpr(ReturnST->getRetValue(), *Context)) {
@@ -29,6 +30,7 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
         // "outer" checks
         std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
         collectChecks(Checks, *ReturnBB, &CDG);
+        errs() << "Checks.size(): " << Checks.size() << '\n';
         sortIntoInnerAndOuterChecks(Checks, &CDG);
         addErrorGuards(Checks, ReturnST);
       }

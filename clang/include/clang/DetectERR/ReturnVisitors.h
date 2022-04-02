@@ -26,9 +26,11 @@ using namespace clang;
 /// H04 - Condition guarding return NULL is error guarding.
 class ReturnNullVisitor : public DetectERRVisitor {
 public:
-  ReturnNullVisitor(ASTContext *Context, ProjectInfo &I, FunctionDecl *FD,
-                    FuncId &FnID)
-      : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H04} {};
+  explicit ReturnNullVisitor(ASTContext *Context, ProjectInfo &I,
+                             FunctionDecl *FD, FuncId &FnID)
+      : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H04} {
+    llvm::errs() << "ReturnNullVisitor constructed\n";
+  };
 
   bool VisitReturnStmt(ReturnStmt *S);
 };
@@ -36,8 +38,8 @@ public:
 /// H02 - Condition guarding return negative value is error guarding.
 class ReturnNegativeNumVisitor : public DetectERRVisitor {
 public:
-  ReturnNegativeNumVisitor(ASTContext *Context, ProjectInfo &I,
-                           FunctionDecl *FD, FuncId &FnID)
+  explicit ReturnNegativeNumVisitor(ASTContext *Context, ProjectInfo &I,
+                                    FunctionDecl *FD, FuncId &FnID)
       : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H02} {};
 
   bool VisitReturnStmt(ReturnStmt *S);
