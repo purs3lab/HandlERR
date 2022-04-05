@@ -63,6 +63,11 @@ public:
       }
     }
   }
+  
+  // Making pure virtual functions to help derived classes.
+  bool VisitCallExpr(CallExpr *CE) {
+    return true;
+  }
 
   ASTContext *Context;
   ProjectInfo &Info;
