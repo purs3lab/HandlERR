@@ -97,6 +97,7 @@ bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
 /// - returns stmt returns a variable (DeclRef)
 /// - there is a check for this returned variable which dominates the return
 ///     stmt but the return is not control dependent on the check
+///     NOTE: for now we should limit this to only checks against NULL
 bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
   CFGBlock *ReturnBB;
   if (FnDecl->getReturnType()->isPointerType()) { // return type = pointer
@@ -136,50 +137,26 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
             Stmt *TStmt = CurrBB->getTerminatorStmt();
 
             Expr *DRE = nullptr;
-            Expr *Cond = nullptr;
 
-            // IF Stmt
-            if (IfStmt *IfCheck = dyn_cast_or_null<IfStmt>(TStmt)) {
-              //              llvm::errs() << "IfStmt\n";
-              Cond = IfCheck->getCond();
-            }
-
-            // While Stmt
-            else if (WhileStmt *WhileCheck =
-                         dyn_cast_or_null<WhileStmt>(TStmt)) {
-              //              llvm::errs() << "WhileStmt\n";
-              Cond = WhileCheck->getCond();
-            }
-
-            // Switch Stmt
-            else if (SwitchStmt *SwitchCheck =
-                         dyn_cast_or_null<SwitchStmt>(TStmt)) {
-              //              llvm::errs() << "WhileStmt\n";
-              Cond = SwitchCheck->getCond();
-            }
+            Expr *Cond = getCondFromCheckStmt(TStmt);
 
             if (Cond) {
-              // I: cond: x != something OR x == something
+              // I: cond: x != NULL
               if (BinaryOperator *BinaryOp = dyn_cast<BinaryOperator>(Cond)) {
-                // we only care about '!=' OR '==
-                if (BinaryOp->getOpcode() == BinaryOperator::Opcode::BO_NE ||
-                    BinaryOp->getOpcode() == BinaryOperator::Opcode::BO_EQ ||
-                    BinaryOp->getOpcode() == BinaryOperator::Opcode::BO_Cmp) {
+                // we only care about '!='
+                if (BinaryOp->getOpcode() == BinaryOperator::Opcode::BO_NE) {
 
                   Expr *LHS = BinaryOp->getLHS();
                   Expr *RHS = BinaryOp->getRHS();
 
-                  if (hasDeclRefExprTo(LHS, ReturnNamedDecl)) {
-                    DRE = (Expr *)getDeclRefExpr(LHS);
-
-                  } else if (hasDeclRefExprTo(RHS, ReturnNamedDecl)) {
+                  if (isNULLExpr(LHS, *Context)) {
                     DRE = (Expr *)getDeclRefExpr(RHS);
 
-                  } else if (isDerefToDeclRef(LHS, ReturnNamedDecl)) {
-                    DRE = getDerefExpr(LHS);
+                  } else if (isNULLExpr(RHS, *Context)) {
+                    DRE = (Expr *)getDeclRefExpr(LHS);
 
-                  } else if (isDerefToDeclRef(RHS, ReturnNamedDecl)) {
-                    DRE = getDerefExpr(RHS);
+                  } else {
+                    // we dont do anything!
                   }
                 }
               }

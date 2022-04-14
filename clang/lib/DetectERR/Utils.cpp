@@ -285,3 +285,26 @@ void collectChecks(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
     }
   }
 }
+
+/// returns the condition expression based on the type of check statement
+/// (if/while/switch)
+Expr *getCondFromCheckStmt(Stmt *ST) {
+  Expr *Cond = nullptr;
+
+  // IF Stmt
+  if (IfStmt *IfCheck = dyn_cast_or_null<IfStmt>(ST)) {
+    Cond = IfCheck->getCond();
+  }
+
+  // While Stmt
+  else if (WhileStmt *WhileCheck = dyn_cast_or_null<WhileStmt>(ST)) {
+    Cond = WhileCheck->getCond();
+  }
+
+  // Switch Stmt
+  else if (SwitchStmt *SwitchCheck = dyn_cast_or_null<SwitchStmt>(ST)) {
+    Cond = SwitchCheck->getCond();
+  }
+
+  return Cond;
+}
