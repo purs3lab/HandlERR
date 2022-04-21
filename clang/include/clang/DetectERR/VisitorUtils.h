@@ -23,54 +23,45 @@ void addErrorGuards(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
   // Hence maintain a flag to check if we have had an "inner" check already
   // Any other "enclosing" checks can then be labelled as "outer".
 
+  const SourceManager &SM = T.Context->getSourceManager();
+
   Stmt *Inner = nullptr;
 
   for (unsigned long I = 0; I < Checks.size(); I++) {
-    SourceRange CurrSR = Checks[I].first->getSourceRange();
-    SourceRange ReturnSTSR = ReturnST->getSourceRange();
+    const SourceRange CurrSR = Checks[I].first->getSourceRange();
+    const SourceLocation CurrSLBegin = SM.getExpansionLoc(CurrSR.getBegin());
+    const SourceLocation CurrSLEnd = SM.getExpansionLoc(CurrSR.getEnd());
+
+    const SourceRange ReturnSTSR = ReturnST->getSourceRange();
+    const SourceLocation ReturnSTSLBegin =
+        SM.getExpansionLoc(ReturnSTSR.getBegin());
+    const SourceLocation ReturnSTSLEnd =
+        SM.getExpansionLoc(ReturnSTSR.getEnd());
+
     GuardLevel Lvl = GuardLevel::Default;
-    if (I == 0) {
-      // TODO: DISCUSS: the following is not working as expected
-      //      if (CurrSR.fullyContains(ReturnSTSR)) {
-      //        Lvl = GuardLevel::Inner;
-      //      }
-      // workaround for the above
-      if (CurrSR.getBegin() <= ReturnSTSR.getBegin() &&
-          CurrSR.getEnd() >= ReturnSTSR.getBegin()) {
+
+    // conditions for a guard to be "Outer"
+    // - return statement is within it
+    // - inner guard is within it
+    if (Inner) {
+      // we can now assign outer checks
+      SourceRange InnerSR = Inner->getSourceRange();
+      const SourceLocation InnerSLBegin =
+          SM.getExpansionLoc(InnerSR.getBegin());
+      const SourceLocation InnerSLEnd = SM.getExpansionLoc(InnerSR.getEnd());
+      if (CurrSLBegin <= InnerSLBegin && CurrSLEnd >= InnerSLEnd) {
+        Lvl = GuardLevel::Outer;
+      }
+    } else {
+      // check if this is the inner check
+      if (CurrSLBegin <= ReturnSTSLBegin && CurrSLEnd >= ReturnSTSLEnd) {
         Lvl = GuardLevel::Inner;
         Inner = Checks[I].first;
       }
-      T.Info.addErrorGuardingStmt(T.FID, Checks[I].first, ReturnST, T.Context,
-                                  T.Heuristic, Lvl);
-    } else {
-      // conditions for a guard to be "Outer"
-      // - return statement is within it
-      // - inner guard is within it
-      // TODO: DISCUSS: the following is not working as expected due to the issue with
-      // fully contains for ReturnSTSR
-      // if (CurrSR.fullyContains(InnerSR) && CurrSR.fullyContains(ReturnSTSR)) {
-      //   Lvl = GuardLevel::Outer;
-      // }
-      // workaround for the above
-      if (Inner) {
-        // we can now assign outer checks
-        SourceRange InnerSR = Inner->getSourceRange();
-        if (CurrSR.fullyContains(InnerSR) &&
-            CurrSR.getBegin() <= ReturnSTSR.getBegin() &&
-            CurrSR.getEnd() >= ReturnSTSR.getBegin()) {
-          Lvl = GuardLevel::Outer;
-        }
-      } else {
-        // check if this is the inner check
-        if (CurrSR.getBegin() <= ReturnSTSR.getBegin() &&
-            CurrSR.getEnd() >= ReturnSTSR.getBegin()) {
-          Lvl = GuardLevel::Inner;
-          Inner = Checks[I].first;
-        }
-      }
-      T.Info.addErrorGuardingStmt(T.FID, Checks[I].first, ReturnST, T.Context,
-                                  T.Heuristic, Lvl);
     }
+
+    T.Info.addErrorGuardingStmt(T.FID, Checks[I].first, ReturnST, T.Context,
+                                T.Heuristic, Lvl);
   }
 }
 
