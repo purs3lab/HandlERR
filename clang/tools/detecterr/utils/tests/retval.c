@@ -54,6 +54,8 @@ int *foo_check_fn_call(int a) {
 int *baz3(int x) {
   int *a = malloc(sizeof(int));
   *a = 0;
+
+  // should not be included
   if (*a == x) {
     *a = 1;
   }

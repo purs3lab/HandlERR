@@ -85,4 +85,8 @@ void sortIntoInnerAndOuterChecks(
 void collectChecks(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
                    CFGBlock &CurBB, ControlDependencyCalculator *CDG);
 
+/// returns the condition expression based on the type of check statement
+/// (if/while/switch)
+Expr *getCondFromCheckStmt(Stmt *ST);
+
 #endif //LLVM_CLANG_DETECTERR_UTILS_H
