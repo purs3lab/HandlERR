@@ -4,7 +4,6 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/DetectERR/DetectERRASTConsumer.h"
 #include "clang/DetectERR/ErrGruard.h"
-#include "clang/DetectERR/VisitorUtils.h"
 
 using namespace llvm;
 using namespace clang;
@@ -32,6 +31,8 @@ public:
       }
     }
   }
+
+  virtual ~DetectERRVisitor() = default;
 
   ProjectInfo &getProjectInfo() { return Info; }
 
@@ -64,21 +65,10 @@ public:
     }
   }
 
-  // Making pure virtual functions to help derived classes.
-  virtual bool VisitCallExpr(CallExpr *CE) {
-    errs() << "DetectERRVisitor::VisitCallExpr\n";
-    return true;
-  }
-
-  virtual bool VisitReturnStmt(ReturnStmt *ST) {
-    errs() << "DetectERRVisitor::VisitReturnStmt\n";
-    return true;
-  }
-
-  virtual bool VisitGotoStmt(GotoStmt *GotoST) {
-    errs() << "DetectERRVisitor::VisitGotoStmt\n";
-    return true;
-  }
+  // Making virtual functions to help derived classes.
+  virtual bool VisitCallExpr(CallExpr *CE) { return true; }
+  virtual bool VisitReturnStmt(ReturnStmt *ST) { return true; }
+  virtual bool VisitGotoStmt(GotoStmt *GotoST) { return true; }
 
   ASTContext *Context;
   ProjectInfo &Info;

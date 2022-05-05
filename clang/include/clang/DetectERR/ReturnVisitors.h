@@ -17,7 +17,6 @@
 #include "clang/DetectERR/DetectERRASTConsumer.h"
 #include "clang/DetectERR/DetectERRVisitor.h"
 #include "clang/DetectERR/Utils.h"
-#include "clang/DetectERR/VisitorUtils.h"
 #include <algorithm>
 
 using namespace llvm;
@@ -28,9 +27,9 @@ class ReturnNullVisitor : public DetectERRVisitor {
 public:
   explicit ReturnNullVisitor(ASTContext *Context, ProjectInfo &I,
                              FunctionDecl *FD, FuncId &FnID)
-      : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H04} {
-    llvm::errs() << "ReturnNullVisitor constructed\n";
-  };
+      : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H04} {};
+
+  virtual ~ReturnNullVisitor() = default;
 
   bool VisitReturnStmt(ReturnStmt *S) override;
 };
@@ -42,6 +41,8 @@ public:
                                     FunctionDecl *FD, FuncId &FnID)
       : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H02} {};
 
+  virtual ~ReturnNegativeNumVisitor() = default;
+
   bool VisitReturnStmt(ReturnStmt *S) override;
 };
 
@@ -52,7 +53,9 @@ public:
                     FuncId &FnID)
       : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H05} {};
 
-  bool VisitReturnStmt(ReturnStmt *S);
+  virtual ~ReturnZeroVisitor() = default;
+
+  bool VisitReturnStmt(ReturnStmt *S) override;
 };
 
 /// H06 - a "return <val>" statement is dominated by a check for that
@@ -63,6 +66,8 @@ public:
                    FuncId &FnID)
       : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H06},
         DomTree(Cfg.get()){};
+
+  virtual ~ReturnValVisitor() = default;
 
   bool VisitReturnStmt(ReturnStmt *S) override;
 
@@ -77,6 +82,8 @@ public:
   ReturnEarlyVisitor(ASTContext *Context, ProjectInfo &I, FunctionDecl *FD,
                      FuncId &FnID)
       : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H07} {};
+
+  virtual ~ReturnEarlyVisitor() = default;
 
   bool VisitReturnStmt(ReturnStmt *S) override;
 };
