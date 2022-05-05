@@ -32,7 +32,7 @@ public:
     llvm::errs() << "ReturnNullVisitor constructed\n";
   };
 
-  bool VisitReturnStmt(ReturnStmt *S);
+  bool VisitReturnStmt(ReturnStmt *S) override;
 };
 
 /// H02 - Condition guarding return negative value is error guarding.
@@ -42,7 +42,7 @@ public:
                                     FunctionDecl *FD, FuncId &FnID)
       : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H02} {};
 
-  bool VisitReturnStmt(ReturnStmt *S);
+  bool VisitReturnStmt(ReturnStmt *S) override;
 };
 
 /// H05 - Condition guarding return 0 value is error guarding.
@@ -64,7 +64,7 @@ public:
       : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H06},
         DomTree(Cfg.get()){};
 
-  bool VisitReturnStmt(ReturnStmt *S);
+  bool VisitReturnStmt(ReturnStmt *S) override;
 
 private:
   CFGDomTree DomTree;
@@ -78,7 +78,7 @@ public:
                      FuncId &FnID)
       : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H07} {};
 
-  bool VisitReturnStmt(ReturnStmt *S);
+  bool VisitReturnStmt(ReturnStmt *S) override;
 };
 
 #endif //LLVM_CLANG_DETECTERR_RETURNVISITORS_H

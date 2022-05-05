@@ -31,7 +31,7 @@ public:
                  FuncId &FnID, const std::set<std::string> *EHFList)
       : DetectERRVisitor(Context, I, FD, FnID, HeuristicID::H03){};
 
-  bool VisitCallExpr(CallExpr *CE);
+  bool VisitCallExpr(CallExpr *CE) override;
 
 private:
   const std::set<std::string> *EhfList;

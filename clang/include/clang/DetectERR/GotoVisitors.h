@@ -20,7 +20,7 @@ public:
               FuncId &FnID)
       : DetectERRVisitor{Context, I, FD, FnID, HeuristicID::H08} {};
 
-  bool VisitGotoStmt(GotoStmt *S);
+  bool VisitGotoStmt(GotoStmt *S) override;
 
 private:
   static std::set<std::string> ErrorLabels;

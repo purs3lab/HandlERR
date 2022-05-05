@@ -65,14 +65,20 @@ public:
   }
 
   // Making pure virtual functions to help derived classes.
-  bool VisitCallExpr(CallExpr *CE) { return true; }
-  bool VisitReturnStmt(ReturnStmt *ST) { return true; }
-  bool VisitGotoStmt(GotoStmt *GotoST) { return true; }
+  virtual bool VisitCallExpr(CallExpr *CE) {
+    errs() << "DetectERRVisitor::VisitCallExpr\n";
+    return true;
+  }
 
-  // bool VisitReturnStmt(ReturnStmt *ST) {
-  //   errs() << "DetectERRVisitor::VisitReturnStmt\n";
-  //   return true;
-  // };
+  virtual bool VisitReturnStmt(ReturnStmt *ST) {
+    errs() << "DetectERRVisitor::VisitReturnStmt\n";
+    return true;
+  }
+
+  virtual bool VisitGotoStmt(GotoStmt *GotoST) {
+    errs() << "DetectERRVisitor::VisitGotoStmt\n";
+    return true;
+  }
 
   ASTContext *Context;
   ProjectInfo &Info;
