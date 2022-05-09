@@ -110,7 +110,7 @@ void DetectERRASTConsumer::handleFuncDecl(
 
     // EHF Call Visitor
     EHFCallVisitor EHFCV(&C, Info, const_cast<FunctionDecl *>(FD), FID,
-                         &EHFList);
+                         EHFList);
     if (Opts.Verbose) {
       llvm::outs() << "[+] Running EHF call handler.\n";
     }

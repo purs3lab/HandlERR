@@ -16,7 +16,7 @@ bool GotoVisitor::VisitGotoStmt(GotoStmt *GotoST) {
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *CurBB, &CDG);
       sortIntoInnerAndOuterChecks(Checks, &CDG);
-      addErrorGuards(Checks, GotoST, *this);
+      addErrorGuards(Checks, GotoST);
     }
   }
   return true;

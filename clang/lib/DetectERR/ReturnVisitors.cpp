@@ -30,7 +30,7 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
         std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
         collectChecks(Checks, *ReturnBB, &CDG);
         sortIntoInnerAndOuterChecks(Checks, &CDG);
-        addErrorGuards(Checks, ReturnST, *this);
+        addErrorGuards(Checks, ReturnST);
       }
     }
   }
@@ -47,7 +47,7 @@ bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
         std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
         collectChecks(Checks, *CurBB, &CDG);
         sortIntoInnerAndOuterChecks(Checks, &CDG);
-        addErrorGuards(Checks, ReturnST, *this);
+        addErrorGuards(Checks, ReturnST);
       }
     }
   }
@@ -70,7 +70,7 @@ bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *CurBB, &CDG);
       sortIntoInnerAndOuterChecks(Checks, &CDG);
-      addErrorGuards(Checks, ReturnST, *this);
+      addErrorGuards(Checks, ReturnST);
     }
   }
   return true;
@@ -236,7 +236,7 @@ bool ReturnEarlyVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *ReturnBB, &CDG);
       sortIntoInnerAndOuterChecks(Checks, &CDG);
-      addErrorGuards(Checks, ReturnST, *this);
+      addErrorGuards(Checks, ReturnST);
     }
   }
   return true;
