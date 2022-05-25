@@ -3,6 +3,7 @@
 //
 
 #include "clang/DetectERR/Utils.h"
+#include "clang/AST/Decl.h"
 #include "clang/AST/Expr.h"
 #include "clang/Analysis/CFG.h"
 #include "clang/DetectERR/PersistentSourceLoc.h"
@@ -310,11 +311,25 @@ Expr *getCondFromCheckStmt(Stmt *ST) {
 }
 
 /// remove the inner check that are using params to the function
+/// NOTE: that this functions expects that the `Checks` have already been sorted
+/// using `sortIntoInnerAndOuterChecks()`
 void removeInnerCheckUsingParams(
-    std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, FunctionDecl &FD) {
-  // get fn parms
-  // find the inner checks from the Checks
-  // assert that there is only one such inner check
-  // check if the inner check depends on any of the params
-  // if so, remove it from the vector
+    std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, ReturnStmt *ReturnST, FunctionDecl &FD) {
+  // find the inner check from the Checks
+  auto it = Checks.begin();
+  if (it != Checks.end()){
+    // only doing this for the first element, since there can only be one
+    // "inner" check
+    SourceRange CurrSR = it->first->getSourceRange();
+    SourceRange ReturnSTSR = ReturnST->getSourceRange();
+    if (CurrSR.fullyContains(ReturnSTSR)) {
+      // this check is the "inner" check
+      // TODO:
+      // 1. get the values used by the condition of this check
+      // 2. get fn params
+      // 3. check if the inner check depends on any of the params
+      // 4. if so, remove it from the vector
+    }
+  }
+
 }

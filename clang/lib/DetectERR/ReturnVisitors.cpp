@@ -226,6 +226,10 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
 /// - function has void return type
 /// - a check is directly followed by an early return
 bool ReturnEarlyVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
+  // TMP: for debugging
+  if(FnDecl->getNameInfo().getAsString() == "not_early_2"){
+    int i = 1;
+  }
   if (FnDecl->getReturnType()->isVoidType()) { // return type = void
     // - BB for the return statement does not contain any other statements
     // - the immediate dominator BB has a terminator statement that is a check
@@ -235,8 +239,8 @@ bool ReturnEarlyVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
     if (ReturnBB->size() == 1) {
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *ReturnBB, &CDG);
-      removeInnerCheckUsingParams(Checks, *FnDecl);
       sortIntoInnerAndOuterChecks(Checks, &CDG);
+      removeInnerCheckUsingParams(Checks, *FnDecl);
       addErrorGuards(Checks, ReturnST);
     }
   }

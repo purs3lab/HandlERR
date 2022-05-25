@@ -25,12 +25,11 @@ void not_early(){
   return;
 }
 
-int *not_early_2(int *x){
+void not_early_2(int *x){
     if(!x){
-        return NULL;
+        return;
     }
 
     int *a = (int *)malloc(sizeof(int));
     *a = *x + 1;
-    return a;
 }
