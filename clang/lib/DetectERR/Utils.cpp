@@ -308,3 +308,13 @@ Expr *getCondFromCheckStmt(Stmt *ST) {
 
   return Cond;
 }
+
+/// remove the inner check that are using params to the function
+void removeInnerCheckUsingParams(
+    std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, FunctionDecl &FD) {
+  // get fn parms
+  // find the inner checks from the Checks
+  // assert that there is only one such inner check
+  // check if the inner check depends on any of the params
+  // if so, remove it from the vector
+}

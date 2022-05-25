@@ -235,6 +235,7 @@ bool ReturnEarlyVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
     if (ReturnBB->size() == 1) {
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *ReturnBB, &CDG);
+      removeInnerCheckUsingParams(Checks, *FnDecl);
       sortIntoInnerAndOuterChecks(Checks, &CDG);
       addErrorGuards(Checks, ReturnST);
     }
