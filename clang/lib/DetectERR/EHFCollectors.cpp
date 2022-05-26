@@ -17,7 +17,13 @@ bool EHFCategoryOneCollector::VisitCallExpr(CallExpr *S) {
   CFGBlock *CurrBB = nullptr;
   auto Parents = Context->getParents(*S);
   if (!Parents.empty()) {
-    const Stmt *St = Parents[0].get<Stmt>();
+    auto Parent = Parents[0];
+    const Stmt *St = nullptr;
+    while (!Parent.get<Stmt>()) {
+      Parents = Context->getParents(Parent);
+      Parent = Parents[0];
+    }
+    St = Parent.get<Stmt>();
     if (St) {
       CurrBB = StMap[S];
     }
