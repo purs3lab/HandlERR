@@ -25,8 +25,16 @@ void not_early(){
   return;
 }
 
-void not_early_2(int *x){
+void not_early_2(int *x, int b){
     if(!x){
+        return;
+    }
+
+    if(x == NULL){
+        return;
+    }
+
+    if(b == 1){
         return;
     }
 

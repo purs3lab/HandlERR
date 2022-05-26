@@ -332,16 +332,22 @@ void removeInnerCheckUsingParams(
       if (BinaryOperator *BinaryOp = dyn_cast<BinaryOperator>(Cond)) {
         Expr *LHS = BinaryOp->getLHS();
         const DeclRefExpr *LeftDRE = getDeclRefExpr(LHS);
-        CondValueDecls.push_back(LeftDRE->getDecl());
+        if (LeftDRE) {
+          CondValueDecls.push_back(LeftDRE->getDecl());
+        }
 
         Expr *RHS = BinaryOp->getRHS();
         const DeclRefExpr *RightDRE = getDeclRefExpr(RHS);
-        CondValueDecls.push_back(RightDRE->getDecl());
+        if (RightDRE) {
+          CondValueDecls.push_back(RightDRE->getDecl());
+        }
 
       } else if (UnaryOperator *UnaryOp = dyn_cast<UnaryOperator>(Cond)) {
         Expr *SubExpr = UnaryOp->getSubExpr();
         const DeclRefExpr *Arg = getDeclRefExpr(SubExpr);
-        CondValueDecls.push_back(Arg->getDecl());
+        if (Arg) {
+          CondValueDecls.push_back(Arg->getDecl());
+        }
       }
 
       // 2. get fn params
