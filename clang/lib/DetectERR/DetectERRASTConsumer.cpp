@@ -77,12 +77,14 @@ void DetectERRASTConsumer::handleFuncDecl(
     FuncId FID = getFuncID(FD, &C);
     if (Opts.Verbose) {
       llvm::outs() << "[+] Handling function:" << FID.first << "\n";
+      llvm::outs().flush();
     }
 
     // Return NULL visitor.
     ReturnNullVisitor RNV(&C, Info, const_cast<FunctionDecl *>(FD), FID);
     if (Opts.Verbose) {
       llvm::outs() << "[+] Running return NULL handler.\n";
+      llvm::outs().flush();
     }
     RNV.TraverseDecl(const_cast<FunctionDecl *>(FD));
 
@@ -91,6 +93,7 @@ void DetectERRASTConsumer::handleFuncDecl(
                                    FID);
     if (Opts.Verbose) {
       llvm::outs() << "[+] Running return negative value handler.\n";
+      llvm::outs().flush();
     }
     RNegV.TraverseDecl(const_cast<FunctionDecl *>(FD));
 
@@ -98,6 +101,7 @@ void DetectERRASTConsumer::handleFuncDecl(
     ReturnZeroVisitor RZV(&C, Info, const_cast<FunctionDecl *>(FD), FID);
     if (Opts.Verbose) {
       llvm::outs() << "[+] Running return zero handler.\n";
+      llvm::outs().flush();
     }
     RZV.TraverseDecl(const_cast<FunctionDecl *>(FD));
 
@@ -105,6 +109,7 @@ void DetectERRASTConsumer::handleFuncDecl(
     ReturnValVisitor RVV(&C, Info, const_cast<FunctionDecl *>(FD), FID);
     if (Opts.Verbose) {
       llvm::outs() << "[+] Running return val handler.\n";
+      llvm::outs().flush();
     }
     RVV.TraverseDecl(const_cast<FunctionDecl *>(FD));
 
@@ -113,6 +118,7 @@ void DetectERRASTConsumer::handleFuncDecl(
                          EHFList);
     if (Opts.Verbose) {
       llvm::outs() << "[+] Running EHF call handler.\n";
+      llvm::outs().flush();
     }
     EHFCV.TraverseDecl(const_cast<FunctionDecl *>(FD));
 
@@ -120,6 +126,7 @@ void DetectERRASTConsumer::handleFuncDecl(
     ReturnEarlyVisitor REV(&C, Info, const_cast<FunctionDecl *>(FD), FID);
     if (Opts.Verbose) {
       llvm::outs() << "[+] Running ReturnEarlyVisitor call handler.\n";
+      llvm::outs().flush();
     }
     REV.TraverseDecl(const_cast<FunctionDecl *>(FD));
 
@@ -127,11 +134,13 @@ void DetectERRASTConsumer::handleFuncDecl(
     GotoVisitor GV(&C, Info, const_cast<FunctionDecl *>(FD), FID);
     if (Opts.Verbose) {
       llvm::outs() << "[+] Running GotoVisitor call handler.\n";
+      llvm::outs().flush();
     }
     GV.TraverseDecl(const_cast<FunctionDecl *>(FD));
 
     if (Opts.Verbose) {
       llvm::outs() << "[+] Finished handling function:" << FID.first << "\n";
+      llvm::outs().flush();
     }
   }
 }
