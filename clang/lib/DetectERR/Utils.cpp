@@ -314,22 +314,49 @@ Expr *getCondFromCheckStmt(Stmt *ST) {
 /// NOTE: that this functions expects that the `Checks` have already been sorted
 /// using `sortIntoInnerAndOuterChecks()`
 void removeInnerCheckUsingParams(
-    std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, ReturnStmt *ReturnST, FunctionDecl &FD) {
+    std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, ReturnStmt *ReturnST,
+    FunctionDecl &FD) {
   // find the inner check from the Checks
-  auto it = Checks.begin();
-  if (it != Checks.end()){
+  auto ChecksIter = Checks.begin();
+  if (ChecksIter != Checks.end()) {
     // only doing this for the first element, since there can only be one
     // "inner" check
-    SourceRange CurrSR = it->first->getSourceRange();
+    SourceRange CurrSR = ChecksIter->first->getSourceRange();
     SourceRange ReturnSTSR = ReturnST->getSourceRange();
     if (CurrSR.fullyContains(ReturnSTSR)) {
       // this check is the "inner" check
-      // TODO:
+
       // 1. get the values used by the condition of this check
+      Expr *Cond = getCondFromCheckStmt(ChecksIter->first);
+      std::vector<const Decl *> CondValueDecls;
+      if (BinaryOperator *BinaryOp = dyn_cast<BinaryOperator>(Cond)) {
+        Expr *LHS = BinaryOp->getLHS();
+        const DeclRefExpr *LeftDRE = getDeclRefExpr(LHS);
+        CondValueDecls.push_back(LeftDRE->getDecl());
+
+        Expr *RHS = BinaryOp->getRHS();
+        const DeclRefExpr *RightDRE = getDeclRefExpr(RHS);
+        CondValueDecls.push_back(RightDRE->getDecl());
+
+      } else if (UnaryOperator *UnaryOp = dyn_cast<UnaryOperator>(Cond)) {
+        Expr *SubExpr = UnaryOp->getSubExpr();
+        const DeclRefExpr *Arg = getDeclRefExpr(SubExpr);
+        CondValueDecls.push_back(Arg->getDecl());
+      }
+
       // 2. get fn params
-      // 3. check if the inner check depends on any of the params
-      // 4. if so, remove it from the vector
+      for (auto *ParamIter = FD.param_begin(); ParamIter != FD.param_end();
+           ParamIter++) {
+        // 3. check if the inner check depends on any of the params
+        for (auto CondValIter = CondValueDecls.begin();
+             CondValIter != CondValueDecls.end(); CondValIter++) {
+          if (*ParamIter == *CondValIter) {
+            // 4. if so, remove it from the vector
+            Checks.erase(ChecksIter);
+            return;
+          }
+        }
+      }
     }
   }
-
 }

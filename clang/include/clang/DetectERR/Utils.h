@@ -91,6 +91,6 @@ Expr *getCondFromCheckStmt(Stmt *ST);
 
 /// remove the inner check that are using params to the function
 void removeInnerCheckUsingParams(
-    std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, FunctionDecl &FD);
+    std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, ReturnStmt *ReturnST, FunctionDecl &FD);
 
 #endif //LLVM_CLANG_DETECTERR_UTILS_H
