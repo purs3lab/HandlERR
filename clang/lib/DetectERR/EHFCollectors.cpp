@@ -108,7 +108,8 @@ bool EHFCategoryTwoCollector::VisitFunctionDecl(FunctionDecl *FD) {
           // vfprintf(stderr, ...)
           if (const Expr *Arg0 = CE->getArg(0)) {
             const DeclRefExpr *DRE = getDeclRefExpr(Arg0);
-            if (DRE->getNameInfo().getAsString() == "stderr") {
+
+            if (DRE && DRE->getNameInfo().getAsString() == "stderr") {
               writesToStderr = true;
               WritingStmt = CurrStmt;
               break;
@@ -130,12 +131,11 @@ bool EHFCategoryTwoCollector::VisitFunctionDecl(FunctionDecl *FD) {
           int nArgs = CE->getNumArgs();
           const Expr *LastArg = CE->getArg(nArgs - 1);
           const DeclRefExpr *DRE = getDeclRefExpr(LastArg);
-          if (DRE) {
-            if (DRE->getNameInfo().getAsString() == "stderr") {
-              writesToStderr = true;
-              WritingStmt = CurrStmt;
-              break;
-            }
+
+          if (DRE && DRE->getNameInfo().getAsString() == "stderr") {
+            writesToStderr = true;
+            WritingStmt = CurrStmt;
+            break;
           }
         }
       }

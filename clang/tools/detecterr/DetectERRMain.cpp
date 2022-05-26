@@ -11,13 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/DetectERR/DetectERR.h"
-#include "llvm/Support/TargetSelect.h"
 #include "clang/Frontend/ASTConsumers.h"
 #include "clang/Frontend/VerifyDiagnosticConsumer.h"
 #include "clang/Tooling/ArgumentsAdjusters.h"
-#include "llvm/Support/TargetSelect.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/TargetSelect.h"
 
 using namespace clang::driver;
 using namespace clang::tooling;
@@ -37,11 +36,10 @@ static cl::opt<bool> OptVerbose("verbose",
 
 static cl::opt<std::string>
     OptOutputJson("output",
-                       cl::desc("Path to the file where all the stats "
-                                "will be dumped as json"),
-                       cl::init("ErrHandlingBlocks.json"),
-                       cl::cat(DetectERRCategory));
-
+                  cl::desc("Path to the file where all the stats "
+                           "will be dumped as json"),
+                  cl::init("ErrHandlingBlocks.json"),
+                  cl::cat(DetectERRCategory));
 
 int main(int argc, const char **argv) {
   struct DetectERROptions DOpt;
@@ -58,8 +56,9 @@ int main(int argc, const char **argv) {
   // clang-tools-extra/clang-tidy/tool/ClangTidyMain.cpp. Apparently every
   // LibTooling-based tool is supposed to duplicate it??
   llvm::Expected<CommonOptionsParser> ExpectedOptionsParser =
-      CommonOptionsParser::create(argc, (const char **)(argv), DetectERRCategory,
-                                  cl::ZeroOrMore, HelpOverview);
+      CommonOptionsParser::create(argc, (const char **)(argv),
+                                  DetectERRCategory, cl::ZeroOrMore,
+                                  HelpOverview);
 
   if (!ExpectedOptionsParser) {
     llvm::errs() << "detecterr: Error(s) parsing command-line arguments:\n"
@@ -85,20 +84,25 @@ int main(int argc, const char **argv) {
 
   if (DErrInf.parseASTs()) {
     llvm::outs() << "[+] Successfully parsed ASTs.\n";
+    llvm::outs().flush();
   } else {
     llvm::outs() << "[-] Unable to parse ASTs.\n";
+    llvm::outs().flush();
   }
 
   llvm::outs() << "[+] Trying to write error handling information to:"
                << OptOutputJson << ".\n";
+  llvm::outs().flush();
   std::error_code Ec;
   llvm::raw_fd_ostream OutputJson(OptOutputJson, Ec);
   if (!OutputJson.has_error()) {
     DErrInf.dumpInfo(OutputJson);
     OutputJson.close();
     llvm::outs() << "[+] Finished writing to given output file.\n";
+    llvm::outs().flush();
   } else {
     llvm::outs() << "[-] Error trying to open file:" << OptOutputJson << ".\n";
+    llvm::outs().flush();
     return -1;
   }
   return 0;
