@@ -22,6 +22,7 @@ BEAR_PATH = None
 PROG_PATH = None
 BENCHMARKS_PATH = None
 NAMES_LIKE = None
+DEBUG = None
 
 # number of usable cpus
 NUM_CPUS = len(os.sched_getaffinity(0))
@@ -211,7 +212,10 @@ def run_tool_on_all(dirs):
     for d in dirs:
         cmds = []
         curr = ""
-        pool = multiprocessing.Pool(max(NUM_CPUS - 2, 1))
+        if DEBUG:
+            pool = multiprocessing.Pool(1)
+        else:
+            pool = multiprocessing.Pool(max(NUM_CPUS - 2, 1))
 
         # libc - special case
         if "libc" in d:
@@ -438,6 +442,12 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="enable debug mode (among other things, this will ensure that one process is run at a time)"
+    )
+
+    parser.add_argument(
         "-k",
         "--names_like",
         dest="names_like",
@@ -473,5 +483,6 @@ if __name__ == "__main__":
     PROG_PATH = args.prog_path
     BENCHMARKS_PATH = args.benchmarks_path
     NAMES_LIKE = args.names_like or []
+    DEBUG = args.debug
 
     run_main(args)
