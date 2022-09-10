@@ -130,7 +130,7 @@ def configure_and_bear_make_single(path, build_inst=None):
         elif "elf" in path:
             # custom for libelf
             subprocess.check_call(
-                "CC=gcc CXX=g++ ./configure", shell=True, cwd=path)
+                "CC=gcc CXX=g++ ./configure --disable-debuginfod --disable-libdebuginfod", shell=True, cwd=path)
 
         else:
             # normal libraries, just do ./configure
