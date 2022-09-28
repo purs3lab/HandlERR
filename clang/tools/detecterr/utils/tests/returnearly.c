@@ -26,14 +26,17 @@ void not_early(){
 }
 
 void not_early_2(int *x, int b){
+    // should NOT be included
     if(!x){
         return;
     }
 
+    // should NOT be included
     if(x == NULL){
         return;
     }
 
+    // should NOT be included
     if(b == 1){
         return;
     }
@@ -65,4 +68,14 @@ static void store_int(void *dest, int size, unsigned long long i)
 		*(long long *)dest = i;
 		break;
 	}
+}
+
+
+// from libpng
+void png_set_write_fn(int *png_ptr, int size){
+    // should NOT be included
+   if (png_ptr == NULL)
+      return;
+
+    printf("size: %d\n", size);
 }
