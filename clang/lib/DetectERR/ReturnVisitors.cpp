@@ -30,6 +30,9 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
         std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
         collectChecks(Checks, *ReturnBB, &CDG);
         sortIntoInnerAndOuterChecks(Checks, &CDG);
+        // removeInnerCheckUsingParams(Checks, ReturnST, *FnDecl,
+        //                             Context->getSourceManager());
+        removeChecksUsingParams(Checks, ReturnST, *FnDecl);
         addErrorGuards(Checks, ReturnST);
       }
     }
@@ -47,6 +50,9 @@ bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
         std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
         collectChecks(Checks, *CurBB, &CDG);
         sortIntoInnerAndOuterChecks(Checks, &CDG);
+        // removeInnerCheckUsingParams(Checks, ReturnST, *FnDecl,
+        //                             Context->getSourceManager());
+        removeChecksUsingParams(Checks, ReturnST, *FnDecl);
         addErrorGuards(Checks, ReturnST);
       }
     }
@@ -70,6 +76,9 @@ bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *CurBB, &CDG);
       sortIntoInnerAndOuterChecks(Checks, &CDG);
+      // removeInnerCheckUsingParams(Checks, ReturnST, *FnDecl,
+      //                             Context->getSourceManager());
+      removeChecksUsingParams(Checks, ReturnST, *FnDecl);
       addErrorGuards(Checks, ReturnST);
     }
   }
@@ -194,6 +203,8 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
                     if (CurrSR.fullyContains(ReturnSTSR)) {
                       Lvl = GuardLevel::Inner;
                     }
+
+                    return false;
                     Info.addErrorGuardingStmt(FID, TStmt, ReturnST, Context,
                                               Heuristic, Lvl);
                   }
@@ -236,7 +247,9 @@ bool ReturnEarlyVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *ReturnBB, &CDG);
       sortIntoInnerAndOuterChecks(Checks, &CDG);
-      removeInnerCheckUsingParams(Checks, ReturnST, *FnDecl);
+      // removeInnerCheckUsingParams(Checks, ReturnST, *FnDecl,
+      //                             Context->getSourceManager());
+      removeChecksUsingParams(Checks, ReturnST, *FnDecl);
       addErrorGuards(Checks, ReturnST);
     }
   }

@@ -79,3 +79,21 @@ void png_set_write_fn(int *png_ptr, int size){
 
     printf("size: %d\n", size);
 }
+
+
+typedef int * png_structrp;
+typedef int * png_inforp;
+
+void
+png_read_info(png_structrp png_ptr, png_inforp info_ptr)
+{
+   int keep;
+
+   png_debug(1, "in png_read_info");
+
+   if (png_ptr == NULL || info_ptr == NULL)
+      return;
+
+   /* Read and check the PNG file signature. */
+   png_read_sig(png_ptr, info_ptr);
+}

@@ -89,8 +89,16 @@ void collectChecks(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
 /// (if/while/switch)
 Expr *getCondFromCheckStmt(Stmt *ST);
 
+/// extracts all the Values that are used in the Conditional
+std::vector<const Decl *> getCondValueDecls(Expr *Cond);
+
 /// remove the inner check that are using params to the function
 void removeInnerCheckUsingParams(
-    std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, ReturnStmt *ReturnST, FunctionDecl &FD);
+    std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, ReturnStmt *ReturnST,
+    FunctionDecl &FD, SourceManager &SM);
+
+/// remove all checks that are using params to the function
+void removeChecksUsingParams(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
+                             ReturnStmt *ReturnST, FunctionDecl &FD);
 
 #endif //LLVM_CLANG_DETECTERR_UTILS_H
