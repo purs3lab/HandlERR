@@ -7,6 +7,7 @@
 #include "clang/AST/Expr.h"
 #include "clang/Analysis/CFG.h"
 #include "clang/Basic/SourceLocation.h"
+#include "clang/DetectERR/ErrGruard.h"
 #include "clang/DetectERR/PersistentSourceLoc.h"
 
 using namespace clang;
@@ -253,11 +254,37 @@ void __dbg_print_statements(std::map<const Stmt *, CFGBlock *> &StMap) {
   llvm::errs() << "__dbg_print_statements <<<\n";
 }
 
+/// return the most immediate Control Dependent check and the guard level
+std::pair<Stmt *, GuardLevel> getImmediateControlDependentCheck(
+    std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ErrorST,
+    ControlDependencyCalculator *CDG, SourceManager &SM) {
+
+  // one trip of bubbling the inner most check
+  if (Checks.size() > 1) {
+    for (unsigned long J = 1; J < Checks.size(); J++) {
+      CFGBlock *BB0 = Checks[0].second;
+      CFGBlock *BBJ = Checks[J].second;
+      if (!CDG->isControlDependent(BB0, BBJ)) {
+        std::swap(Checks[0], Checks[J]);
+      }
+    }
+  }
+
+  GuardLevel Lvl = GuardLevel::Default;
+  SourceRange CurrSR = Checks[0].first->getSourceRange();
+  SourceRange ErrorSTSR = ErrorST->getSourceRange();
+  if (CurrSR.fullyContains(ErrorSTSR)) {
+    Lvl = GuardLevel::Inner;
+  }
+
+  return {Checks[0].first, Lvl};
+}
+
 /// Bubbles the inner dominating check at 0th position so that appropriate
 /// 'level' related info can be added whiled creating the ErrGuard instance
 void sortIntoInnerAndOuterChecks(
     std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
-    ControlDependencyCalculator *CDG) {
+    ControlDependencyCalculator *CDG, SourceManager &SM) {
   if (Checks.size() <= 1) {
     return;
   }
@@ -506,14 +533,14 @@ void removeInnerCheckUsingParams(
 ///
 /// remove all checks that are using params to the function
 void removeChecksUsingParams(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
-                             ReturnStmt *ReturnST, FunctionDecl &FD) {
+                             FunctionDecl &FD) {
   // tmp
   bool debug = false;
   llvm::errs() << FD.getNameAsString() << "\n";
-  // if (FD.getNameAsString() == "not_early_2") {
-  //   debug = true;
-  //   llvm::errs() << "Starting Checks.size(): " << Checks.size() << '\n';
-  // }
+  if (FD.getNameAsString() == "bar") {
+    debug = true;
+    llvm::errs() << "Starting Checks.size(): " << Checks.size() << '\n';
+  }
 
   auto ChecksIter = Checks.begin();
   while (ChecksIter != Checks.end()) {
@@ -524,48 +551,48 @@ void removeChecksUsingParams(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
     std::vector<const Decl *> CondValueDecls = getCondValueDecls(Cond);
 
     // tmp
-    // if (debug) {
-    //   llvm::errs() << "CondValueDecls:\n";
-    //   for (auto *CVD : CondValueDecls) {
-    //     CVD->dump();
-    //   }
-    // }
+    if (debug) {
+      llvm::errs() << "CondValueDecls:\n";
+      for (auto *CVD : CondValueDecls) {
+        CVD->dump();
+      }
+    }
 
     // 2. get fn params
     for (auto *ParamIter = FD.param_begin(); ParamIter != FD.param_end();
          ParamIter++) {
 
       // tmp
-      // if (debug) {
-      //   llvm::errs() << "Param:\n";
-      //   (*ParamIter)->dump();
-      // }
+      if (debug) {
+        llvm::errs() << "Param:\n";
+        (*ParamIter)->dump();
+      }
 
       // 3. check if the check depends on any of the params
       for (auto CondValIter = CondValueDecls.begin();
            CondValIter != CondValueDecls.end(); CondValIter++) {
 
-        // if (debug) {
-        //   llvm::errs() << "comparing...";
-        //   (*ParamIter)->dump();
-        //   llvm::errs() << "and..";
-        //   (*CondValIter)->dump();
-        // }
+        if (debug) {
+          llvm::errs() << "comparing...";
+          (*ParamIter)->dump();
+          llvm::errs() << "and..";
+          (*CondValIter)->dump();
+        }
 
         if (*ParamIter == *CondValIter) {
           // 4. if so, remove it from the vector
-          // if (debug) {
-          //   llvm::errs() << "removing check...\n";
-          // }
+          if (debug) {
+            llvm::errs() << "removing check...\n";
+          }
 
           ChecksIter = Checks.erase(ChecksIter);
           checkDeleted = true;
           goto cont;
 
         } else {
-          // if (debug) {
-          //   llvm::errs() << (*ParamIter == *CondValIter) << '\n';
-          // }
+          if (debug) {
+            llvm::errs() << (*ParamIter == *CondValIter) << '\n';
+          }
         }
       }
     }
@@ -576,7 +603,7 @@ void removeChecksUsingParams(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
       ChecksIter++;
   }
 
-  // if (debug) {
-  //   llvm::errs() << "Final Checks.size(): " << Checks.size() << '\n';
-  // }
+  if (debug) {
+    llvm::errs() << "Final Checks.size(): " << Checks.size() << '\n';
+  }
 }

@@ -21,8 +21,14 @@ bool EHFCallVisitor::VisitCallExpr(CallExpr *CE) {
       CurBB = StMap[CE];
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *CurBB, &CDG);
-      sortIntoInnerAndOuterChecks(Checks, &CDG);
-      addErrorGuards(Checks, CE);
+      removeChecksUsingParams(Checks, *FnDecl);
+      if (!Checks.empty()) {
+        // sortIntoInnerAndOuterChecks(Checks, &CDG, Context->getSourceManager());
+        // addErrorGuards(Checks, CE);
+        auto [check, level] = getImmediateControlDependentCheck(
+            Checks, CE, &CDG, Context->getSourceManager());
+        addErrorGuard(check, CE, level);
+      }
     }
   }
   return true;

@@ -14,6 +14,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/Analysis/Analyses/Dominators.h"
+#include "clang/DetectERR/ErrGruard.h"
 // #include "clang/DetectERR/ProjectInfo.h"
 
 using namespace clang;
@@ -78,7 +79,12 @@ void __dbg_print_statements(std::map<const Stmt *, CFGBlock *> &StMap);
 /// 'level' related info can be added whiled creating the ErrGuard instance
 void sortIntoInnerAndOuterChecks(
     std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
-    ControlDependencyCalculator *CDG);
+    ControlDependencyCalculator *CDG, SourceManager &SM);
+
+/// return the most immediate Control Dependent check
+std::pair<Stmt *, GuardLevel> getImmediateControlDependentCheck(
+    std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ErrorST,
+    ControlDependencyCalculator *CDG, SourceManager &SM);
 
 /// Iterates over the base blocks on which the given block is control dependent
 /// and collects all the terminator checks from those blocks
@@ -94,11 +100,11 @@ std::vector<const Decl *> getCondValueDecls(Expr *Cond);
 
 /// remove the inner check that are using params to the function
 void removeInnerCheckUsingParams(
-    std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, ReturnStmt *ReturnST,
+    std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ErrorST,
     FunctionDecl &FD, SourceManager &SM);
 
 /// remove all checks that are using params to the function
 void removeChecksUsingParams(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
-                             ReturnStmt *ReturnST, FunctionDecl &FD);
+                             FunctionDecl &FD);
 
 #endif //LLVM_CLANG_DETECTERR_UTILS_H

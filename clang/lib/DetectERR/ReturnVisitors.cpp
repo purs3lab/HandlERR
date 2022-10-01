@@ -29,11 +29,14 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
         // "outer" checks
         std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
         collectChecks(Checks, *ReturnBB, &CDG);
-        sortIntoInnerAndOuterChecks(Checks, &CDG);
-        // removeInnerCheckUsingParams(Checks, ReturnST, *FnDecl,
-        //                             Context->getSourceManager());
-        removeChecksUsingParams(Checks, ReturnST, *FnDecl);
-        addErrorGuards(Checks, ReturnST);
+        removeChecksUsingParams(Checks, *FnDecl);
+        if (!Checks.empty()) {
+          // sortIntoInnerAndOuterChecks(Checks, &CDG, Context->getSourceManager());
+          // addErrorGuards(Checks, ReturnST);
+          auto [check, level] = getImmediateControlDependentCheck(
+              Checks, ReturnST, &CDG, Context->getSourceManager());
+          addErrorGuard(check, ReturnST, level);
+        }
       }
     }
   }
@@ -49,11 +52,14 @@ bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
         CurBB = StMap[ReturnST];
         std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
         collectChecks(Checks, *CurBB, &CDG);
-        sortIntoInnerAndOuterChecks(Checks, &CDG);
-        // removeInnerCheckUsingParams(Checks, ReturnST, *FnDecl,
-        //                             Context->getSourceManager());
-        removeChecksUsingParams(Checks, ReturnST, *FnDecl);
-        addErrorGuards(Checks, ReturnST);
+        removeChecksUsingParams(Checks, *FnDecl);
+        // sortIntoInnerAndOuterChecks(Checks, &CDG, Context->getSourceManager());
+        // addErrorGuards(Checks, ReturnST);
+        if (!Checks.empty()) {
+          auto [check, level] = getImmediateControlDependentCheck(
+              Checks, ReturnST, &CDG, Context->getSourceManager());
+          addErrorGuard(check, ReturnST, level);
+        }
       }
     }
   }
@@ -75,11 +81,14 @@ bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
       CurBB = StMap[ReturnST];
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *CurBB, &CDG);
-      sortIntoInnerAndOuterChecks(Checks, &CDG);
-      // removeInnerCheckUsingParams(Checks, ReturnST, *FnDecl,
-      //                             Context->getSourceManager());
-      removeChecksUsingParams(Checks, ReturnST, *FnDecl);
-      addErrorGuards(Checks, ReturnST);
+      removeChecksUsingParams(Checks, *FnDecl);
+      // sortIntoInnerAndOuterChecks(Checks, &CDG, Context->getSourceManager());
+      // addErrorGuards(Checks, ReturnST);
+      if (!Checks.empty()) {
+        auto [check, level] = getImmediateControlDependentCheck(
+            Checks, ReturnST, &CDG, Context->getSourceManager());
+        addErrorGuard(check, ReturnST, level);
+      }
     }
   }
   return true;
@@ -246,11 +255,14 @@ bool ReturnEarlyVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
     if (ReturnBB->size() == 1) {
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *ReturnBB, &CDG);
-      sortIntoInnerAndOuterChecks(Checks, &CDG);
-      // removeInnerCheckUsingParams(Checks, ReturnST, *FnDecl,
-      //                             Context->getSourceManager());
-      removeChecksUsingParams(Checks, ReturnST, *FnDecl);
-      addErrorGuards(Checks, ReturnST);
+      removeChecksUsingParams(Checks, *FnDecl);
+      // sortIntoInnerAndOuterChecks(Checks, &CDG, Context->getSourceManager());
+      // addErrorGuards(Checks, ReturnST);
+      if (!Checks.empty()) {
+        auto [check, level] = getImmediateControlDependentCheck(
+            Checks, ReturnST, &CDG, Context->getSourceManager());
+        addErrorGuard(check, ReturnST, level);
+      }
     }
   }
   return true;

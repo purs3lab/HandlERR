@@ -1,9 +1,68 @@
 #include <stdio.h>
+#include <stdlib.h>
+
+int *another(int a) {
+  int x = 1;
+  // should be included
+  if (x != 1) {
+    // should NOT be included
+    if (a == 0) {
+      return NULL;
+    }
+  }
+}
+
+int *yet_another3(int *a) {
+  int *x = malloc(sizeof(int));
+  *x = 1;
+
+  // should be included
+  if (*x == 0) {
+    // should NOT be included
+    if (*x == 1) {
+      return a;
+    }
+    return x;
+  }
+  return NULL;
+}
+
+int *yet_another2(int a) {
+  int *x = malloc(sizeof(int));
+  *x = 1;
+
+  // should be included
+  if (*x == 0) {
+    // should be included
+    if (*x == 1) {
+      return NULL;
+    }
+    return x;
+  }
+  return NULL;
+}
+
+int *yet_another(int a) {
+  int *x = malloc(sizeof(int));
+  *x = 1;
+
+  // should NOT be included
+  if (*x == 0) {
+    // should be included
+    if (*x == 1) {
+      return NULL;
+    }
+  }
+
+  return x;
+}
 
 int *foo1(int a) {
+  // should NOT be included
   if (a != 2) {
+    // should NOT be included
     if (a != 3) {
-    // should not be included
+      // should NOT be included
       if (a < 0) {
         return &a;
       }
@@ -13,9 +72,10 @@ int *foo1(int a) {
 }
 
 int *foo(int a) {
+  // should NOT be included
   if (a != -2) {
     printf("Hello\n");
-    // should not be included
+    // should NOT be included
     if (a < 0) {
       return &a;
     }
@@ -24,7 +84,7 @@ int *foo(int a) {
 }
 
 int *bar(int *x) {
-    // should NOT be included
+  // should NOT be included
   if (x == NULL) {
     return NULL;
   }
@@ -32,7 +92,7 @@ int *bar(int *x) {
 }
 
 int *foo2(int a, int b) {
-    // should not be included
+  // should NOT be included
   if (a == 0 && b == 0) {
     return malloc(sizeof(int));
   }
@@ -41,7 +101,7 @@ int *foo2(int a, int b) {
 
 int *foo3(int x) {
   int *a = malloc(sizeof(int));
-  // should not be listed
+  // should NOT be listed
   switch (x) {
   case 1:
     return a;
@@ -53,7 +113,7 @@ int *foo3(int x) {
 
 int *bar3(int x) {
   int *a = malloc(sizeof(int));
-  // should be included
+  // should NOT be included
   if (x == 0) {
     return NULL;
   }

@@ -15,8 +15,14 @@ bool GotoVisitor::VisitGotoStmt(GotoStmt *GotoST) {
       CFGBlock *CurBB = StMap[GotoST];
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *CurBB, &CDG);
-      sortIntoInnerAndOuterChecks(Checks, &CDG);
-      addErrorGuards(Checks, GotoST);
+      removeChecksUsingParams(Checks, *FnDecl);
+      // sortIntoInnerAndOuterChecks(Checks, &CDG, Context->getSourceManager());
+      // addErrorGuards(Checks, GotoST);
+      if (!Checks.empty()) {
+        auto [check, level] = getImmediateControlDependentCheck(
+            Checks, GotoST, &CDG, Context->getSourceManager());
+        addErrorGuard(check, GotoST, level);
+      }
     }
   }
   return true;

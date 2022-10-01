@@ -36,6 +36,12 @@ public:
 
   ProjectInfo &getProjectInfo() { return Info; }
 
+  void addErrorGuard(Stmt *Check, Stmt *ErrorST, GuardLevel Level) {
+    Info.addErrorGuardingStmt(FID, Check, ErrorST, Context, Heuristic, Level);
+  }
+
+  // Note - for now we wont be using this function anymore, as
+  // we are going to focus on the most immediate Control Dependent check only
   void addErrorGuards(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
                       Stmt *ReturnST) {
     for (unsigned long I = 0; I < Checks.size(); I++) {
