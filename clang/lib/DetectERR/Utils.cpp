@@ -428,14 +428,16 @@ void removeInnerCheckUsingParams(
 
   // tmp
   bool debug = false;
-  llvm::errs() << FD.getNameAsString() << "\n";
-  if (FD.getNameAsString() == "bar") {
-    debug = true;
-  }
+  // llvm::errs() << FD.getNameAsString() << "\n";
+  // if (FD.getNameAsString() == "bar") {
+  //   debug = true;
+  // }
 
   // find the inner check from the Checks
-  llvm::errs() << "Checks.size(): " << Checks.size() << '\n';
-  llvm::errs() << (Checks.begin() == Checks.end()) << '\n';
+  if (debug) {
+    llvm::errs() << "Checks.size(): " << Checks.size() << '\n';
+    llvm::errs() << (Checks.begin() == Checks.end()) << '\n';
+  }
   auto ChecksIter = Checks.begin();
   if (ChecksIter != Checks.end()) {
     // only doing this for the first element, since there can only be one
@@ -500,8 +502,8 @@ void removeInnerCheckUsingParams(
         }
       }
     } else {
-      llvm::errs() << "check does not fully contain the return stmt\n";
       if (debug) {
+        llvm::errs() << "check does not fully contain the return stmt\n";
         CurrSR.dump(SM);
         auto CurrSRBegin = CurrSR.getBegin();
         auto CurrSREnd = CurrSR.getEnd();
@@ -536,11 +538,11 @@ void removeChecksUsingParams(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
                              FunctionDecl &FD) {
   // tmp
   bool debug = false;
-  llvm::errs() << FD.getNameAsString() << "\n";
-  if (FD.getNameAsString() == "bar") {
-    debug = true;
-    llvm::errs() << "Starting Checks.size(): " << Checks.size() << '\n';
-  }
+  // if (FD.getNameAsString() == "bar") {
+  //   llvm::errs() << FD.getNameAsString() << "\n";
+  //   debug = true;
+  //   llvm::errs() << "Starting Checks.size(): " << Checks.size() << '\n';
+  // }
 
   auto ChecksIter = Checks.begin();
   while (ChecksIter != Checks.end()) {
