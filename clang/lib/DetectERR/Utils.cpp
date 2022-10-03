@@ -470,6 +470,8 @@ void removeChecksUsingParams(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
                              FunctionDecl &FD) {
   auto ChecksIter = Checks.begin();
   while (ChecksIter != Checks.end()) {
+    bool checkDeleted = false;
+
     // 1. get the values used by the condition of this check
     Expr *Cond = getCondFromCheckStmt(ChecksIter->first);
     std::vector<const Decl *> CondValueDecls = getCondValueDecls(Cond);
