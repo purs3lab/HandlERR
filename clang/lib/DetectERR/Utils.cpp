@@ -339,11 +339,12 @@ Expr *getCondFromCheckStmt(Stmt *ST) {
 }
 
 /// extracts all the Values that are used in the Conditional
-std::vector<const Decl *> getCondValueDecls(Expr *Cond) {
+std::vector<const Decl *> getCondValueDecls(const Expr *Cond) {
   std::vector<const Decl *> Result;
 
-  // TODO
-  if (BinaryOperator *BinaryOp = dyn_cast<BinaryOperator>(Cond)) {
+  const Expr *Stripped = removeAuxillaryCasts(Cond);
+
+  if (const BinaryOperator *BinaryOp = dyn_cast<BinaryOperator>(Stripped)) {
     // collect vals from LHS
     Expr *LHS = BinaryOp->getLHS();
     auto CondVals = getCondValueDecls(LHS);
@@ -362,7 +363,7 @@ std::vector<const Decl *> getCondValueDecls(Expr *Cond) {
       }
     }
 
-  } else if (UnaryOperator *UnaryOp = dyn_cast<UnaryOperator>(Cond)) {
+  } else if (const UnaryOperator *UnaryOp = dyn_cast<UnaryOperator>(Stripped)) {
     // collect vals
     Expr *SubExpr = UnaryOp->getSubExpr();
     auto CondVals = getCondValueDecls(SubExpr);
@@ -374,7 +375,7 @@ std::vector<const Decl *> getCondValueDecls(Expr *Cond) {
 
   } else {
     // likely just an actual value
-    const DeclRefExpr *DRE = getDeclRefExpr(Cond);
+    const DeclRefExpr *DRE = getDeclRefExpr(Stripped);
     if (DRE) {
       Result.push_back(DRE->getDecl());
     }
@@ -426,18 +427,6 @@ void removeInnerCheckUsingParams(
     std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, ReturnStmt *ReturnST,
     FunctionDecl &FD, SourceManager &SM) {
 
-  // tmp
-  bool debug = false;
-  // llvm::errs() << FD.getNameAsString() << "\n";
-  // if (FD.getNameAsString() == "bar") {
-  //   debug = true;
-  // }
-
-  // find the inner check from the Checks
-  if (debug) {
-    llvm::errs() << "Checks.size(): " << Checks.size() << '\n';
-    llvm::errs() << (Checks.begin() == Checks.end()) << '\n';
-  }
   auto ChecksIter = Checks.begin();
   if (ChecksIter != Checks.end()) {
     // only doing this for the first element, since there can only be one
@@ -445,13 +434,6 @@ void removeInnerCheckUsingParams(
 
     SourceRange CurrSR = ChecksIter->first->getSourceRange();
     SourceRange ReturnSTSR = ReturnST->getSourceRange();
-
-    if (debug) {
-      llvm::errs() << "ChecksIter:\n";
-      ChecksIter->first->dump();
-      llvm::errs() << "ReturnST:\n";
-      ReturnST->dump();
-    }
 
     bool CheckEnclosesReturnSt = doesFullyContain(CurrSR, ReturnSTSR, SM);
 
@@ -462,23 +444,9 @@ void removeInnerCheckUsingParams(
       Expr *Cond = getCondFromCheckStmt(ChecksIter->first);
       std::vector<const Decl *> CondValueDecls = getCondValueDecls(Cond);
 
-      // tmp
-      if (debug) {
-        llvm::errs() << "CondValueDecls:\n";
-        for (auto *CVD : CondValueDecls) {
-          CVD->dump();
-        }
-      }
-
       // 2. get fn params
       for (auto *ParamIter = FD.param_begin(); ParamIter != FD.param_end();
            ParamIter++) {
-
-        // tmp
-        if (debug) {
-          llvm::errs() << "Param:\n";
-          (*ParamIter)->dump();
-        }
 
         // 3. check if the inner check depends on any of the params
         for (auto CondValIter = CondValueDecls.begin();
@@ -487,46 +455,10 @@ void removeInnerCheckUsingParams(
           if (*ParamIter == *CondValIter) {
             // 4. if so, remove it from the vector
 
-            if (debug) {
-              llvm::errs() << "removing check...\n";
-            }
-
             Checks.erase(ChecksIter);
             return;
-
-          } else {
-            if (debug) {
-              llvm::errs() << (*ParamIter == *CondValIter) << '\n';
-            }
           }
         }
-      }
-    } else {
-      if (debug) {
-        llvm::errs() << "check does not fully contain the return stmt\n";
-        CurrSR.dump(SM);
-        auto CurrSRBegin = CurrSR.getBegin();
-        auto CurrSREnd = CurrSR.getEnd();
-        ReturnSTSR.dump(SM);
-        auto ReturnSTSRBegin = ReturnSTSR.getBegin();
-        auto ReturnSTSREnd = ReturnSTSR.getEnd();
-
-        llvm::errs() << (CurrSRBegin < ReturnSTSRBegin) << '\n';
-        llvm::errs() << (CurrSREnd < ReturnSTSREnd) << '\n';
-
-        FullSourceLoc CurrSREndFull = FullSourceLoc(CurrSREnd, SM);
-        llvm::errs() << "SEnd: Line: " << CurrSREndFull.getExpansionLineNumber()
-                     << '\n';
-        llvm::errs() << "SEnd: Col: "
-                     << CurrSREndFull.getExpansionColumnNumber() << '\n';
-
-        FullSourceLoc ReturnSTSREndFull = FullSourceLoc(ReturnSTSREnd, SM);
-        llvm::errs() << "ReturnEnd: Line: "
-                     << ReturnSTSREndFull.getExpansionLineNumber() << '\n';
-        llvm::errs() << "ReturnEnd: Col: "
-                     << ReturnSTSREndFull.getExpansionColumnNumber() << '\n';
-        llvm::errs() << CurrSREndFull.getFileID().getHashValue() << '\n';
-        llvm::errs() << ReturnSTSREndFull.getFileID().getHashValue() << '\n';
       }
     }
   }
@@ -536,76 +468,32 @@ void removeInnerCheckUsingParams(
 /// remove all checks that are using params to the function
 void removeChecksUsingParams(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
                              FunctionDecl &FD) {
-  // tmp
-  bool debug = false;
-  // if (FD.getNameAsString() == "bar") {
-  //   llvm::errs() << FD.getNameAsString() << "\n";
-  //   debug = true;
-  //   llvm::errs() << "Starting Checks.size(): " << Checks.size() << '\n';
-  // }
-
   auto ChecksIter = Checks.begin();
   while (ChecksIter != Checks.end()) {
-    bool checkDeleted = false;
-
     // 1. get the values used by the condition of this check
     Expr *Cond = getCondFromCheckStmt(ChecksIter->first);
     std::vector<const Decl *> CondValueDecls = getCondValueDecls(Cond);
-
-    // tmp
-    if (debug) {
-      llvm::errs() << "CondValueDecls:\n";
-      for (auto *CVD : CondValueDecls) {
-        CVD->dump();
-      }
-    }
 
     // 2. get fn params
     for (auto *ParamIter = FD.param_begin(); ParamIter != FD.param_end();
          ParamIter++) {
 
-      // tmp
-      if (debug) {
-        llvm::errs() << "Param:\n";
-        (*ParamIter)->dump();
-      }
-
       // 3. check if the check depends on any of the params
       for (auto CondValIter = CondValueDecls.begin();
            CondValIter != CondValueDecls.end(); CondValIter++) {
 
-        if (debug) {
-          llvm::errs() << "comparing...";
-          (*ParamIter)->dump();
-          llvm::errs() << "and..";
-          (*CondValIter)->dump();
-        }
-
         if (*ParamIter == *CondValIter) {
           // 4. if so, remove it from the vector
-          if (debug) {
-            llvm::errs() << "removing check...\n";
-          }
-
           ChecksIter = Checks.erase(ChecksIter);
           checkDeleted = true;
           goto cont;
-
-        } else {
-          if (debug) {
-            llvm::errs() << (*ParamIter == *CondValIter) << '\n';
-          }
         }
       }
     }
 
-    // label to continue after deleting a check
+  // label to continue after deleting a check
   cont:
     if (!checkDeleted)
       ChecksIter++;
-  }
-
-  if (debug) {
-    llvm::errs() << "Final Checks.size(): " << Checks.size() << '\n';
   }
 }

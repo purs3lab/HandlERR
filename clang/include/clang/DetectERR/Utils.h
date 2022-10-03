@@ -96,7 +96,7 @@ void collectChecks(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
 Expr *getCondFromCheckStmt(Stmt *ST);
 
 /// extracts all the Values that are used in the Conditional
-std::vector<const Decl *> getCondValueDecls(Expr *Cond);
+std::vector<const Decl *> getCondValueDecls(const Expr *Cond);
 
 /// remove the inner check that are using params to the function
 void removeInnerCheckUsingParams(
