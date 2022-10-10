@@ -144,6 +144,19 @@ def configure_and_bear_make_single(path, build_inst=None):
             subprocess.check_call("./configure", shell=True, cwd=path)
         print("[+] configure done")
 
+    # poppler -> cmake
+    if "poppler" in path:
+        print("[+] working with poppler")
+        subprocess.check_call(f"mkdir -p build", shell=True, cwd=path)
+        path = os.path.join(path, "build")
+        subprocess.check_call(
+            "CC=clang CXX=clang++ cmake .. "
+            '-DCMAKE_C_FLAGS="-g -O0" -DCMAKE_CXX_FLAGS="-g -O0" '
+            "-DCMAKE_BUILD_TYPE=debug -DENABLE_BOOST=OFF",
+            shell=True,
+            cwd=path,
+        )
+
     # bear make
     print("[+] running bear make...")
     subprocess.check_call(f"{BEAR_PATH} make -j{NUM_CPUS}", shell=True, cwd=path)
@@ -205,6 +218,10 @@ def convert_project(build_dirs):
         if "libc" in d:
             d = os.path.join(d, "../build")
 
+        # poppler - special case
+        if "poppler" in d:
+            d = os.path.join(d, "build")
+
         print(f"[+] converting project {d}")
         if "compile_commands.json" in os.listdir(d):
             print("[+] compile_commands.json found")
@@ -241,6 +258,10 @@ def run_tool_on_all(dirs):
         # libc - special case
         if "libc" in d:
             d = os.path.join(d, "../build")
+
+        # poppler - special case
+        if "poppler" in d:
+            d = os.path.join(d, "build")
 
         print(f"[+] running tool on {d}")
         convert_individual_script = os.path.join(d, "convert_individual.sh")
