@@ -157,6 +157,15 @@ def configure_and_bear_make_single(path, build_inst=None):
             cwd=path,
         )
 
+    # openssl -> Configure
+    if "ssl" in path:
+        print("[+] working with openssl")
+        subprocess.check_call(
+            "CC=clang CXX=clang++ ./Configure --debug",
+            shell=True,
+            cwd=path,
+        )
+
     # bear make
     print("[+] running bear make...")
     subprocess.check_call(f"{BEAR_PATH} make -j{NUM_CPUS}", shell=True, cwd=path)
