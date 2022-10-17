@@ -139,6 +139,14 @@ def configure_and_bear_make_single(path, build_inst=None):
                 cwd=path,
             )
 
+        elif "ffmpeg" in path:
+            # custom for ffmpeg libs (libavcodec, libavformat, libavutil)
+            subprocess.check_call(
+                "./configure --enable-shared --disable-doc",
+                shell=True,
+                cwd=path,
+            )
+
         else:
             # normal libraries, just do ./configure
             subprocess.check_call("./configure", shell=True, cwd=path)
@@ -153,6 +161,17 @@ def configure_and_bear_make_single(path, build_inst=None):
             "CC=clang CXX=clang++ cmake .. "
             '-DCMAKE_C_FLAGS="-g -O0" -DCMAKE_CXX_FLAGS="-g -O0" '
             "-DCMAKE_BUILD_TYPE=debug -DENABLE_BOOST=OFF",
+            shell=True,
+            cwd=path,
+        )
+
+    # libjpeg -> cmake
+    if "libjpeg" in path:
+        print("[+] working with libjpeg")
+        subprocess.check_call("mkdir -p build", shell=True, cwd=path)
+        path = os.path.join(path, "build")
+        subprocess.check_call(
+            "CC=clang CXX=clang++ cmake .. -DCMAKE_BUILD_TYPE=debug",
             shell=True,
             cwd=path,
         )
@@ -227,8 +246,10 @@ def convert_project(build_dirs):
         if "libc" in d:
             d = os.path.join(d, "../build")
 
-        # poppler - special case
-        if "poppler" in d:
+        # cmake cases (cd to build dir)
+        # poppler
+        # libjpeg
+        if "poppler" in d or "libjpeg" in d:
             d = os.path.join(d, "build")
 
         print(f"[+] converting project {d}")
@@ -240,7 +261,8 @@ def convert_project(build_dirs):
             )
         else:
             print("[+] compile_commands.json not found. skipping this one.")
-        print(f"[+] converting project done")
+
+        print("[+] converting project done")
 
 
 def process(cmd):
@@ -268,8 +290,10 @@ def run_tool_on_all(dirs):
         if "libc" in d:
             d = os.path.join(d, "../build")
 
-        # poppler - special case
-        if "poppler" in d:
+        # cmake cases
+        # poppler
+        # libjpeg
+        if "poppler" in d or "libjpeg" in d:
             d = os.path.join(d, "build")
 
         print(f"[+] running tool on {d}")
