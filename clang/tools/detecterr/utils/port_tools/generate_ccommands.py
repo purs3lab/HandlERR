@@ -28,8 +28,7 @@ DEFAULT_ARGS = ["-verbose"]
 #    CMD_SEP = " ;"
 
 
-class VSCodeJsonWriter():
-
+class VSCodeJsonWriter:
     def __init__(self):
         self.clangd_path = ""
         self.args = []
@@ -45,9 +44,9 @@ class VSCodeJsonWriter():
 
     def writeJsonFile(self, outputF):
         fp = open(outputF, "w")
-        fp.write("{\"clangd.path\":\"" + self.clangd_path + "\",\n")
-        fp.write("\"clangd.arguments\": [\n")
-        argsstrs = map(lambda x: "\"" + x + "\"", self.args)
+        fp.write('{"clangd.path":"' + self.clangd_path + '",\n')
+        fp.write('"clangd.arguments": [\n')
+        argsstrs = map(lambda x: '"' + x + '"', self.args)
         argsstrs = ",\n".join(argsstrs)
         fp.write(argsstrs)
         fp.write("]\n")
@@ -73,16 +72,23 @@ def getCheckedCArgs(argument_list):
     # that might need to be made absolute here.
     clang_x_args = []
     source_filename = argument_list[-1]
-    assert source_filename.endswith('.c')
+    is_c = source_filename.endswith(".c")
+    is_cpp = source_filename.endswith(".cpp")
+    assert is_c or is_cpp
     # By default; may be overwritten below.
-    output_filename = source_filename[:-len('.c')] + '.o'
+
+    if is_c:
+        output_filename = source_filename[: -len(".c")] + ".o"
+    else:
+        output_filename = source_filename[: -len(".cpp")] + ".o"
+
     idx = 0
     while idx < len(argument_list) - 1:
         arg = argument_list[idx]
         idx += 1
-        if arg == '-c':
+        if arg == "-c":
             pass
-        elif arg == '-o':
+        elif arg == "-o":
             # Remove the output filename from the argument list and save it
             # separately.
             output_filename = argument_list[idx]
@@ -91,7 +97,7 @@ def getCheckedCArgs(argument_list):
             clang_x_args.append(arg)
     # Disable all Clang warnings. Generally, we don't want to do anything about
     # them and they are just distracting.
-    clang_x_args.append('-w')
+    clang_x_args.append("-w")
     return (clang_x_args, output_filename)
 
 
@@ -99,10 +105,10 @@ def tryFixUp(s):
     """
     Fix-up for a failure between cmake and nmake.
     """
-    b = open(s, 'r').read()
-    b = re.sub(r'@<<\n', "", b)
-    b = re.sub(r'\n<<', "", b)
-    f = open(s, 'w')
+    b = open(s, "r").read()
+    b = re.sub(r"@<<\n", "", b)
+    b = re.sub(r"\n<<", "", b)
+    f = open(s, "w")
     f.write(b)
     f.close()
     return
@@ -110,14 +116,16 @@ def tryFixUp(s):
 
 # We no longer take the checkedc_include_dir here because we assume the working
 # tree is set up so that the Checked C headers get used automatically by 3c.
-def run3C(checkedc_bin,
-          extra_3c_args,
-          compilation_base_dir,
-          compile_commands_json,
-          skip_paths,
-          expand_macros_opts: ExpandMacrosOptions,
-          skip_running=False,
-          run_individual=False):
+def run3C(
+    checkedc_bin,
+    extra_3c_args,
+    compilation_base_dir,
+    compile_commands_json,
+    skip_paths,
+    expand_macros_opts: ExpandMacrosOptions,
+    skip_running=False,
+    run_individual=False,
+):
     global INDIVIDUAL_COMMANDS_FILE
     global TOTAL_COMMANDS_FILE
     runs = 0
@@ -128,20 +136,21 @@ def run3C(checkedc_bin,
     while runs < 2:
         runs = runs + 1
         try:
-            cmds = json.load(open(compile_commands_json, 'r'))
+            cmds = json.load(open(compile_commands_json, "r"))
         except:
             traceback.print_exc()
             tryFixUp(compile_commands_json)
 
     if cmds == None:
-        logging.error("failed to get commands from compile commands json:" +
-                      compile_commands_json)
+        logging.error(
+            "failed to get commands from compile commands json:" + compile_commands_json
+        )
         return
 
     translation_units: List[TranslationUnitInfo] = []
     all_files = []
     for i in cmds:
-        file_to_add = i['file']
+        file_to_add = i["file"]
         compiler_path = None  # XXX Clean this up
         compiler_x_args = []
         output_filename = None
@@ -152,19 +161,20 @@ def run3C(checkedc_bin,
         # BEAR uses relative paths for 'file' rather than absolute paths. It
         # also has a field called 'arguments' instead of 'command' in the cmake
         # style. Use that to detect BEAR and add the directory.
-        if 'arguments' in i and not 'command' in i:
+        if "arguments" in i and not "command" in i:
             # TODO: shank - tmp fix
-            if not i["arguments"][-1].endswith('.c'):
+            is_c = i["arguments"][-1].endswith(".c")
+            is_cpp = i["arguments"][-1].endswith(".cpp")
+            if not is_c and not is_cpp:
                 continue
 
             # BEAR. Need to add directory.
-            file_to_add = i['directory'] + SLASH + file_to_add
-            compiler_path = i['arguments'][0]
+            file_to_add = i["directory"] + SLASH + file_to_add
+            compiler_path = i["arguments"][0]
             # get the compiler arguments
-            (compiler_x_args,
-             output_filename) = getCheckedCArgs(i["arguments"][1:])
+            (compiler_x_args, output_filename) = getCheckedCArgs(i["arguments"][1:])
             # get the directory used during compilation.
-            target_directory = i['directory']
+            target_directory = i["directory"]
         file_to_add = os.path.realpath(file_to_add)
         matched = False
         for j in filters:
@@ -172,15 +182,19 @@ def run3C(checkedc_bin,
                 matched = True
         if not matched:
             all_files.append(file_to_add)
-            tu = TranslationUnitInfo(compiler_path, compiler_x_args,
-                                     target_directory, file_to_add,
-                                     output_filename)
+            tu = TranslationUnitInfo(
+                compiler_path,
+                compiler_x_args,
+                target_directory,
+                file_to_add,
+                output_filename,
+            )
             translation_units.append(tu)
 
     expandMacros(expand_macros_opts, compilation_base_dir, translation_units)
 
     prog_name = checkedc_bin
-    f = open(INDIVIDUAL_COMMANDS_FILE, 'w')
+    f = open(INDIVIDUAL_COMMANDS_FILE, "w")
     f.write("#!/bin/bash\n")
     for tu in translation_units:
         args = []
@@ -197,29 +211,28 @@ def run3C(checkedc_bin,
         args.extend(extra_3c_args)
         # Even when we run 3c on a single file, we can let it read the compiler
         # options from the compilation database.
-        args.append('-p')
+        args.append("-p")
         args.append(compile_commands_json)
         # ...but we need to add -w, as in getCheckedCArgs.
-        args.append('-extra-arg=-w')
+        args.append("-extra-arg=-w")
         error_output_json = tu.input_filename + ".errblocks.json"
         # args.append('-base-dir="' + compilation_base_dir + '"')
         # args.append('-output-dir="' + compilation_base_dir + '/out.checked"')
-        args.append('-output=\"' + error_output_json + '\"')
+        args.append('-output="' + error_output_json + '"')
         args.append(tu.input_filename)
         # run individual commands.
         if run_individual:
-            logging.debug("Running:" + ' '.join(args))
-            subprocess.check_call(' '.join(args),
-                                  cwd=target_directory,
-                                  shell=True)
+            logging.debug("Running:" + " ".join(args))
+            subprocess.check_call(" ".join(args), cwd=target_directory, shell=True)
         # prepend the command to change the working directory.
         if len(change_dir_cmd) > 0:
             args = [change_dir_cmd] + args
         f.write(" \\\n".join(args))
         f.write("\n")
     f.close()
-    logging.debug("Saved all the individual commands into the file:" +
-                  INDIVIDUAL_COMMANDS_FILE)
+    logging.debug(
+        "Saved all the individual commands into the file:" + INDIVIDUAL_COMMANDS_FILE
+    )
     os.system("chmod +x " + INDIVIDUAL_COMMANDS_FILE)
 
     vcodewriter = VSCodeJsonWriter()
@@ -234,9 +247,9 @@ def run3C(checkedc_bin,
     args.append(prog_name)
     args.extend(DEFAULT_ARGS)
     args.extend(extra_3c_args)
-    args.append('-p')
+    args.append("-p")
     args.append(compile_commands_json)
-    args.append('-extra-arg=-w')
+    args.append("-extra-arg=-w")
     # vcodewriter.addClangdArg("-log=verbose")
     # vcodewriter.addClangdArg(args[1:])
     # args.append('-base-dir="' + compilation_base_dir + '"')
@@ -248,24 +261,35 @@ def run3C(checkedc_bin,
     # vcodewriter.addClangdArg(list(set(all_files)))
     # vcodewriter.writeJsonFile(VSCODE_SETTINGS_JSON)
 
-    f = open(TOTAL_COMMANDS_FILE, 'w')
+    f = open(TOTAL_COMMANDS_FILE, "w")
     f.write("#!/bin/bash\n")
     f.write(" \\\n".join(args))
     f.close()
     os.system("chmod +x " + TOTAL_COMMANDS_FILE)
     # run whole command
     if not run_individual and not skip_running:
-        logging.info("Running:" + str(' '.join(args)))
-        subprocess.check_call(' '.join(args), shell=True)
-    logging.debug("Saved the total command into the file:" +
-                  TOTAL_COMMANDS_FILE)
-    os.system("cp " + TOTAL_COMMANDS_FILE + " " + os.path.join(
-        compilation_base_dir, os.path.basename(TOTAL_COMMANDS_FILE)))
-    logging.debug("Saved to:" + os.path.join(
-        compilation_base_dir, os.path.basename(TOTAL_COMMANDS_FILE)))
-    os.system("cp " + INDIVIDUAL_COMMANDS_FILE + " " + os.path.join(
-        compilation_base_dir, os.path.basename(INDIVIDUAL_COMMANDS_FILE)))
-    logging.debug("Saved to:" + os.path.join(
-        compilation_base_dir, os.path.basename(INDIVIDUAL_COMMANDS_FILE)))
+        logging.info("Running:" + str(" ".join(args)))
+        subprocess.check_call(" ".join(args), shell=True)
+    logging.debug("Saved the total command into the file:" + TOTAL_COMMANDS_FILE)
+    os.system(
+        "cp "
+        + TOTAL_COMMANDS_FILE
+        + " "
+        + os.path.join(compilation_base_dir, os.path.basename(TOTAL_COMMANDS_FILE))
+    )
+    logging.debug(
+        "Saved to:"
+        + os.path.join(compilation_base_dir, os.path.basename(TOTAL_COMMANDS_FILE))
+    )
+    os.system(
+        "cp "
+        + INDIVIDUAL_COMMANDS_FILE
+        + " "
+        + os.path.join(compilation_base_dir, os.path.basename(INDIVIDUAL_COMMANDS_FILE))
+    )
+    logging.debug(
+        "Saved to:"
+        + os.path.join(compilation_base_dir, os.path.basename(INDIVIDUAL_COMMANDS_FILE))
+    )
     # logging.debug("VSCode Settings json saved to:" + VSCODE_SETTINGS_JSON)
     return
