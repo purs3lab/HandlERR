@@ -378,15 +378,17 @@ def create_cumulative_errblocks_json_for_each(dirs):
         with open(cumulative_file_, "w") as cumulative_file:
             cumulative_data = process_errblocks_for_dir(d)
             deduplicated = []
-            seen = set()
+            seen = set() # set of (file, function_name)
             for entry in cumulative_data:
                 file = entry["FunctionInfo"]["File"]
+                function_name = entry["FunctionInfo"]["Name"]
                 if _is_relative(file):
                     file = os.path.join(d, file.lstrip("../"))
                     entry["FunctionInfo"]["File"] = file
-                if file in seen:
+                if (file, function_name) in seen:
                     continue
                 deduplicated.append(entry)
+                seen.add((file, function_name))
             json.dump(deduplicated, cumulative_file)
         print("[+] creating cumulative errblocks.json done")
 
