@@ -97,7 +97,6 @@ def configure_and_bear_make_single(path, build_inst=None):
         subprocess.check_call(
             (
                 "./bootstrap.sh "
-                "--with-libraries=filesystem,container,system,regex,serialization,chrono,date_time "
                 "--with-toolset=clang"
             ),
             shell=True,
@@ -123,6 +122,7 @@ def configure_and_bear_make_single(path, build_inst=None):
     autogen_required_libs = [
         "libxml2",
         "procps",
+        "cairo",
     ]
     for name in autogen_required_libs:
         if name in path:
@@ -162,6 +162,19 @@ def configure_and_bear_make_single(path, build_inst=None):
             # custom for ffmpeg libs (libavcodec, libavformat, libavutil)
             subprocess.check_call(
                 "./configure --enable-shared --disable-doc",
+                shell=True,
+                cwd=path,
+            )
+
+        elif "cairo" in path:
+            # custom for cairo
+            subprocess.check_call(
+                "sed 's/PTR/void */' -i ./util/cairo-trace/lookup-symbol.c",
+                shell=True,
+                cwd=path,
+            )
+            subprocess.check_call(
+                "./configure --disable-static CC=clang CXX=clang++",
                 shell=True,
                 cwd=path,
             )
