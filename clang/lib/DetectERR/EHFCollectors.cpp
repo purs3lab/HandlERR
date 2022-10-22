@@ -13,6 +13,10 @@
 #include "clang/DetectERR/Utils.h"
 
 /// - a call to a known exit function is the last statement of the function
+///
+/// this statement should not be control dependent on anything, in other words
+/// once the function containing this call starts, it would definitely end
+/// up calling the exit function.
 bool EHFCategoryOneCollector::VisitCallExpr(CallExpr *S) {
   CFGBlock *CurrBB = nullptr;
   auto Parents = Context->getParents(*S);
@@ -34,19 +38,36 @@ bool EHFCategoryOneCollector::VisitCallExpr(CallExpr *S) {
   if (FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(CalledDecl)) {
     std::string calledFnName = FD->getNameInfo().getAsString();
     // - a call to a known exit function is the last statement of the function
+    // - and also this call should not be control dependent on anything
     if (EHFList_->find(calledFnName) != EHFList_->end()) {
+      // CONDITION I
       // the call stmt should be the last statement of the function
       // in other words, it should:
       // - not have any post dominator nodes
       // AND
       // - in the currBB, it should be the last statement
-
+      bool isLastStmt = false;
       // check if CurrBB has any post-dominators
       if (!hasPostDominators(*CurrBB, &CDG.getCFGPostDomTree(), *Cfg.get())) {
         if (isLastStmtInBB(*S, *CurrBB)) {
-          // now we are certain that this function is an error handling function (cat-1)
-          EHFList_->insert(FnDecl->getNameInfo().getAsString());
+          isLastStmt = true;
         }
+      }
+
+      // CONDITION II
+      // this call should not be control dependent on anything
+      bool willDefinitelyHappen = false;
+      if (CDG.getControlDependencies(CurrBB).empty()) {
+        willDefinitelyHappen = true;
+      }
+
+      if (isLastStmt && willDefinitelyHappen) {
+        // now we are certain that this function is an error handling function (cat-1)
+        llvm::errs()
+            << "adding function '" << FnDecl->getNameInfo().getAsString()
+            << "' to EHFList_ as Cat-II due to VisitCallExpr(). It calls '"
+            << calledFnName << "'\n";
+        EHFList_->insert(FnDecl->getNameInfo().getAsString());
       }
     }
   }
@@ -58,6 +79,8 @@ bool EHFCategoryOneCollector::VisitCallExpr(CallExpr *S) {
 /// - the function has a 'noreturn' attribute
 bool EHFCategoryOneCollector::VisitFunctionDecl(FunctionDecl *FD) {
   if (FD->isNoReturn()) {
+    llvm::errs() << "adding function '" << FD->getNameInfo().getAsString()
+                 << "' to EHFList_ as Cat-I\n";
     EHFList_->insert(FD->getNameInfo().getAsString());
   }
 
@@ -77,6 +100,8 @@ bool EHFCategoryTwoCollector::VisitFunctionDecl(FunctionDecl *FD) {
   /// 1. name contains "err"
   std::string FnName = FD->getNameInfo().getAsString();
   if (FnName.find("err") != std::string::npos) {
+    llvm::errs() << "adding function '" << FD->getNameInfo().getAsString()
+                 << "' to EHFList_ as Cat-II\n";
     EHFList_->insert(FnDecl->getNameInfo().getAsString());
     return true;
   }
@@ -172,6 +197,8 @@ bool EHFCategoryTwoCollector::VisitFunctionDecl(FunctionDecl *FD) {
 
   // 2 && 3 && 4 -> EHF Cat 2 function
   if (isVoidReturn && isIndependentWriteToStderr && isShortFunction) {
+    llvm::errs() << "adding function '" << FD->getNameInfo().getAsString()
+                 << "' to EHFList_ as Cat-II\n";
     EHFList_->insert(FnDecl->getNameInfo().getAsString());
   }
 

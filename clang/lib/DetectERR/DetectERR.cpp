@@ -11,15 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/DetectERR/DetectERR.h"
-#include "clang/DetectERR/ProjectInfo.h"
 #include "clang/DetectERR/DetectERRASTConsumer.h"
-#include "llvm/Support/TargetSelect.h"
+#include "clang/DetectERR/ProjectInfo.h"
 #include "clang/Frontend/ASTConsumers.h"
 #include "clang/Frontend/VerifyDiagnosticConsumer.h"
 #include "clang/Tooling/ArgumentsAdjusters.h"
-#include "llvm/Support/TargetSelect.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/TargetSelect.h"
 
 using namespace clang::driver;
 using namespace clang::tooling;
@@ -33,7 +32,8 @@ public:
 
   virtual std::unique_ptr<ASTConsumer>
   CreateASTConsumer(CompilerInstance &Compiler, StringRef InFile) {
-    return std::unique_ptr<ASTConsumer>(new T(Info, Opts, &Compiler.getASTContext()));
+    return std::unique_ptr<ASTConsumer>(
+        new T(Info, Opts, &Compiler.getASTContext()));
   }
 
 private:
@@ -47,8 +47,8 @@ newFrontendActionFactoryA(ProjectInfo &I, struct DetectERROptions &OP) {
   class ArgFrontendActionFactory : public FrontendActionFactory {
   public:
     explicit ArgFrontendActionFactory(ProjectInfo &I,
-                                      struct DetectERROptions &OP) : Info(I),
-                                                                     Opts(OP) {}
+                                      struct DetectERROptions &OP)
+        : Info(I), Opts(OP) {}
 
     std::unique_ptr<FrontendAction> create() override {
       return std::unique_ptr<FrontendAction>(new T(Info, Opts));
@@ -63,9 +63,10 @@ newFrontendActionFactoryA(ProjectInfo &I, struct DetectERROptions &OP) {
       new ArgFrontendActionFactory(I, OP));
 }
 
-DetectERRInterface::DetectERRInterface(const struct DetectERROptions &DEopt,
-                     const std::vector<std::string> &SourceFileList,
-                     clang::tooling::CompilationDatabase *CompDB) {
+DetectERRInterface::DetectERRInterface(
+    const struct DetectERROptions &DEopt,
+    const std::vector<std::string> &SourceFileList,
+    clang::tooling::CompilationDatabase *CompDB) {
 
   DErrOptions = DEopt;
   SourceFiles = SourceFileList;
@@ -77,13 +78,18 @@ DetectERRInterface::DetectERRInterface(const struct DetectERROptions &DEopt,
 }
 
 bool DetectERRInterface::parseASTs() {
+
+  if (DErrOptions.Verbose) {
+    llvm::errs() << "[>] Parsing ASTs\n";
+  }
+
   bool RetVal = false;
   auto *Tool = new ClangTool(*CurrCompDB, SourceFiles);
 
-  std::unique_ptr<ToolAction> ConstraintTool = newFrontendActionFactoryA<
-      GenericAction<DetectERRASTConsumer,
-                    ProjectInfo, struct DetectERROptions>>(this->PInfo,
-                                                           this->DErrOptions);
+  std::unique_ptr<ToolAction> ConstraintTool =
+      newFrontendActionFactoryA<GenericAction<DetectERRASTConsumer, ProjectInfo,
+                                              struct DetectERROptions>>(
+          this->PInfo, this->DErrOptions);
 
   if (ConstraintTool) {
     Tool->run(ConstraintTool.get());

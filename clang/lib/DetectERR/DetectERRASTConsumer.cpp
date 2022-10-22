@@ -23,6 +23,8 @@ using namespace clang;
 void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
   TranslationUnitDecl *TUD = C.getTranslationUnitDecl();
 
+  llvm::errs() << "[>] EHF computation start\n";
+
   // Fixed point computation for exit functions
   // populate EHFList with known error functions.
   std::set<std::string> EHFList;
@@ -57,6 +59,12 @@ void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
       }
     }
     is_changed = EHFList.size() != num_exit_func;
+  }
+
+  llvm::errs() << "[>] EHF computation end\n";
+  llvm::errs() << "[>] EFList: \n";
+  for(auto it=EHFList.begin(); it != EHFList.end(); it++){
+    llvm::errs() << "--- " << *it << "\n";
   }
 
   // Iterate through all function declarations.
