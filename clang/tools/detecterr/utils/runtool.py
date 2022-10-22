@@ -90,6 +90,25 @@ def configure_and_bear_make_single(path, build_inst=None):
     """
     print(f"running configure_and_bear_make_single on {path}")
 
+    # libboost, the wierd one...
+    if "boost" in path:
+        print("libboost detected, doing the special instructions...")
+        # bootstrap
+        subprocess.check_call(
+            (
+                "./bootstrap.sh "
+                "--with-libraries=filesystem,container,system,regex,serialization,chrono,date_time "
+                "--with-toolset=clang"
+            ),
+            shell=True,
+            cwd=path,
+        )
+        # bear b2
+        subprocess.check_call(
+            f"bear ./b2", shell=True, cwd=path,
+        )
+        return
+
     # custom build_inst
     if build_inst:
         print(f"running custome build_inst first")
