@@ -36,7 +36,8 @@ const Expr *removeAuxillaryCasts(const Expr *E) {
 bool isNULLExpr(const clang::Expr *E, ASTContext &C) {
   QualType Typ = E->getType();
   E = removeAuxillaryCasts(E);
-  return Typ->isPointerType() && E->isIntegerConstantExpr(C) &&
+
+  return Typ->isPointerType() &&
          E->isNullPointerConstant(C, Expr::NPC_ValueDependentIsNotNull);
 }
 
