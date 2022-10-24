@@ -63,7 +63,7 @@ void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
 
   llvm::errs() << "[>] EHF computation end\n";
   llvm::errs() << "[>] EFList: \n";
-  for(auto it=EHFList.begin(); it != EHFList.end(); it++){
+  for (auto it = EHFList.begin(); it != EHFList.end(); it++) {
     llvm::errs() << "--- " << *it << "\n";
   }
 
@@ -71,9 +71,27 @@ void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
   for (const auto &D : TUD->decls()) {
     if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
       handleFuncDecl(C, FD, EHFList);
+
+    } else if (const NamespaceDecl *ND = dyn_cast_or_null<NamespaceDecl>(D)) {
+      // useful for c++
+      handleNamespaceDecl(C, ND, EHFList);
     }
   }
   return;
+}
+
+void DetectERRASTConsumer::handleNamespaceDecl(
+    ASTContext &C, const clang::NamespaceDecl *ND,
+    const std::set<std::string> &EHFList) {
+  for (const auto &D : ND->decls()) {
+    if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
+      handleFuncDecl(C, FD, EHFList);
+
+    } else if (const NamespaceDecl *ND = dyn_cast_or_null<NamespaceDecl>(D)) {
+      // nested namespace
+      handleNamespaceDecl(C, ND, EHFList);
+    }
+  }
 }
 
 void DetectERRASTConsumer::handleFuncDecl(
