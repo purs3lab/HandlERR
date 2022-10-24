@@ -43,7 +43,7 @@ bool isNULLExpr(const clang::Expr *E, ASTContext &C) {
 
 bool isNegativeNumber(const clang::Expr *E, ASTContext &C) {
   E = removeAuxillaryCasts(E);
-  if (E->isIntegerConstantExpr(C)) {
+  if (!E->isValueDependent() && E->isIntegerConstantExpr(C)) {
     auto NewAPI = E->getIntegerConstantExpr(C);
     if (NewAPI.hasValue()) {
       return (NewAPI->getSExtValue() < 0);
