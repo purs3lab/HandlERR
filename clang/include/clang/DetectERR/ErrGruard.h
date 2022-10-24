@@ -51,7 +51,10 @@ enum HeuristicID {
   H07,
 
   /// H08 - goto to an error label is control dependent on a check
-  H08
+  H08,
+
+  /// H09 - throwing an exception is control dependent on a check
+  H09
 };
 
 /// The level at which the given check occurs (inner/outer)

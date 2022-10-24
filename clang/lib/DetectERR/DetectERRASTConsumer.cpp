@@ -15,6 +15,7 @@
 #include "clang/DetectERR/EHFCollectors.h"
 #include "clang/DetectERR/GotoVisitors.h"
 #include "clang/DetectERR/ReturnVisitors.h"
+#include "clang/DetectERR/ThrowVisitors.h"
 #include "clang/DetectERR/Utils.h"
 
 using namespace llvm;
@@ -163,6 +164,14 @@ void DetectERRASTConsumer::handleFuncDecl(
       llvm::outs().flush();
     }
     GV.TraverseDecl(const_cast<FunctionDecl *>(FD));
+
+    // EHF Call Visitor
+    ThrowVisitor TV(&C, Info, const_cast<FunctionDecl *>(FD), FID);
+    if (Opts.Verbose) {
+      llvm::outs() << "[+] Running ThrowVisitor call handler.\n";
+      llvm::outs().flush();
+    }
+    TV.TraverseDecl(const_cast<FunctionDecl *>(FD));
 
     if (Opts.Verbose) {
       llvm::outs() << "[+] Finished handling function:" << FID.first << "\n";

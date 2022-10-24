@@ -12,6 +12,7 @@ add_clang_library(
   ReturnVisitors.cpp
   EHFCallVisitors.cpp
   GotoVisitors.cpp
+  ThrowVisitors.cpp
   LINK_LIBS
   clangAST
   clangAnalysis

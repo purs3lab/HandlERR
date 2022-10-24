@@ -75,6 +75,7 @@ public:
   virtual bool VisitCallExpr(CallExpr *CE) { return true; }
   virtual bool VisitReturnStmt(ReturnStmt *ST) { return true; }
   virtual bool VisitGotoStmt(GotoStmt *GotoST) { return true; }
+  virtual bool VisitCXXThrowExpr(CXXThrowExpr *TE) { return true; }
 
   ASTContext *Context;
   ProjectInfo &Info;
