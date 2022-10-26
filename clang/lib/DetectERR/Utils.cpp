@@ -5,6 +5,7 @@
 #include "clang/DetectERR/Utils.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/Expr.h"
+#include "clang/AST/Mangle.h"
 #include "clang/Analysis/CFG.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/DetectERR/ErrGruard.h"
@@ -15,7 +16,11 @@ using namespace clang;
 FuncId getFuncID(const clang::FunctionDecl *FD, ASTContext *C) {
   FuncId RetFID;
   auto PSL = PersistentSourceLoc::mkPSL(FD, *C);
-  RetFID.first = FD->getNameAsString();
+
+  // fix for using with C++ files as well
+  ASTNameGenerator *NameGenerator = new ASTNameGenerator(*C);
+  // RetFID.first = FD->getNameAsString();
+  RetFID.first = NameGenerator->getName(FD);
   RetFID.second = PSL.getFileName();
   return RetFID;
 }

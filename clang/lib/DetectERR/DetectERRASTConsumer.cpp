@@ -31,7 +31,6 @@ void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
   std::set<std::string> EHFList;
   EHFList.insert("exit");
   EHFList.insert("abort");
-  EHFList.insert("emit_error"); // boost
 
   bool is_changed = true;
   while (is_changed) {

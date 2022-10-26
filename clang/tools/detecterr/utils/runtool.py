@@ -96,15 +96,14 @@ def configure_and_bear_make_single(path, build_inst=None):
         # bootstrap
         subprocess.check_call(
             (
-                "./bootstrap.sh "
-                "--with-toolset=clang"
+                "./bootstrap.sh --with-toolset=clang --with-libraries=filesystem "
             ),
             shell=True,
             cwd=path,
         )
         # bear b2
         subprocess.check_call(
-            f"bear ./b2", shell=True, cwd=path,
+            f"bear ./b2 link=shared", shell=True, cwd=path,
         )
         return
 
