@@ -25,6 +25,13 @@ bool EHFCategoryOneCollector::VisitCallExpr(CallExpr *S) {
     const Stmt *St = nullptr;
     while (!Parent.get<Stmt>()) {
       Parents = Context->getParents(Parent);
+
+      // this happens when the call is a part of constructor initializer list
+      // we can safely skip this CallExpr
+      if (Parents.empty()) {
+        return true;
+      }
+
       Parent = Parents[0];
     }
     St = Parent.get<Stmt>();
