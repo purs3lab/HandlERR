@@ -51,17 +51,14 @@ void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
           errs() << "Analyzing function: " << FnName << "\n";
           FL.dump();
 
-          if (FnName == "unite") {
-            std::unique_ptr<CFG> Cfg =
-                CFG::buildCFG(nullptr, FD->getBody(), &C, CFG::BuildOptions());
-
-            if (!Cfg.get()) {
-              errs()
-                  << "[!] Failed to build CFG for function (will be skipped): "
-                  << FnName << "\n";
-              FD->getBody()->dumpColor();
-              continue;
-            }
+          // check that a source level CFG can actually be built by clang for this function,
+          // else skip it
+          std::unique_ptr<CFG> Cfg =
+              CFG::buildCFG(nullptr, FD->getBody(), &C, CFG::BuildOptions());
+          if (!Cfg.get()) {
+            errs() << "[!] Failed to build CFG for function (will be skipped): "
+                   << FnName << "\n";
+            continue;
           }
 
           // cat 1 exit fn?
@@ -122,6 +119,16 @@ void DetectERRASTConsumer::handleFuncDecl(
     if (Opts.Verbose) {
       llvm::outs() << "[+] Handling function:" << FID.first << "\n";
       llvm::outs().flush();
+      FL.dump();
+    }
+
+    // tmp: @shank
+    std::unique_ptr<CFG> Cfg =
+        CFG::buildCFG(nullptr, FD->getBody(), &C, CFG::BuildOptions());
+    if (!Cfg.get()) {
+      errs() << "[!] Failed to build CFG for function (will be skipped): "
+             << FID.first << "\n";
+      return;
     }
 
     // Return NULL visitor.

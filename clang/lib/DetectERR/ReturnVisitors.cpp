@@ -273,7 +273,7 @@ bool ReturnEarlyVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
     //    (if, while, switch)
 
     CFGBlock *ReturnBB = StMap[ReturnST];
-    if (ReturnBB->size() == 1) {
+    if (ReturnBB && ReturnBB->size() == 1) {
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *ReturnBB, &CDG);
       removeChecksUsingParams(Checks, *FnDecl);
