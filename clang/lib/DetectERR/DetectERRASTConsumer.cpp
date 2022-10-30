@@ -47,6 +47,18 @@ void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
             continue;
           }
 
+          // tmp: @shank
+          errs() << "Analyzing function: " << FnName << "\n";
+          FL.dump();
+
+          if (FnName == "unite") {
+            std::unique_ptr<CFG> Cfg =
+                CFG::buildCFG(nullptr, FD->getBody(), &C, CFG::BuildOptions());
+
+            assert(Cfg.get() && "Failed to build CFG for function");
+            errs() << "CFG built for function: " << FnName << "\n";
+          }
+
           // cat 1 exit fn?
           EHFCategoryOneCollector ECVOne(&C, const_cast<FunctionDecl *>(FD),
                                          EHFList);
