@@ -55,8 +55,13 @@ void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
             std::unique_ptr<CFG> Cfg =
                 CFG::buildCFG(nullptr, FD->getBody(), &C, CFG::BuildOptions());
 
-            assert(Cfg.get() && "Failed to build CFG for function");
-            errs() << "CFG built for function: " << FnName << "\n";
+            if (!Cfg.get()) {
+              errs()
+                  << "[!] Failed to build CFG for function (will be skipped): "
+                  << FnName << "\n";
+              FD->getBody()->dumpColor();
+              continue;
+            }
           }
 
           // cat 1 exit fn?
