@@ -73,13 +73,16 @@ def getCheckedCArgs(argument_list):
     clang_x_args = []
     source_filename = argument_list[-1]
     is_c = source_filename.endswith(".c")
-    is_cpp = source_filename.endswith(".cpp")
+    is_cpp = source_filename.endswith(
+        ".cpp") or source_filename.endswith(".cc")
     assert is_c or is_cpp
     # By default; may be overwritten below.
 
     if is_c:
         output_filename = source_filename[: -len(".c")] + ".o"
-    else:
+    elif source_filename.endswith(".cc"):
+        output_filename = source_filename[: -len(".cc")] + ".o"
+    elif source_filename.endswith(".cpp"):
         output_filename = source_filename[: -len(".cpp")] + ".o"
 
     idx = 0
@@ -164,7 +167,8 @@ def run3C(
         if "arguments" in i and not "command" in i:
             # TODO: shank - tmp fix
             is_c = i["arguments"][-1].endswith(".c")
-            is_cpp = i["arguments"][-1].endswith(".cpp")
+            is_cpp = i["arguments"][-1].endswith(
+                ".cpp") or i["arguments"][-1].endswith(".cc")
             if not is_c and not is_cpp:
                 continue
 
@@ -172,7 +176,8 @@ def run3C(
             file_to_add = i["directory"] + SLASH + file_to_add
             compiler_path = i["arguments"][0]
             # get the compiler arguments
-            (compiler_x_args, output_filename) = getCheckedCArgs(i["arguments"][1:])
+            (compiler_x_args, output_filename) = getCheckedCArgs(
+                i["arguments"][1:])
             # get the directory used during compilation.
             target_directory = i["directory"]
         file_to_add = os.path.realpath(file_to_add)
@@ -223,7 +228,8 @@ def run3C(
         # run individual commands.
         if run_individual:
             logging.debug("Running:" + " ".join(args))
-            subprocess.check_call(" ".join(args), cwd=target_directory, shell=True)
+            subprocess.check_call(
+                " ".join(args), cwd=target_directory, shell=True)
         # prepend the command to change the working directory.
         if len(change_dir_cmd) > 0:
             args = [change_dir_cmd] + args
@@ -270,26 +276,31 @@ def run3C(
     if not run_individual and not skip_running:
         logging.info("Running:" + str(" ".join(args)))
         subprocess.check_call(" ".join(args), shell=True)
-    logging.debug("Saved the total command into the file:" + TOTAL_COMMANDS_FILE)
+    logging.debug("Saved the total command into the file:" +
+                  TOTAL_COMMANDS_FILE)
     os.system(
         "cp "
         + TOTAL_COMMANDS_FILE
         + " "
-        + os.path.join(compilation_base_dir, os.path.basename(TOTAL_COMMANDS_FILE))
+        + os.path.join(compilation_base_dir,
+                       os.path.basename(TOTAL_COMMANDS_FILE))
     )
     logging.debug(
         "Saved to:"
-        + os.path.join(compilation_base_dir, os.path.basename(TOTAL_COMMANDS_FILE))
+        + os.path.join(compilation_base_dir,
+                       os.path.basename(TOTAL_COMMANDS_FILE))
     )
     os.system(
         "cp "
         + INDIVIDUAL_COMMANDS_FILE
         + " "
-        + os.path.join(compilation_base_dir, os.path.basename(INDIVIDUAL_COMMANDS_FILE))
+        + os.path.join(compilation_base_dir,
+                       os.path.basename(INDIVIDUAL_COMMANDS_FILE))
     )
     logging.debug(
         "Saved to:"
-        + os.path.join(compilation_base_dir, os.path.basename(INDIVIDUAL_COMMANDS_FILE))
+        + os.path.join(compilation_base_dir,
+                       os.path.basename(INDIVIDUAL_COMMANDS_FILE))
     )
     # logging.debug("VSCode Settings json saved to:" + VSCODE_SETTINGS_JSON)
     return
