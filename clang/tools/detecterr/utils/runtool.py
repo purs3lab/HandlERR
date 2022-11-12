@@ -68,7 +68,8 @@ def extract_archives(input_path):
         # extract the archive
         print(f"[+] extracting {f} to {output_dir}")
         subprocess.check_call(f"mkdir -p {output_dir}", shell=True)
-        subprocess.check_call(f"tar xf {f} --directory={output_dir}", shell=True)
+        subprocess.check_call(
+            f"tar xf {f} --directory={output_dir}", shell=True)
         print(f"[+] extracting complete")
 
         # custom instructions provided?
@@ -202,7 +203,7 @@ def configure_and_bear_make_single(path, build_inst=None):
         subprocess.check_call("mkdir -p build", shell=True, cwd=path)
         path = os.path.join(path, "build")
         subprocess.check_call(
-            "CC=clang CXX=clang++ cmake .. -DCMAKE_BUILD_TYPE=debug",
+            "CC=clang CXX=clang++ cmake .. -DCMAKE_BUILD_TYPE=debug -DWITH_JPEG8=ON -DENABLE_STATIC=False -DWITH_SIMD=OFF",
             shell=True,
             cwd=path,
         )
@@ -218,7 +219,8 @@ def configure_and_bear_make_single(path, build_inst=None):
 
     # bear make
     print("[+] running bear make...")
-    subprocess.check_call(f"{BEAR_PATH} make -j{NUM_CPUS}", shell=True, cwd=path)
+    subprocess.check_call(
+        f"{BEAR_PATH} make -j{NUM_CPUS}", shell=True, cwd=path)
     print("[+] bear make done")
 
 
@@ -270,7 +272,8 @@ def convert_project(build_dirs):
     build_dirs.
     """
     convert_project_bin = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "port_tools", "convert_project.py"
+        os.path.dirname(os.path.realpath(__file__)
+                        ), "port_tools", "convert_project.py"
     )
     for d in build_dirs:
         # libc - special case
@@ -405,11 +408,12 @@ def create_cumulative_errblocks_json_for_each(dirs):
     """
     for d in dirs:
         cumulative_file_ = os.path.join(d, "__project.errblocks.json")
-        print(f"[+] creating cumulative errblocks.json for {d} as {cumulative_file_}")
+        print(
+            f"[+] creating cumulative errblocks.json for {d} as {cumulative_file_}")
         with open(cumulative_file_, "w") as cumulative_file:
             cumulative_data = process_errblocks_for_dir(d)
             deduplicated = []
-            seen = set() # set of (file, function_name)
+            seen = set()  # set of (file, function_name)
             for entry in cumulative_data:
                 file = entry["FunctionInfo"]["File"]
                 function_name = entry["FunctionInfo"]["Name"]
@@ -442,7 +446,8 @@ def generate_stats(dirs):
     project_files = []
     for d in dirs:
         cumulative_file_ = os.path.join(d, "__project.errblocks.json")
-        print(f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)}")
+        print(
+            f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)}")
         project_name = os.path.basename(os.path.dirname(d))
         project_filename = f"{project_name}__project.errblocks.json"
         bench_project_filename = os.path.join(
@@ -578,7 +583,8 @@ if __name__ == "__main__":
 
     if not args.benchmarks_path or not os.path.isdir(args.benchmarks_path):
         print("Error: Path to the benchmarks folder is invalid.")
-        print("Provided argument: {} is not a directory.".format(args.benchmarks_path))
+        print("Provided argument: {} is not a directory.".format(
+            args.benchmarks_path))
         sys.exit(1)
 
     if not args.bear_path or not os.path.isfile(args.bear_path):

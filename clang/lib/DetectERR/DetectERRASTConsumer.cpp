@@ -48,8 +48,8 @@ void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
           }
 
           // tmp: @shank
-          errs() << "Analyzing function: " << FnName << "\n";
-          FL.dump();
+          // errs() << "Analyzing function: " << FnName << "\n";
+          // FL.dump();
 
           // check that a source level CFG can actually be built by clang for this function,
           // else skip it
