@@ -44,7 +44,7 @@ def extract_archives(input_path):
 
         base_dir = os.path.realpath(input_path)
         # expected archives are tar.gz files
-        if f.endswith("tar.gz") or f.endswith("tar.bz2"):
+        if f.endswith("tar.gz") or f.endswith("tar.bz2") or f.endswith("tar.xz"):
             # TODO - parallelize this
             f = os.path.join(base_dir, f)
             archives.append(f)
@@ -57,6 +57,7 @@ def extract_archives(input_path):
         # the folder name for the extracted archive
         basename = os.path.basename(f).replace(".tar.bz2", "")
         basename = basename.replace(".tar.gz", "")
+        basename = basename.replace(".tar.xz", "")
         output_dir = os.path.join(os.path.dirname(f), basename)
 
         # remove existing directory
