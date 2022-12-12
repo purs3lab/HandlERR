@@ -43,7 +43,7 @@ def extract_archives(input_path):
             continue
 
         base_dir = os.path.realpath(input_path)
-        # expected archives are tar.gz files
+        # expected archives are tar.gz / tar.xz / tar.bz2 files
         if f.endswith("tar.gz") or f.endswith("tar.bz2") or f.endswith("tar.xz"):
             # TODO - parallelize this
             f = os.path.join(base_dir, f)
@@ -69,8 +69,7 @@ def extract_archives(input_path):
         # extract the archive
         print(f"[+] extracting {f} to {output_dir}")
         subprocess.check_call(f"mkdir -p {output_dir}", shell=True)
-        subprocess.check_call(
-            f"tar xf {f} --directory={output_dir}", shell=True)
+        subprocess.check_call(f"tar xf {f} --directory={output_dir}", shell=True)
         print(f"[+] extracting complete")
 
         # custom instructions provided?
@@ -97,131 +96,136 @@ def configure_and_bear_make_single(path, build_inst=None):
         print("libboost detected, doing the special instructions...")
         # bootstrap
         subprocess.check_call(
-            (
-                "./bootstrap.sh --with-toolset=clang --with-libraries=filesystem "
-            ),
+            ("./bootstrap.sh --with-toolset=clang --with-libraries=filesystem "),
             shell=True,
             cwd=path,
         )
         # bear b2
         subprocess.check_call(
-            f"bear ./b2 link=shared", shell=True, cwd=path,
+            f"bear ./b2 link=shared",
+            shell=True,
+            cwd=path,
         )
         return
 
     # custom build_inst
     if build_inst:
-        print(f"running custome build_inst first")
+        print(f"running custom build_inst first")
         with open(build_inst) as inst_f:
             # execute one instruction at a time
-            inst = inst_f.readline().strip()
-            print(f"[+] running: {inst}")
-            subprocess.check_call(f"{inst}", shell=True, cwd=path)
+            for line in inst_f.readlines():
+                inst = line.strip()
+                print(f"[+] running: {inst}")
+                subprocess.check_call(f"{inst}", shell=True, cwd=path)
+                print("[+] configure done")
+
+    else:
+        # autogen.sh required
+        autogen_required_libs = [
+            "libxml2",
+            "procps",
+            "cairo",
+        ]
+        for name in autogen_required_libs:
+            if name in path:
+                subprocess.check_call("./autogen.sh", shell=True, cwd=path)
+                break
+
+        # configure file
+        if "configure" in os.listdir(path):
+            print("[+] running configure...")
+            if "libgcrypt" in path:
+                # custom for libgcrypt
+                subprocess.check_call(
+                    "./configure --enable-maintainer-mode", shell=True, cwd=path
+                )
+
+            elif "glibc" in path:
+                # custom for glibc
+                subprocess.check_call(f"mkdir -p ../build", shell=True, cwd=path)
+                configure_path = os.path.join(path, "configure")
+                path = os.path.join(path, "../build")
+                print(f"path: {path}")
+                subprocess.check_call(
+                    f"CC=gcc CXX=g++ {configure_path} --prefix=/tmp/glibc",
+                    shell=True,
+                    cwd=path,
+                )
+
+            elif "elf" in path:
+                # custom for libelf
+                subprocess.check_call(
+                    "CC=gcc CXX=g++ ./configure --disable-debuginfod --disable-libdebuginfod",
+                    shell=True,
+                    cwd=path,
+                )
+
+            elif "ffmpeg" in path:
+                # custom for ffmpeg libs (libavcodec, libavformat, libavutil)
+                subprocess.check_call(
+                    "./configure --enable-shared --disable-doc",
+                    shell=True,
+                    cwd=path,
+                )
+
+            elif "cairo" in path:
+                # custom for cairo
+                subprocess.check_call(
+                    "sed 's/PTR/void */' -i ./util/cairo-trace/lookup-symbol.c",
+                    shell=True,
+                    cwd=path,
+                )
+                subprocess.check_call(
+                    "./configure --disable-static CC=clang CXX=clang++",
+                    shell=True,
+                    cwd=path,
+                )
+
+            else:
+                # normal libraries, just do ./configure
+                subprocess.check_call(
+                    './configure CFLAGS="-g -O0" CXXFLAGS="-g -O0"',
+                    shell=True,
+                    cwd=path,
+                )
             print("[+] configure done")
 
-    # autogen.sh required
-    autogen_required_libs = [
-        "libxml2",
-        "procps",
-        "cairo",
-    ]
-    for name in autogen_required_libs:
-        if name in path:
-            subprocess.check_call("./autogen.sh", shell=True, cwd=path)
-            break
-
-    # configure file
-    if "configure" in os.listdir(path):
-        print("[+] running configure...")
-        if "libgcrypt" in path:
-            # custom for libgcrypt
+        # poppler -> cmake
+        if "poppler" in path:
+            print("[+] working with poppler")
+            subprocess.check_call(f"mkdir -p build", shell=True, cwd=path)
+            path = os.path.join(path, "build")
             subprocess.check_call(
-                "./configure --enable-maintainer-mode", shell=True, cwd=path
-            )
-
-        elif "glibc" in path:
-            # custom for glibc
-            subprocess.check_call(f"mkdir -p ../build", shell=True, cwd=path)
-            configure_path = os.path.join(path, "configure")
-            path = os.path.join(path, "../build")
-            print(f"path: {path}")
-            subprocess.check_call(
-                f"CC=gcc CXX=g++ {configure_path} --prefix=/tmp/glibc",
+                "CC=clang CXX=clang++ cmake .. "
+                '-DCMAKE_C_FLAGS="-g -O0" -DCMAKE_CXX_FLAGS="-g -O0" '
+                "-DCMAKE_BUILD_TYPE=debug -DENABLE_BOOST=OFF",
                 shell=True,
                 cwd=path,
             )
 
-        elif "elf" in path:
-            # custom for libelf
+        # libjpeg -> cmake
+        if "libjpeg" in path:
+            print("[+] working with libjpeg")
+            subprocess.check_call("mkdir -p build", shell=True, cwd=path)
+            path = os.path.join(path, "build")
             subprocess.check_call(
-                "CC=gcc CXX=g++ ./configure --disable-debuginfod --disable-libdebuginfod",
+                "CC=clang CXX=clang++ cmake .. -DCMAKE_BUILD_TYPE=debug -DWITH_JPEG8=ON -DENABLE_STATIC=False -DWITH_SIMD=OFF",
                 shell=True,
                 cwd=path,
             )
 
-        elif "ffmpeg" in path:
-            # custom for ffmpeg libs (libavcodec, libavformat, libavutil)
+        # openssl -> Configure
+        if "ssl" in path:
+            print("[+] working with openssl")
             subprocess.check_call(
-                "./configure --enable-shared --disable-doc",
+                "CC=clang CXX=clang++ ./Configure --debug",
                 shell=True,
                 cwd=path,
             )
-
-        elif "cairo" in path:
-            # custom for cairo
-            subprocess.check_call(
-                "sed 's/PTR/void */' -i ./util/cairo-trace/lookup-symbol.c",
-                shell=True,
-                cwd=path,
-            )
-            subprocess.check_call(
-                "./configure --disable-static CC=clang CXX=clang++",
-                shell=True,
-                cwd=path,
-            )
-
-        else:
-            # normal libraries, just do ./configure
-            subprocess.check_call("./configure", shell=True, cwd=path)
-        print("[+] configure done")
-
-    # poppler -> cmake
-    if "poppler" in path:
-        print("[+] working with poppler")
-        subprocess.check_call(f"mkdir -p build", shell=True, cwd=path)
-        path = os.path.join(path, "build")
-        subprocess.check_call(
-            "CC=clang CXX=clang++ cmake .. "
-            '-DCMAKE_C_FLAGS="-g -O0" -DCMAKE_CXX_FLAGS="-g -O0" '
-            "-DCMAKE_BUILD_TYPE=debug -DENABLE_BOOST=OFF",
-            shell=True,
-            cwd=path,
-        )
-
-    # libjpeg -> cmake
-    if "libjpeg" in path:
-        print("[+] working with libjpeg")
-        subprocess.check_call("mkdir -p build", shell=True, cwd=path)
-        path = os.path.join(path, "build")
-        subprocess.check_call(
-            "CC=clang CXX=clang++ cmake .. -DCMAKE_BUILD_TYPE=debug -DWITH_JPEG8=ON -DENABLE_STATIC=False -DWITH_SIMD=OFF",
-            shell=True,
-            cwd=path,
-        )
-
-    # openssl -> Configure
-    if "ssl" in path:
-        print("[+] working with openssl")
-        subprocess.check_call(
-            "CC=clang CXX=clang++ ./Configure --debug",
-            shell=True,
-            cwd=path,
-        )
 
     # bear make
     print("[+] running bear make...")
-    subprocess.check_call(
-        f"{BEAR_PATH} make -j{NUM_CPUS}", shell=True, cwd=path)
+    subprocess.check_call(f"{BEAR_PATH} make -j{NUM_CPUS}", shell=True, cwd=path)
     print("[+] bear make done")
 
 
@@ -273,8 +277,7 @@ def convert_project(build_dirs):
     build_dirs.
     """
     convert_project_bin = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)
-                        ), "port_tools", "convert_project.py"
+        os.path.dirname(os.path.realpath(__file__)), "port_tools", "convert_project.py"
     )
     for d in build_dirs:
         # libc - special case
@@ -409,8 +412,7 @@ def create_cumulative_errblocks_json_for_each(dirs):
     """
     for d in dirs:
         cumulative_file_ = os.path.join(d, "__project.errblocks.json")
-        print(
-            f"[+] creating cumulative errblocks.json for {d} as {cumulative_file_}")
+        print(f"[+] creating cumulative errblocks.json for {d} as {cumulative_file_}")
         with open(cumulative_file_, "w") as cumulative_file:
             cumulative_data = process_errblocks_for_dir(d)
             deduplicated = []
@@ -447,8 +449,7 @@ def generate_stats(dirs):
     project_files = []
     for d in dirs:
         cumulative_file_ = os.path.join(d, "__project.errblocks.json")
-        print(
-            f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)}")
+        print(f"[+] copying {cumulative_file_} to {os.path.abspath(BENCHMARKS_PATH)}")
         project_name = os.path.basename(os.path.dirname(d))
         project_filename = f"{project_name}__project.errblocks.json"
         bench_project_filename = os.path.join(
@@ -584,8 +585,7 @@ if __name__ == "__main__":
 
     if not args.benchmarks_path or not os.path.isdir(args.benchmarks_path):
         print("Error: Path to the benchmarks folder is invalid.")
-        print("Provided argument: {} is not a directory.".format(
-            args.benchmarks_path))
+        print("Provided argument: {} is not a directory.".format(args.benchmarks_path))
         sys.exit(1)
 
     if not args.bear_path or not os.path.isfile(args.bear_path):
