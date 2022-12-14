@@ -23,7 +23,6 @@ PROG_PATH: str | None = None
 BENCHMARKS_PATH: str | None = None
 NAMES_LIKE = None
 DEBUG = None
-COMPILE_COMMANDS_PATH: str | None = None
 SRC_DIR: str | None = None
 
 # number of usable cpus
@@ -503,9 +502,8 @@ def run_main(args: argparse.Namespace) -> None:
     #   create a cumulative json file for the entire project.
     # - Finally, have a single csv file with summaries for each project
 
-    # if we are given a compile_commands.json, we can skip the extraction and
-    # configure steps
-    if not args.compile_commands_path:
+    # if we are given a src_dir, we can skip the extraction and configure steps
+    if not args.src_dir:
         build_dirs = extract_and_configure_archives(args.input_path)
     else:
         build_dirs = [args.src_dir]
@@ -579,14 +577,6 @@ def _setup_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "-c",
-        "--compile_commands",
-        dest="compile_commands_path",
-        type=str,
-        help="Path to compile_commands.json file",
-    )
-
-    parser.add_argument(
         "-s",
         "--src_dir",
         dest="src_dir",
@@ -622,37 +612,14 @@ def _parse_and_validate_arguments(
         print("Provided argument: {} is not a file.".format(args.bear_path))
         sys.exit(1)
 
-    if args.compile_commands_path:
-        # if compile commands path is provided, then it should be a json file
-        if not os.path.isfile(args.compile_commands_path):
-            print(
-                "Error: Path to the compile_commands.json file is invalid."
-                "Provided argument: {} is not a file.".format(
-                    args.compile_commands_path
-                )
-            )
-            sys.exit(1)
-        if not args.compile_commands_path.endswith(".json"):
-            print(
-                "Error: Path to the compile_commands.json file is invalid."
-                "Provided argument: {} is not a json file.".format(
-                    args.compile_commands_path
-                )
-            )
-            sys.exit(1)
+    if args.src_dir and not os.path.isdir(args.src_dir):
+        print("Error: Path to the src directory is invalid.")
+        print("Provided argument: {} is not a directory.".format(args.src_dir))
+        sys.exit(1)
 
-        # if compile commands path is provided, then src_dir should also be
-        # provided
-        if not args.src_dir or not os.path.isdir(args.src_dir):
-            print("Error: Path to the src directory is invalid.")
-            print("Provided argument: {} is not a directory.".format(args.src_dir))
-            sys.exit(1)
-
-    # either the input path or the compile commands path should be provided
-    if not args.input_path and not args.compile_commands_path:
-        print(
-            "Error: Either the input path or the compile commands path should be provided."
-        )
+    # either the input path or the src_dir should be provided
+    if not args.input_path and not args.src_dir:
+        print("Error: Either the input path or the src_dir should be provided.")
         sys.exit(1)
 
     global BEAR_PATH
