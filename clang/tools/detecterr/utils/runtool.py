@@ -18,11 +18,13 @@ import sys
 import datetime
 import multiprocessing
 
-BEAR_PATH = None
-PROG_PATH = None
-BENCHMARKS_PATH = None
+BEAR_PATH: str | None = None
+PROG_PATH: str | None = None
+BENCHMARKS_PATH: str | None = None
 NAMES_LIKE = None
 DEBUG = None
+COMPILE_COMMANDS_PATH: str | None = None
+SRC_DIR: str | None = None
 
 # number of usable cpus
 NUM_CPUS = len(os.sched_getaffinity(0))
@@ -492,7 +494,7 @@ def generate_stats(dirs):
         json.dump(stats, stats_f)
 
 
-def run_main(args):
+def run_main(args: argparse.Namespace) -> None:
     # TODO
     # - Extract, run configure, and run bear make
     # - Run convert_project.py using the compile_commands.json and path to the
@@ -501,7 +503,13 @@ def run_main(args):
     #   create a cumulative json file for the entire project.
     # - Finally, have a single csv file with summaries for each project
 
-    build_dirs = extract_and_configure_archives(args.input_path)
+    # if we are given a compile_commands.json, we can skip the extraction and
+    # configure steps
+    if not args.compile_commands_path:
+        build_dirs = extract_and_configure_archives(args.input_path)
+    else:
+        build_dirs = [args.src_dir]
+
     convert_project(build_dirs)
     run_tool_on_all(build_dirs)
 
@@ -514,8 +522,7 @@ def run_main(args):
     generate_stats(build_dirs)
 
 
-if __name__ == "__main__":
-
+def _setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         __file__,
         description="Tool that converts the compilation commands into"
@@ -571,6 +578,28 @@ if __name__ == "__main__":
         help="substrings to match in names of the archives",
     )
 
+    parser.add_argument(
+        "-c",
+        "--compile_commands",
+        dest="compile_commands_path",
+        type=str,
+        help="Path to compile_commands.json file",
+    )
+
+    parser.add_argument(
+        "-s",
+        "--src_dir",
+        dest="src_dir",
+        type=str,
+        help="Path to src directory",
+    )
+
+    return parser
+
+
+def _parse_and_validate_arguments(
+    parser: argparse.ArgumentParser,
+) -> argparse.Namespace:
     args = parser.parse_args()
 
     if not args.prog_path or not os.path.isfile(args.prog_path):
@@ -578,7 +607,7 @@ if __name__ == "__main__":
         print("Provided argument: {} is not a file.".format(args.prog_path))
         sys.exit(1)
 
-    if not args.input_path or not os.path.isdir(args.input_path):
+    if args.input_path and not os.path.isdir(args.input_path):
         print("Error: Path to the input archives folder is invalid.")
         print("Provided argument: {} is not a directory.".format(args.input_path))
         sys.exit(1)
@@ -593,10 +622,54 @@ if __name__ == "__main__":
         print("Provided argument: {} is not a file.".format(args.bear_path))
         sys.exit(1)
 
+    if args.compile_commands_path:
+        # if compile commands path is provided, then it should be a json file
+        if not os.path.isfile(args.compile_commands_path):
+            print(
+                "Error: Path to the compile_commands.json file is invalid."
+                "Provided argument: {} is not a file.".format(
+                    args.compile_commands_path
+                )
+            )
+            sys.exit(1)
+        if not args.compile_commands_path.endswith(".json"):
+            print(
+                "Error: Path to the compile_commands.json file is invalid."
+                "Provided argument: {} is not a json file.".format(
+                    args.compile_commands_path
+                )
+            )
+            sys.exit(1)
+
+        # if compile commands path is provided, then src_dir should also be
+        # provided
+        if not args.src_dir or not os.path.isdir(args.src_dir):
+            print("Error: Path to the src directory is invalid.")
+            print("Provided argument: {} is not a directory.".format(args.src_dir))
+            sys.exit(1)
+
+    # either the input path or the compile commands path should be provided
+    if not args.input_path and not args.compile_commands_path:
+        print(
+            "Error: Either the input path or the compile commands path should be provided."
+        )
+        sys.exit(1)
+
+    global BEAR_PATH
     BEAR_PATH = args.bear_path
+    global PROG_PATH
     PROG_PATH = args.prog_path
+    global BENCHMARKS_PATH
     BENCHMARKS_PATH = args.benchmarks_path
+    global NAMES_LIKE
     NAMES_LIKE = args.names_like or []
+    global DEBUG
     DEBUG = args.debug
 
+    return args
+
+
+if __name__ == "__main__":
+    parser = _setup_parser()
+    args = _parse_and_validate_arguments(parser)
     run_main(args)
