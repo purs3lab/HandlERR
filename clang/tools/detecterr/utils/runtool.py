@@ -24,9 +24,13 @@ BENCHMARKS_PATH: str | None = None
 NAMES_LIKE = None
 DEBUG = None
 SRC_DIR: str | None = None
+MODE = None
 
 # number of usable cpus
 NUM_CPUS = len(os.sched_getaffinity(0))
+
+MODE_NORMAL = "normal"
+MODE_FIFUZZ = "fifuzz"
 
 
 def extract_archives(input_path):
@@ -295,9 +299,18 @@ def convert_project(build_dirs):
         if "compile_commands.json" in os.listdir(d):
             print("[+] compile_commands.json found")
             print(f"[+] running {convert_project_bin}")
-            subprocess.check_call(
-                f"{convert_project_bin} -dr -pr {d} -p {PROG_PATH}", shell=True
-            )
+
+            if MODE == MODE_FIFUZZ:
+                subprocess.check_call(
+                    f'{convert_project_bin} -dr -pr {d} -p {PROG_PATH} --extra-3c-arg="--mode=fifuzz"',
+                    shell=True,
+                )
+            else:
+                subprocess.check_call(
+                    f"{convert_project_bin} -dr -pr {d} -p {PROG_PATH}",
+                    shell=True,
+                )
+
         else:
             print("[+] compile_commands.json not found. skipping this one.")
 
@@ -494,7 +507,6 @@ def generate_stats(dirs):
 
 
 def run_main(args: argparse.Namespace) -> None:
-    # TODO
     # - Extract, run configure, and run bear make
     # - Run convert_project.py using the compile_commands.json and path to the
     #   detecterr binary
@@ -584,6 +596,14 @@ def _setup_parser() -> argparse.ArgumentParser:
         help="Path to src directory",
     )
 
+    parser.add_argument(
+        "--mode",
+        dest="mode",
+        type=str,
+        default=MODE_NORMAL,
+        help="Mode to run detecterr in (normal/fifuzz), defaults to normal",
+    )
+
     return parser
 
 
@@ -622,6 +642,20 @@ def _parse_and_validate_arguments(
         print("Error: Either the input path or the src_dir should be provided.")
         sys.exit(1)
 
+    # invalid mode
+    if args.mode and args.mode not in [MODE_NORMAL, MODE_FIFUZZ]:
+        print(
+            f"Error: Mode should be either 'normal' or 'fifuzz', but found {args.mode}"
+        )
+        sys.exit(1)
+
+    # env var rquired for fifuzz mode not set
+    if args.mode == MODE_FIFUZZ and not os.getenv("FUZZERR_FIFUZZ_SRC_LOCATION"):
+        print(
+            f"Error: env var FUZZERR_FIFUZZ_SRC_LOCATION required for fifuzz mode, not set"
+        )
+        sys.exit(1)
+
     global BEAR_PATH
     BEAR_PATH = args.bear_path
     global PROG_PATH
@@ -632,6 +666,8 @@ def _parse_and_validate_arguments(
     NAMES_LIKE = args.names_like or []
     global DEBUG
     DEBUG = args.debug
+    global MODE
+    MODE = args.mode
 
     return args
 

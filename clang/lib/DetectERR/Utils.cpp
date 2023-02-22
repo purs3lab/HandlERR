@@ -153,8 +153,8 @@ bool isLibraryCallExpr(const CallExpr *CE, ASTContext *Context) {
     llvm::errs() << "FUZZERR_FIFUZZ_SRC_LOCATION env var not set\n";
     exit(EXIT_FAILURE);
   }
-  llvm::errs() << "FUZZERR_FIFUZZ_SRC_LOCATION => " << FuzzerrFifuzzSrcLocation
-               << "\n";
+  // llvm::errs() << "FUZZERR_FIFUZZ_SRC_LOCATION => " << FuzzerrFifuzzSrcLocation
+  //              << "\n";
 
   // check if the the file containing the declaration of the called function lies somewhere
   // inside FUZZERR_FIFUZZ_SRC_LOCATION
@@ -167,11 +167,11 @@ bool isLibraryCallExpr(const CallExpr *CE, ASTContext *Context) {
   // llvm::errs() << declSrcLoc << "\n";
 
   if (DeclSrcLoc.find(FuzzerrFifuzzSrcLocation) != std::string::npos) {
-    llvm::errs() << ">>>> not a library function\n";
+    // llvm::errs() << ">>>> not a library function\n";
     return false;
   }
 
-  llvm::errs() << ">>>> library function\n";
+  // llvm::errs() << ">>>> library function\n";
   return true;
 }
 
