@@ -401,7 +401,10 @@ def process_errblocks_for_dir(dir):
             print(f"[+] processing {f_abspath}")
             with open(f_abspath) as err_file:
                 data = json.load(err_file)
-                cumulative_data.extend(data["ErrGuardingConditions"])
+                if "ErrGuardingConditions" in data:
+                    cumulative_data.extend(data["ErrGuardingConditions"])
+                elif "ErrPoints" in data:
+                    cumulative_data.extend(data["ErrPoints"])
 
         # process dirs
         elif os.path.isdir(f_abspath):

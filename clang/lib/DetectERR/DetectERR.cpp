@@ -103,7 +103,8 @@ bool DetectERRInterface::parseASTs() {
 }
 
 void DetectERRInterface::dumpInfo(llvm::raw_ostream &O) {
-  this->PInfo.errCondsToJsonString(O);
+  PInfo.toJsonString(O);
+  // this->PInfo.errCondsToJsonString(O);
 }
 
 std::string modeStr(Mode &Mode) {

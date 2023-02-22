@@ -39,27 +39,26 @@ bool ProjectInfo::addErrorPointStmt(const FuncId &FID, const clang::Stmt *ErrST,
 }
 
 std::string ProjectInfo::fifuzzErrPointsToJsonString() const {
-  // TODO: shank
   std::string RetVal = "{\"ErrPoints\":[";
-  // bool AddComma = false;
-  // for (auto &FC : ErrPoints) {
-  //   if (AddComma) {
-  //     RetVal += ",\n";
-  //   }
-  //   RetVal += "{\"FunctionInfo\":{\"Name\":\"" + FC.first.first +
-  //             "\", \"File\":\"" + FC.first.second + "\"}";
-  //   RetVal += ",\"ErrConditions\":[";
-  //   bool AddComma1 = false;
-  //   for (auto &ED : FC.second) {
-  //     if (AddComma1) {
-  //       RetVal += ",";
-  //     }
-  //     RetVal += ED.toJsonString();
-  //     AddComma1 = true;
-  //   }
-  //   RetVal += "]}";
-  //   AddComma = true;
-  // }
+  bool AddComma = false;
+  for (auto &FC : ErrPoints) {
+    if (AddComma) {
+      RetVal += ",\n";
+    }
+    RetVal += "{\"FunctionInfo\":{\"Name\":\"" + FC.first.first +
+              "\", \"File\":\"" + FC.first.second + "\"}";
+    RetVal += ",\"ErrConditions\":[";
+    bool AddComma1 = false;
+    for (auto &EP : FC.second) {
+      if (AddComma1) {
+        RetVal += ",";
+      }
+      RetVal += EP.toJsonString();
+      AddComma1 = true;
+    }
+    RetVal += "]}";
+    AddComma = true;
+  }
   RetVal += "\n]}";
   return RetVal;
 }
@@ -94,5 +93,18 @@ void ProjectInfo::errCondsToJsonString(llvm::raw_ostream &O) const {
 }
 
 void ProjectInfo::fifuzzErrPointsToJsonString(llvm::raw_ostream &O) const {
-  O << errCondsToJsonString();
+  O << fifuzzErrPointsToJsonString();
+}
+
+void ProjectInfo::toJsonString(llvm::raw_ostream &O) const {
+  if (!ErrGuardingConds.empty()) {
+    llvm::errs() << "ErrGuardingConds not empty, hence converting "
+                    "errguardingconds to json\n";
+    errCondsToJsonString(O);
+
+  } else if (!ErrPoints.empty()) {
+    llvm::errs()
+        << "ErrPoints not empty, hence converting errorpoints to json\n";
+    fifuzzErrPointsToJsonString(O);
+  }
 }

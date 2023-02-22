@@ -4,6 +4,7 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/DetectERR/DetectERRASTConsumer.h"
 #include "clang/DetectERR/ErrGruard.h"
+#include "clang/DetectERR/ErrPoint.h"
 
 using namespace llvm;
 using namespace clang;
@@ -40,10 +41,8 @@ public:
     Info.addErrorGuardingStmt(FID, Check, ErrorST, Context, Heuristic, Level);
   }
 
-  void addErrorPoint(Stmt *CE) {
-    // TODO: shank - does this work?
-    Info.addErrorGuardingStmt(FID, CE, nullptr, Context, Heuristic,
-                              GuardLevel::Default);
+  void addErrorPoint(Stmt *CE, FnReturnType RetType) {
+    Info.addErrorPointStmt(FID, CE, RetType, Context);
   }
 
   // Note - for now we wont be using this function anymore, as

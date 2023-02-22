@@ -9,6 +9,7 @@
 #include "clang/Analysis/CFG.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/DetectERR/ErrGruard.h"
+#include "clang/DetectERR/ErrPoint.h"
 #include "clang/DetectERR/PersistentSourceLoc.h"
 #include <cstdlib>
 
@@ -141,6 +142,18 @@ bool isLastStmtInBB(const Stmt &ST, const CFGBlock &BB) {
   }
 
   return false;
+}
+
+FnReturnType getReturnType(const CallExpr *CE, ASTContext *Context) {
+  auto ReturnType = CE->getCallReturnType(*Context);
+  const auto *UnqualifiedReturnType = ReturnType->getUnqualifiedDesugaredType();
+  if (UnqualifiedReturnType->isAnyPointerType()) {
+    return FnReturnType::POINTER;
+  }
+  if (UnqualifiedReturnType->isIntegerType()) {
+    return FnReturnType::INT;
+  }
+  return FnReturnType::NOT_INTERESTING;
 }
 
 bool isLibraryCallExpr(const CallExpr *CE, ASTContext *Context) {

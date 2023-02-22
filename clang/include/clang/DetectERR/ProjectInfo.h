@@ -43,6 +43,8 @@ public:
 
   void fifuzzErrPointsToJsonString(llvm::raw_ostream &O) const;
 
+    void toJsonString(llvm::raw_ostream &O) const;
+
 private:
   // map of function id and set of error guarding conditions.
   //  std::map<FuncId, std::set<PersistentSourceLoc>> ErrGuardingConds;

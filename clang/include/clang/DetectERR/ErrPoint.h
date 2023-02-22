@@ -17,7 +17,7 @@
 #include "PersistentSourceLoc.h"
 #include <cstdlib>
 
-enum FnReturnType { POINTER, INT };
+enum FnReturnType { POINTER, INT, NOT_INTERESTING };
 std::string fnReturnTypeStr(const FnReturnType &RT);
 
 class ErrPoint {
@@ -33,6 +33,8 @@ public:
     return ErrPtLoc < O.ErrPtLoc ||
            (ErrPtLoc == O.ErrPtLoc && RetType < O.RetType);
   }
+
+    std::string toJsonString() const;
 
 private:
   PersistentSourceLoc ErrPtLoc;

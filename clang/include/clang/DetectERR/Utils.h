@@ -15,6 +15,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/Analysis/Analyses/Dominators.h"
 #include "clang/DetectERR/ErrGruard.h"
+#include "clang/DetectERR/ErrPoint.h"
 // #include "clang/DetectERR/ProjectInfo.h"
 
 using namespace clang;
@@ -59,6 +60,9 @@ bool isUpdatedInPostDominators(const NamedDecl *ND, CFGBlock &CurrBB,
 
 /// Checks if the given statement is the last statement in the given CFGBlock
 bool isLastStmtInBB(const Stmt &ST, const CFGBlock &BB);
+
+/// get the return type of a call expression (pointer or int) for fifuzz mode
+FnReturnType getReturnType(const CallExpr *CE, ASTContext *Context);
 
 /// Checks if the given CallExpr calls a library function
 bool isLibraryCallExpr(const CallExpr *CE, ASTContext *Context);

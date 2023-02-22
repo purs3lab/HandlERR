@@ -13,13 +13,13 @@
 
 /// call to a library function, which returns either a pointer or an integer
 bool FiFuzzVisitor::VisitCallExpr(CallExpr *CE) {
-  CFGBlock *CurBB;
+  // CFGBlock *CurBB;
   if (isLibraryCallExpr(CE, Context)) {
     // TODO: shank
     // add the location for this call to errblocks
-    addErrorPoint(CE);
+    addErrorPoint(CE, getReturnType(CE, Context));
   }
-  CurBB = StMap[CE];
+  // CurBB = StMap[CE];
 
   // if (isEHFCallExpr(CE, *EhfList, Context)) {
   //   if (StMap.find(CE) != StMap.end()) {
