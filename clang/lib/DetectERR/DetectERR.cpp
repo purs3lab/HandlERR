@@ -81,6 +81,7 @@ bool DetectERRInterface::parseASTs() {
 
   if (DErrOptions.Verbose) {
     llvm::errs() << "[>] Parsing ASTs\n";
+    llvm::errs() << "[>] Mode:" << modeStr(DErrOptions.Mode) << "\n";
   }
 
   bool RetVal = false;
@@ -103,4 +104,16 @@ bool DetectERRInterface::parseASTs() {
 
 void DetectERRInterface::dumpInfo(llvm::raw_ostream &O) {
   this->PInfo.errCondsToJsonString(O);
+}
+
+std::string modeStr(Mode &Mode) {
+  switch (Mode) {
+  case Normal:
+    return "Mode(Normal)";
+  case Fifuzz:
+    return "Mode(Fifuzz)";
+  default:
+    llvm::errs() << "unknown mode: " << Mode << '\n';
+    exit(EXIT_FAILURE);
+  }
 }

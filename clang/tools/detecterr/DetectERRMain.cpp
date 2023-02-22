@@ -15,6 +15,7 @@
 #include "clang/Frontend/VerifyDiagnosticConsumer.h"
 #include "clang/Tooling/ArgumentsAdjusters.h"
 #include "clang/Tooling/Tooling.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
 
@@ -30,8 +31,7 @@ static const char *HelpOverview =
 static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 
 static cl::opt<bool> OptVerbose("verbose",
-                                cl::desc("Print verbose "
-                                         "information"),
+                                cl::desc("Print verbose information"),
                                 cl::init(false), cl::cat(DetectERRCategory));
 
 static cl::opt<std::string>
@@ -40,6 +40,12 @@ static cl::opt<std::string>
                            "will be dumped as json"),
                   cl::init("ErrHandlingBlocks.json"),
                   cl::cat(DetectERRCategory));
+
+static cl::opt<Mode>
+    OptMode("mode", cl::desc("Normal or Fifuzz mode"),
+            cl::values(clEnumValN(Mode::Normal, "normal", "normal mode"),
+                       clEnumValN(Mode::Fifuzz, "fifuzz", "fifuzz mode")),
+            cl::init(Mode::Normal), cl::cat(DetectERRCategory));
 
 int main(int argc, const char **argv) {
   struct DetectERROptions DOpt;
@@ -78,6 +84,8 @@ int main(int argc, const char **argv) {
 
   // Verbose flag.
   DOpt.Verbose = OptVerbose;
+  // Mode flag.
+  DOpt.Mode = OptMode;
 
   DetectERRInterface DErrInf(DOpt, OptionsParser.getSourcePathList(),
                              &(OptionsParser.getCompilations()));

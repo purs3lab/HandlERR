@@ -10,6 +10,7 @@
 
 #include "clang/DetectERR/ProjectInfo.h"
 #include "clang/DetectERR/ErrGruard.h"
+#include "clang/DetectERR/ErrPoint.h"
 
 using namespace clang;
 
@@ -24,6 +25,42 @@ bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID,
     ErrGuard EG = ErrGuard::mkErrGuard(GuardL, ErrL, Heuristic, Lvl);
     RetVal = ErrGuardingConds[FID].insert(EG).second;
   }
+  return RetVal;
+}
+
+bool ProjectInfo::addErrorPointStmt(const FuncId &FID, const clang::Stmt *ErrST,
+                                    FnReturnType RetType, ASTContext *C) {
+  bool RetVal = false;
+  PersistentSourceLoc ErrLoc = PersistentSourceLoc::mkPSL(ErrST, *C);
+  ErrPoint *EP = new ErrPoint(ErrLoc, RetType);
+  RetVal = ErrPoints[FID].insert(*EP).second;
+
+  return RetVal;
+}
+
+std::string ProjectInfo::fifuzzErrPointsToJsonString() const {
+  // TODO: shank
+  std::string RetVal = "{\"ErrPoints\":[";
+  // bool AddComma = false;
+  // for (auto &FC : ErrPoints) {
+  //   if (AddComma) {
+  //     RetVal += ",\n";
+  //   }
+  //   RetVal += "{\"FunctionInfo\":{\"Name\":\"" + FC.first.first +
+  //             "\", \"File\":\"" + FC.first.second + "\"}";
+  //   RetVal += ",\"ErrConditions\":[";
+  //   bool AddComma1 = false;
+  //   for (auto &ED : FC.second) {
+  //     if (AddComma1) {
+  //       RetVal += ",";
+  //     }
+  //     RetVal += ED.toJsonString();
+  //     AddComma1 = true;
+  //   }
+  //   RetVal += "]}";
+  //   AddComma = true;
+  // }
+  RetVal += "\n]}";
   return RetVal;
 }
 
@@ -53,5 +90,9 @@ std::string ProjectInfo::errCondsToJsonString() const {
 }
 
 void ProjectInfo::errCondsToJsonString(llvm::raw_ostream &O) const {
+  O << errCondsToJsonString();
+}
+
+void ProjectInfo::fifuzzErrPointsToJsonString(llvm::raw_ostream &O) const {
   O << errCondsToJsonString();
 }

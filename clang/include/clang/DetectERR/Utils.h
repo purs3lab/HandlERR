@@ -60,6 +60,9 @@ bool isUpdatedInPostDominators(const NamedDecl *ND, CFGBlock &CurrBB,
 /// Checks if the given statement is the last statement in the given CFGBlock
 bool isLastStmtInBB(const Stmt &ST, const CFGBlock &BB);
 
+/// Checks if the given CallExpr calls a library function
+bool isLibraryCallExpr(const CallExpr *CE, ASTContext *Context);
+
 /// Checks if the given CallExpr calls an EHF
 bool isEHFCallExpr(const CallExpr *CE, const std::set<std::string> &EHFList,
                    ASTContext *Context);

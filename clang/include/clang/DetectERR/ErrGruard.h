@@ -54,7 +54,10 @@ enum HeuristicID {
   H08,
 
   /// H09 - throwing an exception is control dependent on a check
-  H09
+  H09,
+
+  /// FiFuzz
+  FIFUZZ
 };
 
 /// The level at which the given check occurs (inner/outer)

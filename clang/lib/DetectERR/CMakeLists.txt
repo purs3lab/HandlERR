@@ -6,6 +6,7 @@ add_clang_library(
   DetectERRASTConsumer.cpp
   PersistentSourceLoc.cpp
   ErrGuard.cpp
+  ErrPoint.cpp
   ProjectInfo.cpp
   EHFCollectors.cpp
   Utils.cpp
@@ -13,6 +14,7 @@ add_clang_library(
   EHFCallVisitors.cpp
   GotoVisitors.cpp
   ThrowVisitors.cpp
+  FiFuzzVisitors.cpp
   LINK_LIBS
   clangAST
   clangAnalysis

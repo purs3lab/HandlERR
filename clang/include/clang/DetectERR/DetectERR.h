@@ -17,13 +17,18 @@
 
 #include "clang/DetectERR/ProjectInfo.h"
 #include "clang/Tooling/CommonOptionsParser.h"
+#include <cstdlib>
 #include <mutex>
 
 using namespace clang;
 
+enum Mode { Normal, Fifuzz };
+std::string modeStr(Mode &Mode);
+
 // Future, if we want to pass some options.
 struct DetectERROptions {
   bool Verbose;
+  Mode Mode;
 };
 
 // The main interface exposed by the DetectERR to interact with the tool.

@@ -40,6 +40,12 @@ public:
     Info.addErrorGuardingStmt(FID, Check, ErrorST, Context, Heuristic, Level);
   }
 
+  void addErrorPoint(Stmt *CE) {
+    // TODO: shank - does this work?
+    Info.addErrorGuardingStmt(FID, CE, nullptr, Context, Heuristic,
+                              GuardLevel::Default);
+  }
+
   // Note - for now we wont be using this function anymore, as
   // we are going to focus on the most immediate Control Dependent check only
   void addErrorGuards(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,

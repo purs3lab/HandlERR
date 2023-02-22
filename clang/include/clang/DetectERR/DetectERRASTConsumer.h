@@ -12,6 +12,7 @@
 #define LLVM_CLANG_DETECTERR_DETECTERRASTCONSUMER_H
 
 #include "clang/AST/ASTConsumer.h"
+#include "clang/AST/Decl.h"
 #include "clang/DetectERR/DetectERR.h"
 #include "clang/DetectERR/ProjectInfo.h"
 
@@ -35,6 +36,14 @@ private:
   // on the given function decl.
   void handleNamespaceDecl(ASTContext &C, const NamespaceDecl *ND,
                            const std::set<std::string> &EHFList);
+
+  // does the stuff  in normal mode
+  void normalMode(ASTContext &C, TranslationUnitDecl *TUD);
+
+  // does the stuff in fifuzz mode
+  void fifuzzMode(ASTContext &C, TranslationUnitDecl *TUD);
+  void handleFuncDeclFifuzz(ASTContext &C, const FunctionDecl *FD);
+
   ProjectInfo &Info;
   struct DetectERROptions Opts;
 };

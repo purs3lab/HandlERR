@@ -10,6 +10,7 @@
 #include "clang/Basic/SourceLocation.h"
 #include "clang/DetectERR/ErrGruard.h"
 #include "clang/DetectERR/PersistentSourceLoc.h"
+#include <cstdlib>
 
 using namespace clang;
 
@@ -140,6 +141,38 @@ bool isLastStmtInBB(const Stmt &ST, const CFGBlock &BB) {
   }
 
   return false;
+}
+
+bool isLibraryCallExpr(const CallExpr *CE, ASTContext *Context) {
+  // a library call is when the function being called is declared in a library file
+
+  // check if the FUZZERR_SRC_LOCATION is set
+  const char *FuzzerrFifuzzSrcLocation =
+      std::getenv("FUZZERR_FIFUZZ_SRC_LOCATION");
+  if (!FuzzerrFifuzzSrcLocation) {
+    llvm::errs() << "FUZZERR_FIFUZZ_SRC_LOCATION env var not set\n";
+    exit(EXIT_FAILURE);
+  }
+  llvm::errs() << "FUZZERR_FIFUZZ_SRC_LOCATION => " << FuzzerrFifuzzSrcLocation
+               << "\n";
+
+  // check if the the file containing the declaration of the called function lies somewhere
+  // inside FUZZERR_FIFUZZ_SRC_LOCATION
+  const clang::Decl *CalleeDecl = CE->getCalleeDecl();
+  // calleeDecl->dumpColor();
+  auto CalleeDeclLoc = CalleeDecl->getLocation();
+  // CalleeDeclLoc.dump(Context->getSourceManager());
+  std::string DeclSrcLoc =
+      CalleeDeclLoc.printToString(Context->getSourceManager());
+  // llvm::errs() << declSrcLoc << "\n";
+
+  if (DeclSrcLoc.find(FuzzerrFifuzzSrcLocation) != std::string::npos) {
+    llvm::errs() << ">>>> not a library function\n";
+    return false;
+  }
+
+  llvm::errs() << ">>>> library function\n";
+  return true;
 }
 
 bool isEHFCallExpr(const CallExpr *CE, const std::set<std::string> &EHFList,

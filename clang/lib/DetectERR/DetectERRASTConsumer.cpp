@@ -13,6 +13,7 @@
 #include "clang/Analysis/CFG.h"
 #include "clang/DetectERR/EHFCallVisitors.h"
 #include "clang/DetectERR/EHFCollectors.h"
+#include "clang/DetectERR/FiFuzzVisitors.h"
 #include "clang/DetectERR/GotoVisitors.h"
 #include "clang/DetectERR/ReturnVisitors.h"
 #include "clang/DetectERR/ThrowVisitors.h"
@@ -22,77 +23,16 @@ using namespace llvm;
 using namespace clang;
 
 void DetectERRASTConsumer::HandleTranslationUnit(ASTContext &C) {
+  llvm::errs() << ">>>> inside HandleTranslationUnit\n";
+
   TranslationUnitDecl *TUD = C.getTranslationUnitDecl();
 
-  llvm::errs() << "[>] EHF computation start\n";
+  if (Opts.Mode == Mode::Fifuzz) {
+    fifuzzMode(C, TUD);
 
-  // Fixed point computation for exit functions
-  // populate EHFList with known error functions.
-  std::set<std::string> EHFList;
-  EHFList.insert("exit");
-  EHFList.insert("abort");
-
-  bool is_changed = true;
-  while (is_changed) {
-    unsigned num_exit_func = EHFList.size();
-    for (const auto &D : TUD->decls()) {
-      if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
-        FullSourceLoc FL = C.getFullLoc(FD->getBeginLoc());
-        if (FL.isValid() && FD->hasBody() &&
-            FD->isThisDeclarationADefinition()) {
-          std::string FnName = FD->getNameInfo().getAsString();
-
-          // do we already know that this is a exit function?
-          if (EHFList.find(FnName) != EHFList.end()) {
-            continue;
-          }
-
-          // tmp: @shank
-          // errs() << "Analyzing function: " << FnName << "\n";
-          // FL.dump();
-
-          // check that a source level CFG can actually be built by clang for this function,
-          // else skip it
-          std::unique_ptr<CFG> Cfg =
-              CFG::buildCFG(nullptr, FD->getBody(), &C, CFG::BuildOptions());
-          if (!Cfg.get()) {
-            errs() << "[!] Failed to build CFG for function (will be skipped): "
-                   << FnName << "\n";
-            continue;
-          }
-
-          // cat 1 exit fn?
-          EHFCategoryOneCollector ECVOne(&C, const_cast<FunctionDecl *>(FD),
-                                         EHFList);
-          ECVOne.TraverseDecl(const_cast<FunctionDecl *>(FD));
-
-          // cat 2 exit fn?
-          EHFCategoryTwoCollector ECVTwo(&C, const_cast<FunctionDecl *>(FD),
-                                         EHFList);
-          ECVTwo.TraverseDecl(const_cast<FunctionDecl *>(FD));
-        }
-      }
-    }
-    is_changed = EHFList.size() != num_exit_func;
+  } else {
+    normalMode(C, TUD);
   }
-
-  llvm::errs() << "[>] EHF computation end\n";
-  llvm::errs() << "[>] EFList: \n";
-  for (auto it = EHFList.begin(); it != EHFList.end(); it++) {
-    llvm::errs() << "--- " << *it << "\n";
-  }
-
-  // Iterate through all function declarations.
-  for (const auto &D : TUD->decls()) {
-    if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
-      handleFuncDecl(C, FD, EHFList);
-
-    } else if (const NamespaceDecl *ND = dyn_cast_or_null<NamespaceDecl>(D)) {
-      // useful for c++
-      handleNamespaceDecl(C, ND, EHFList);
-    }
-  }
-  return;
 }
 
 void DetectERRASTConsumer::handleNamespaceDecl(
@@ -105,6 +45,40 @@ void DetectERRASTConsumer::handleNamespaceDecl(
     } else if (const NamespaceDecl *ND = dyn_cast_or_null<NamespaceDecl>(D)) {
       // nested namespace
       handleNamespaceDecl(C, ND, EHFList);
+    }
+  }
+}
+
+void DetectERRASTConsumer::handleFuncDeclFifuzz(ASTContext &C,
+                                                const clang::FunctionDecl *FD) {
+  // TODO
+  FullSourceLoc FL = C.getFullLoc(FD->getBeginLoc());
+  if (FL.isValid() && FD->hasBody() && FD->isThisDeclarationADefinition()) {
+    FuncId FID = getFuncID(FD, &C);
+    if (Opts.Verbose) {
+      llvm::outs() << "[+] Handling function:" << FID.first << "\n";
+      llvm::outs().flush();
+      FL.dump();
+    }
+
+    std::unique_ptr<CFG> Cfg =
+        CFG::buildCFG(nullptr, FD->getBody(), &C, CFG::BuildOptions());
+    if (!Cfg.get()) {
+      errs() << "[!] Failed to build CFG for function (will be skipped): "
+             << FID.first << "\n";
+      return;
+    }
+
+    FiFuzzVisitor EHFCV(&C, Info, const_cast<FunctionDecl *>(FD), FID);
+    if (Opts.Verbose) {
+      llvm::outs() << "[+] Running FiFuzz Visitor.\n";
+      llvm::outs().flush();
+    }
+    EHFCV.TraverseDecl(const_cast<FunctionDecl *>(FD));
+
+    if (Opts.Verbose) {
+      llvm::outs() << "[+] Finished handling function:" << FID.first << "\n";
+      llvm::outs().flush();
     }
   }
 }
@@ -189,7 +163,7 @@ void DetectERRASTConsumer::handleFuncDecl(
     }
     GV.TraverseDecl(const_cast<FunctionDecl *>(FD));
 
-    // EHF Call Visitor
+    // Throw Visitor
     ThrowVisitor TV(&C, Info, const_cast<FunctionDecl *>(FD), FID);
     if (Opts.Verbose) {
       llvm::outs() << "[+] Running ThrowVisitor call handler.\n";
@@ -201,5 +175,86 @@ void DetectERRASTConsumer::handleFuncDecl(
       llvm::outs() << "[+] Finished handling function:" << FID.first << "\n";
       llvm::outs().flush();
     }
+  }
+}
+
+void DetectERRASTConsumer::normalMode(ASTContext &C, TranslationUnitDecl *TUD) {
+  // Normal Mode
+  llvm::errs() << "[>] EHF computation start\n";
+
+  // Fixed point computation for exit functions
+  // populate EHFList with known error functions.
+  std::set<std::string> EHFList;
+  EHFList.insert("exit");
+  EHFList.insert("abort");
+
+  bool is_changed = true;
+  while (is_changed) {
+    unsigned num_exit_func = EHFList.size();
+    for (const auto &D : TUD->decls()) {
+      if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
+        FullSourceLoc FL = C.getFullLoc(FD->getBeginLoc());
+        if (FL.isValid() && FD->hasBody() &&
+            FD->isThisDeclarationADefinition()) {
+          std::string FnName = FD->getNameInfo().getAsString();
+
+          // do we already know that this is a exit function?
+          if (EHFList.find(FnName) != EHFList.end()) {
+            continue;
+          }
+
+          // tmp: @shank
+          // errs() << "Analyzing function: " << FnName << "\n";
+          // FL.dump();
+
+          // check that a source level CFG can actually be built by clang for this function,
+          // else skip it
+          std::unique_ptr<CFG> Cfg =
+              CFG::buildCFG(nullptr, FD->getBody(), &C, CFG::BuildOptions());
+          if (!Cfg.get()) {
+            errs() << "[!] Failed to build CFG for function (will be skipped): "
+                   << FnName << "\n";
+            continue;
+          }
+
+          // cat 1 exit fn?
+          EHFCategoryOneCollector ECVOne(&C, const_cast<FunctionDecl *>(FD),
+                                         EHFList);
+          ECVOne.TraverseDecl(const_cast<FunctionDecl *>(FD));
+
+          // cat 2 exit fn?
+          EHFCategoryTwoCollector ECVTwo(&C, const_cast<FunctionDecl *>(FD),
+                                         EHFList);
+          ECVTwo.TraverseDecl(const_cast<FunctionDecl *>(FD));
+        }
+      }
+    }
+    is_changed = EHFList.size() != num_exit_func;
+  }
+
+  llvm::errs() << "[>] EHF computation end\n";
+  llvm::errs() << "[>] EFList: \n";
+  for (auto it = EHFList.begin(); it != EHFList.end(); it++) {
+    llvm::errs() << "--- " << *it << "\n";
+  }
+
+  // Iterate through all function declarations.
+  for (const auto &D : TUD->decls()) {
+    if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
+      handleFuncDecl(C, FD, EHFList);
+
+    } else if (const NamespaceDecl *ND = dyn_cast_or_null<NamespaceDecl>(D)) {
+      // useful for c++
+      handleNamespaceDecl(C, ND, EHFList);
+    }
+  }
+}
+
+void DetectERRASTConsumer::fifuzzMode(ASTContext &C, TranslationUnitDecl *TUD) {
+  for (const auto &D : TUD->decls()) {
+    if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
+      handleFuncDeclFifuzz(C, FD);
+    }
+    // We do nothing for C++, as Fifuzz doesnt handle it either
   }
 }
