@@ -399,12 +399,13 @@ def process_errblocks_for_dir(dir):
             and f != "__project.errblocks.json"
         ):
             print(f"[+] processing {f_abspath}")
-            with open(f_abspath) as err_file:
-                data = json.load(err_file)
-                if "ErrGuardingConditions" in data:
-                    cumulative_data.extend(data["ErrGuardingConditions"])
-                elif "ErrPoints" in data:
-                    cumulative_data.extend(data["ErrPoints"])
+            if os.path.getsize(f_abspath) > 0:
+                with open(f_abspath) as err_file:
+                    data = json.load(err_file)
+                    if "ErrGuardingConditions" in data:
+                        cumulative_data.extend(data["ErrGuardingConditions"])
+                    elif "ErrPoints" in data:
+                        cumulative_data.extend(data["ErrPoints"])
 
         # process dirs
         elif os.path.isdir(f_abspath):
