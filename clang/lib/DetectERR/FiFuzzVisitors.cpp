@@ -9,17 +9,23 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/DetectERR/FiFuzzVisitors.h"
+#include "clang/DetectERR/ErrPoint.h"
 #include "clang/DetectERR/Utils.h"
 
 /// call to a library function, which returns either a pointer or an integer
 bool FiFuzzVisitor::VisitCallExpr(CallExpr *CE) {
   // CFGBlock *CurBB;
   if (isLibraryCallExpr(CE, Context)) {
-    // TODO: shank
-    // add the location for this call to errblocks
-    addErrorPoint(CE, getReturnType(CE, Context));
+    FnReturnType RetType = getReturnType(CE, Context);
+    if (RetType == POINTER || RetType == INT) {
+      // add the location for this call to errblocks
+      llvm::errs() << ">>>> adding error point with return type: "
+                   << fnReturnTypeStr(RetType) << "\n";
+      CE->dumpPretty(*Context);
+      llvm::errs() << "\n";
+      addErrorPoint(CE, getReturnType(CE, Context));
+    }
   }
-  // CurBB = StMap[CE];
 
   // if (isEHFCallExpr(CE, *EhfList, Context)) {
   //   if (StMap.find(CE) != StMap.end()) {

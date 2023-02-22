@@ -1,6 +1,6 @@
 #include "clang/DetectERR/ErrPoint.h"
 
-std::string FnReturnTypeStr(FnReturnType &RT) {
+std::string fnReturnTypeStr(const FnReturnType &RT) {
   switch (RT) {
   case POINTER:
     return "Pointer";
