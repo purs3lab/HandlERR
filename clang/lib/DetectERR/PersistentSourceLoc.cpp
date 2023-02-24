@@ -35,14 +35,18 @@ PersistentSourceLoc PersistentSourceLoc::mkPSL(clang::SourceRange SR,
                                                SourceLocation SL,
                                                const ASTContext &Context) {
   const SourceManager &SM = Context.getSourceManager();
+  // SR.dump(SM);
   PresumedLoc PL = SM.getPresumedLoc(SL);
+  // llvm::errs() << "PL.getColumn(): " << PL.getColumn() << "\n";
 
   // If there is no PresumedLoc, create a nullary PersistentSourceLoc.
   if (!PL.isValid())
     return PersistentSourceLoc();
 
   SourceLocation ESL = SM.getExpansionLoc(SL);
+  // ESL.dump(SM);
   FullSourceLoc FESL = Context.getFullLoc(ESL);
+  // FESL.dump();
 
   assert(FESL.isValid());
   // Get End location, if exists.

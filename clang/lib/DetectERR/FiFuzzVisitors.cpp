@@ -21,9 +21,11 @@ bool FiFuzzVisitor::VisitCallExpr(CallExpr *CE) {
       // add the location for this call to errblocks
       llvm::errs() << ">>>> adding error point with return type: "
                    << fnReturnTypeStr(RetType) << "\n";
-      CE->dumpPretty(*Context);
-      llvm::errs() << "\n";
-      addErrorPoint(CE, getReturnType(CE, Context));
+      // CE->dumpPretty(*Context);
+      // llvm::errs() << "\n";
+      // CE->dumpColor();
+      // llvm::errs() << "\n";
+      addErrorPoint(CE, RetType);
     }
   }
 
