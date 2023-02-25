@@ -166,8 +166,11 @@ bool isLibraryCallExpr(const CallExpr *CE, ASTContext *Context) {
     llvm::errs() << "FUZZERR_FIFUZZ_SRC_LOCATION env var not set\n";
     exit(EXIT_FAILURE);
   }
-  // llvm::errs() << "FUZZERR_FIFUZZ_SRC_LOCATION => " << FuzzerrFifuzzSrcLocation
-  //              << "\n";
+  char *real_path = realpath(FuzzerrFifuzzSrcLocation, NULL);
+  std::string FifuzzSrcLocation(real_path);
+  free(real_path);
+  llvm::errs() << "FUZZERR_FIFUZZ_SRC_LOCATION => " << FifuzzSrcLocation
+               << "\n";
 
   // check if the the file containing the declaration of the called function lies somewhere
   // inside FUZZERR_FIFUZZ_SRC_LOCATION
@@ -177,9 +180,14 @@ bool isLibraryCallExpr(const CallExpr *CE, ASTContext *Context) {
   // CalleeDeclLoc.dump(Context->getSourceManager());
   std::string DeclSrcLoc =
       CalleeDeclLoc.printToString(Context->getSourceManager());
-  // llvm::errs() << declSrcLoc << "\n";
 
-  if (DeclSrcLoc.find(FuzzerrFifuzzSrcLocation) != std::string::npos) {
+  // we consider all relative paths as not belonging to library
+  llvm::errs() << "DeclSrcLocl: " << DeclSrcLoc << "\n";
+  if (DeclSrcLoc.find("..") != std::string::npos) {
+    return false;
+  }
+
+  if (DeclSrcLoc.find(FifuzzSrcLocation) != std::string::npos) {
     // llvm::errs() << ">>>> not a library function\n";
     return false;
   }
