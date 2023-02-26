@@ -365,6 +365,10 @@ def run_tool_on_all(dirs):
                 else:
                     curr += line.rstrip("\\")
 
+        # the last line..
+        if curr:
+            cmds.append(curr)
+
         pool.imap(process, cmds)
         pool.close()
         pool.join()
