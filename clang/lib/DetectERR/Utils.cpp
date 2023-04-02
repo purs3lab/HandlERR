@@ -331,8 +331,10 @@ std::pair<Stmt *, GuardLevel> getImmediateControlDependentCheck(
   }
 
   GuardLevel Lvl = GuardLevel::Default;
-  SourceRange CurrSR = Checks[0].first->getSourceRange();
-  SourceRange ErrorSTSR = ErrorST->getSourceRange();
+    CharSourceRange CurrER = SM.getExpansionRange(Checks[0].first->getSourceRange());
+    CharSourceRange ErrorSTER = SM.getExpansionRange(ErrorST->getSourceRange());
+    SourceRange CurrSR = CurrER.getAsRange();
+    SourceRange ErrorSTSR = ErrorSTER.getAsRange();
   if (CurrSR.fullyContains(ErrorSTSR)) {
     Lvl = GuardLevel::Inner;
   }
