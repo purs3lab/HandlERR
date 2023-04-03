@@ -186,6 +186,10 @@ def configure_and_bear_make_single(path, build_inst=None):
                     cwd=path,
                 )
 
+            elif "ssl" in path:
+                # do nothing for this part, handled below
+                pass
+
             else:
                 # normal libraries, just do ./configure
                 subprocess.check_call(
@@ -220,7 +224,7 @@ def configure_and_bear_make_single(path, build_inst=None):
             )
 
         # openssl -> Configure
-        if "ssl" in path:
+        if "ssl" in path and "apimu4c" not in path:
             print("[+] working with openssl")
             subprocess.check_call(
                 "CC=clang CXX=clang++ ./Configure --debug",
@@ -228,9 +232,18 @@ def configure_and_bear_make_single(path, build_inst=None):
                 cwd=path,
             )
 
+        # openssl apimu4c
+        if "ssl" in path and "apimu4c" in path:
+            print("[+] working with openssl (apimu4c)")
+            subprocess.check_call(
+                'CC=clang CFLAGS="-g -O0" ./config -d -v --prefix=$(pwd)/installed',
+                shell=True,
+                cwd=path,
+            )
+
     # bear make
     print("[+] running bear make...")
-    subprocess.check_call(f"{BEAR_PATH} make -j{NUM_CPUS}", shell=True, cwd=path)
+    subprocess.check_call(f"make clean && {BEAR_PATH} make -j{NUM_CPUS}", shell=True, cwd=path)
     print("[+] bear make done")
 
 
