@@ -94,11 +94,11 @@ def configure_and_bear_make_single(path, build_inst=None):
     If build_inst is not None, then the steps mentioned in the build_inst file
     are executed before doing 'configure' and 'make'.
     """
-    print(f"running configure_and_bear_make_single on {path}")
+    print(f">> running configure_and_bear_make_single on {path}")
 
     # libboost, the wierd one...
     if "boost" in path:
-        print("libboost detected, doing the special instructions...")
+        print(">> libboost detected, doing the special instructions...")
         # bootstrap
         subprocess.check_call(
             ("./bootstrap.sh --with-toolset=clang --with-libraries=filesystem "),
@@ -115,7 +115,7 @@ def configure_and_bear_make_single(path, build_inst=None):
 
     # custom build_inst
     if build_inst:
-        print(f"running custom build_inst first")
+        print(f">> running custom build_inst first")
         with open(build_inst) as inst_f:
             # execute one instruction at a time
             for line in inst_f.readlines():
@@ -150,7 +150,7 @@ def configure_and_bear_make_single(path, build_inst=None):
                 subprocess.check_call(f"mkdir -p ../build", shell=True, cwd=path)
                 configure_path = os.path.join(path, "configure")
                 path = os.path.join(path, "../build")
-                print(f"path: {path}")
+                print(f">> path: {path}")
                 subprocess.check_call(
                     f"CC=gcc CXX=g++ {configure_path} --prefix=/tmp/glibc",
                     shell=True,
@@ -223,8 +223,17 @@ def configure_and_bear_make_single(path, build_inst=None):
                 cwd=path,
             )
 
+        # openssl
+        if "openssl-1-1-pre8_patched_cmdline" in path:
+            print("[+] working with openssl_1_1_pre8_patched_cmdline")
+            subprocess.check_call(
+                "CC=clang CXX=clang++ ./config --debug -v no-idea no-asm no-threads --prefix=$(pwd)/installed",
+                shell=True,
+                cwd=path,
+            )
+
         # openssl -> Configure
-        if "ssl" in path and "apimu4c" not in path:
+        elif "ssl" in path and "apimu4c" not in path:
             print("[+] working with openssl")
             subprocess.check_call(
                 "CC=clang CXX=clang++ ./Configure --debug",
@@ -233,7 +242,7 @@ def configure_and_bear_make_single(path, build_inst=None):
             )
 
         # openssl apimu4c
-        if "ssl" in path and "apimu4c" in path:
+        elif "ssl" in path and "apimu4c" in path:
             print("[+] working with openssl (apimu4c)")
             subprocess.check_call(
                 'CC=clang CFLAGS="-g -O0" ./config -d -v --prefix=$(pwd)/installed',
@@ -243,7 +252,9 @@ def configure_and_bear_make_single(path, build_inst=None):
 
     # bear make
     print("[+] running bear make...")
-    subprocess.check_call(f"make clean && {BEAR_PATH} make -j{NUM_CPUS}", shell=True, cwd=path)
+    subprocess.check_call(
+        f"make clean && {BEAR_PATH} make -j{NUM_CPUS}", shell=True, cwd=path
+    )
     print("[+] bear make done")
 
 
