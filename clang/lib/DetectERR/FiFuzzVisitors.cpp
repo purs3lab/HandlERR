@@ -19,12 +19,12 @@ bool FiFuzzVisitor::VisitCallExpr(CallExpr *CE) {
     FnReturnType RetType = getReturnType(CE, Context);
     if (RetType == POINTER || RetType == INT) {
       // add the location for this call to errblocks
-      llvm::errs() << ">>>> adding error point with return type: "
-                   << fnReturnTypeStr(RetType) << "\n";
-      CE->dumpPretty(*Context);
-      llvm::errs() << "\n";
-      CE->dumpColor();
-      llvm::errs() << "\n";
+      // llvm::errs() << ">>>> adding error point with return type: "
+      //              << fnReturnTypeStr(RetType) << "\n";
+      // CE->dumpPretty(*Context);
+      // llvm::errs() << "\n";
+      // CE->dumpColor();
+      // llvm::errs() << "\n";
       addErrorPoint(CE, RetType);
     }
   }
