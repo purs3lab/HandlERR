@@ -21,6 +21,17 @@ bool EHFCallVisitor::VisitCallExpr(CallExpr *CE) {
       CurBB = StMap[CE];
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
       collectChecks(Checks, *CurBB, &CDG);
+
+      // if the immediate control dependent check is using params, skip this
+      // and return
+      if(!Checks.empty()){
+        auto [check, level] = getImmediateControlDependentCheck(
+            Checks, CE, &CDG, Context->getSourceManager());
+        if (isCheckUsingParams(check, *FnDecl)){
+          return true;
+        }
+      }
+
       removeChecksUsingParams(Checks, *FnDecl);
       if (!Checks.empty()) {
         // sortIntoInnerAndOuterChecks(Checks, &CDG, Context->getSourceManager());

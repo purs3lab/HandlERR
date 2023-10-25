@@ -110,6 +110,9 @@ void removeInnerCheckUsingParams(
     std::vector<std::pair<Stmt *, CFGBlock *>> &Checks, Stmt *ErrorST,
     FunctionDecl &FD, SourceManager &SM);
 
+/// see if this check statement using any of the params to the function
+bool isCheckUsingParams(Stmt *CheckST, FunctionDecl &FD);
+
 /// remove all checks that are using params to the function
 void removeChecksUsingParams(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
                              FunctionDecl &FD);
