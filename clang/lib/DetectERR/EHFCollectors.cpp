@@ -109,12 +109,12 @@ bool EHFCategoryTwoCollector::VisitFunctionDecl(FunctionDecl *FD) {
   if (FnName.find("err") != std::string::npos) {
     llvm::errs() << "adding function '" << FD->getNameInfo().getAsString()
                  << "' to EHFList_ as Cat-II\n";
-    EHFList_->insert(FnDecl->getNameInfo().getAsString());
+    EHFList_->insert(FD->getNameInfo().getAsString());
     return true;
   }
 
   /// 2. return type is void
-  bool isVoidReturn = FnDecl->getReturnType()->isVoidType();
+  bool isVoidReturn = FD->getReturnType()->isVoidType();
 
   /// 3. writes to stderr that is not control dependent on anything
   // there are many functions that write to stderr:
@@ -206,7 +206,7 @@ bool EHFCategoryTwoCollector::VisitFunctionDecl(FunctionDecl *FD) {
   if (isVoidReturn && isIndependentWriteToStderr && isShortFunction) {
     llvm::errs() << "adding function '" << FD->getNameInfo().getAsString()
                  << "' to EHFList_ as Cat-II\n";
-    EHFList_->insert(FnDecl->getNameInfo().getAsString());
+    EHFList_->insert(FD->getNameInfo().getAsString());
   }
 
   return true;
