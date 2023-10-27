@@ -21,6 +21,14 @@ bool GotoVisitor::VisitGotoStmt(GotoStmt *GotoST) {
       if (!Checks.empty()) {
         auto [check, level] = getImmediateControlDependentCheck(
             Checks, GotoST, &CDG, Context->getSourceManager());
+        if (isMacroExpanded(check)) {
+          llvm::errs() << ">>>> Skipping macro expansion (check)\n";
+          llvm::errs() << ">>>> "
+                       << check->getBeginLoc().printToString(
+                              Context->getSourceManager())
+                       << "\n";
+          return true;
+        }
         addErrorGuard(check, GotoST, level);
       }
     }

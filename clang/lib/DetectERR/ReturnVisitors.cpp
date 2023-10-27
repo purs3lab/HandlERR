@@ -35,6 +35,14 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
           // addErrorGuards(Checks, ReturnST);
           auto [check, level] = getImmediateControlDependentCheck(
               Checks, ReturnST, &CDG, Context->getSourceManager());
+          if (isMacroExpanded(check)) {
+            llvm::errs() << ">>>> Skipping macro expansion (check)\n";
+            llvm::errs() << ">>>> "
+                         << check->getBeginLoc().printToString(
+                                Context->getSourceManager())
+                         << "\n";
+            return true;
+          }
           addErrorGuard(check, ReturnST, level);
         }
       }
@@ -79,6 +87,15 @@ bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
         if (!Checks.empty()) {
           auto [check, level] = getImmediateControlDependentCheck(
               Checks, ReturnST, &CDG, Context->getSourceManager());
+          if (isMacroExpanded(check)) {
+            llvm::errs() << ">>>> Skipping macro expansion (check)\n";
+            llvm::errs() << ">>>> "
+                         << check->getBeginLoc().printToString(
+                                Context->getSourceManager())
+                         << "\n";
+            return true;
+          }
+
           addErrorGuard(check, ReturnST, level);
         }
       }
@@ -108,6 +125,14 @@ bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
       if (!Checks.empty()) {
         auto [check, level] = getImmediateControlDependentCheck(
             Checks, ReturnST, &CDG, Context->getSourceManager());
+        if (isMacroExpanded(check)) {
+          llvm::errs() << ">>>> Skipping macro expansion (check)\n";
+          llvm::errs() << ">>>> "
+                       << check->getBeginLoc().printToString(
+                              Context->getSourceManager())
+                       << "\n";
+          return true;
+        }
         addErrorGuard(check, ReturnST, level);
       }
     }
@@ -282,6 +307,14 @@ bool ReturnEarlyVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
       if (!Checks.empty()) {
         auto [check, level] = getImmediateControlDependentCheck(
             Checks, ReturnST, &CDG, Context->getSourceManager());
+        if (isMacroExpanded(check)) {
+          llvm::errs() << ">>>> Skipping macro expansion (check)\n";
+          llvm::errs() << ">>>> "
+                       << check->getBeginLoc().printToString(
+                              Context->getSourceManager())
+                       << "\n";
+          return true;
+        }
         addErrorGuard(check, ReturnST, level);
       }
     }

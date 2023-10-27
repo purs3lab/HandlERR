@@ -10,6 +10,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/DetectERR/EHFCallVisitors.h"
+#include "clang/AST/Stmt.h"
+#include "clang/Basic/SourceLocation.h"
 #include "clang/DetectERR/Utils.h"
 
 /// H03 - call to an exit function is control dependent on one or more
@@ -17,6 +19,16 @@
 bool EHFCallVisitor::VisitCallExpr(CallExpr *CE) {
   CFGBlock *CurBB;
   if (isEHFCallExpr(CE, *EhfList, Context)) {
+    // if the error marker is result of macro expansion, skip it
+    if (isMacroExpanded(CE)) {
+      llvm::errs() << ">>>> Skipping macro expansion\n";
+      llvm::errs() << ">>>> "
+                   << CE->getExprLoc().printToString(
+                          Context->getSourceManager())
+                   << "\n";
+      return true;
+    }
+
     if (StMap.find(CE) != StMap.end()) {
       CurBB = StMap[CE];
       std::vector<std::pair<Stmt *, CFGBlock *>> Checks;
@@ -24,10 +36,10 @@ bool EHFCallVisitor::VisitCallExpr(CallExpr *CE) {
 
       // if the immediate control dependent check is using params, skip this
       // and return
-      if(!Checks.empty()){
+      if (!Checks.empty()) {
         auto [check, level] = getImmediateControlDependentCheck(
             Checks, CE, &CDG, Context->getSourceManager());
-        if (isCheckUsingParams(check, *FnDecl)){
+        if (isCheckUsingParams(check, *FnDecl)) {
           return true;
         }
       }
@@ -38,6 +50,16 @@ bool EHFCallVisitor::VisitCallExpr(CallExpr *CE) {
         // addErrorGuards(Checks, CE);
         auto [check, level] = getImmediateControlDependentCheck(
             Checks, CE, &CDG, Context->getSourceManager());
+
+        if(isMacroExpanded(check)) {
+          llvm::errs() << ">>>> Skipping macro expansion (check)\n";
+          llvm::errs() << ">>>> "
+                       << check->getBeginLoc().printToString(
+                              Context->getSourceManager())
+                       << "\n";
+          return true;
+        }
+
         addErrorGuard(check, CE, level);
       }
     }

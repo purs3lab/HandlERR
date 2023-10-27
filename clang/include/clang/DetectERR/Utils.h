@@ -117,4 +117,8 @@ bool isCheckUsingParams(Stmt *CheckST, FunctionDecl &FD);
 void removeChecksUsingParams(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
                              FunctionDecl &FD);
 
+/// check if given location is due to a macro expansion
+bool isMacroExpanded(Expr *Exp);
+bool isMacroExpanded(Stmt *St);
+
 #endif //LLVM_CLANG_DETECTERR_UTILS_H

@@ -331,10 +331,11 @@ std::pair<Stmt *, GuardLevel> getImmediateControlDependentCheck(
   }
 
   GuardLevel Lvl = GuardLevel::Default;
-    CharSourceRange CurrER = SM.getExpansionRange(Checks[0].first->getSourceRange());
-    CharSourceRange ErrorSTER = SM.getExpansionRange(ErrorST->getSourceRange());
-    SourceRange CurrSR = CurrER.getAsRange();
-    SourceRange ErrorSTSR = ErrorSTER.getAsRange();
+  CharSourceRange CurrER =
+      SM.getExpansionRange(Checks[0].first->getSourceRange());
+  CharSourceRange ErrorSTER = SM.getExpansionRange(ErrorST->getSourceRange());
+  SourceRange CurrSR = CurrER.getAsRange();
+  SourceRange ErrorSTSR = ErrorSTER.getAsRange();
   if (CurrSR.fullyContains(ErrorSTSR)) {
     Lvl = GuardLevel::Inner;
   }
@@ -527,21 +528,22 @@ void removeInnerCheckUsingParams(
 }
 
 /// see if this check statement using any of the params to the function
-bool isCheckUsingParams(Stmt *CheckST, FunctionDecl &FD){
+bool isCheckUsingParams(Stmt *CheckST, FunctionDecl &FD) {
   // 1. get the values used by the condition of this check
   Expr *Cond = getCondFromCheckStmt(CheckST);
   std::vector<const Decl *> CondValueDecls = getCondValueDecls(Cond);
 
   // 2. get fn params
-  for (auto *ParamIter = FD.param_begin(); ParamIter != FD.param_end(); ParamIter++) {
-      // 3. check if the check depends on any of the params
-      for (auto CondValIter = CondValueDecls.begin();
-           CondValIter != CondValueDecls.end(); CondValIter++) {
+  for (auto *ParamIter = FD.param_begin(); ParamIter != FD.param_end();
+       ParamIter++) {
+    // 3. check if the check depends on any of the params
+    for (auto CondValIter = CondValueDecls.begin();
+         CondValIter != CondValueDecls.end(); CondValIter++) {
 
-        if (*ParamIter == *CondValIter) {
-          return true;
-        }
+      if (*ParamIter == *CondValIter) {
+        return true;
       }
+    }
   }
 
   return false;
@@ -552,38 +554,14 @@ void removeChecksUsingParams(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
                              FunctionDecl &FD) {
   auto ChecksIter = Checks.begin();
   while (ChecksIter != Checks.end()) {
-    if (isCheckUsingParams(ChecksIter->first, FD)){
+    if (isCheckUsingParams(ChecksIter->first, FD)) {
       ChecksIter = Checks.erase(ChecksIter);
     } else {
       ChecksIter++;
     }
-
-  //   bool checkDeleted = false;
-  //
-  //   // 1. get the values used by the condition of this check
-  //   Expr *Cond = getCondFromCheckStmt(ChecksIter->first);
-  //   std::vector<const Decl *> CondValueDecls = getCondValueDecls(Cond);
-  //
-  //   // 2. get fn params
-  //   for (auto *ParamIter = FD.param_begin(); ParamIter != FD.param_end();
-  //        ParamIter++) {
-  //
-  //     // 3. check if the check depends on any of the params
-  //     for (auto CondValIter = CondValueDecls.begin();
-  //          CondValIter != CondValueDecls.end(); CondValIter++) {
-  //
-  //       if (*ParamIter == *CondValIter) {
-  //         // 4. if so, remove it from the vector
-  //         ChecksIter = Checks.erase(ChecksIter);
-  //         checkDeleted = true;
-  //         goto cont;
-  //       }
-  //     }
-  //   }
-  //
-  // // label to continue after deleting a check
-  // cont:
-  //   if (!checkDeleted)
-  //     ChecksIter++;
   }
 }
+
+/// check if given location is due to a macro expansion
+bool isMacroExpanded(Expr *Exp) { return Exp->getExprLoc().isMacroID(); }
+bool isMacroExpanded(Stmt *St) { return St->getBeginLoc().isMacroID() || St->getEndLoc().isMacroID(); }
