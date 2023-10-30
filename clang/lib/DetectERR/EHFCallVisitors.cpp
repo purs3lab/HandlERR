@@ -60,7 +60,9 @@ bool EHFCallVisitor::VisitCallExpr(CallExpr *CE) {
           return true;
         }
 
-        addErrorGuard(check, CE, level);
+        uint32_t ErrBBL = getFirstLineNo(CurBB, Context);
+        // addErrorGuard(check, CE, level);
+        addErrorGuard(check, CE, level, ErrBBL);
       }
     }
   }

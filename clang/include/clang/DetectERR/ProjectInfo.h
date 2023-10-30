@@ -30,6 +30,10 @@ public:
                             const clang::Stmt *ErrST, ASTContext *C,
                             HeuristicID Heuristic, GuardLevel Lvl);
 
+  bool addErrorGuardingStmt(const FuncId &FID, const clang::Stmt *GuardST,
+                            const clang::Stmt *ErrST, ASTContext *C,
+                            HeuristicID Heuristic, GuardLevel Lvl, uint32_t ErrBBL);
+
   bool addErrorPointStmt(const FuncId &FID, const clang::Stmt *ErrST,
                          FnReturnType RetType, ASTContext *C);
 

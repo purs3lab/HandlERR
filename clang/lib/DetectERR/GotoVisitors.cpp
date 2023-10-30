@@ -29,7 +29,9 @@ bool GotoVisitor::VisitGotoStmt(GotoStmt *GotoST) {
                        << "\n";
           return true;
         }
-        addErrorGuard(check, GotoST, level);
+        uint32_t ErrBBL = getFirstLineNo(CurBB, Context);
+        addErrorGuard(check, GotoST, level, ErrBBL);
+        // addErrorGuard(check, GotoST, level);
       }
     }
   }

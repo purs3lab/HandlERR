@@ -1,4 +1,5 @@
 #include "clang/DetectERR/ErrGruard.h"
+#include <string>
 
 std::map<GuardLevel, std::string> ErrGuard::GuardLevelLabel = {
     {GuardLevel::Inner, "Inner"},
@@ -37,6 +38,6 @@ std::string ErrGuard::toJsonString() const {
          "\", \"LineNo\":" + std::to_string(GuardLoc.getLineNo()) +
          ", \"ColNo\":" + std::to_string(GuardLoc.getColSNo()) +
          ", \"Heuristic\":\"" + HeuristicLabel[HID] + "\"" + ", \"Level\":\"" +
-         GuardLevelLabel[Level] + "\", \"ErrorLoc\":" + ErrLoc.toJsonString() +
+         GuardLevelLabel[Level] + "\", \"ErrorBBFirstLineNo\": " + std::to_string(ErrorBBFirstLineNo) + ", \"ErrorLoc\":" + ErrLoc.toJsonString() +
          "}";
 }

@@ -41,6 +41,10 @@ public:
     Info.addErrorGuardingStmt(FID, Check, ErrorST, Context, Heuristic, Level);
   }
 
+  void addErrorGuard(Stmt *Check, Stmt *ErrorST, GuardLevel Level, uint32_t ErrBBL) {
+    Info.addErrorGuardingStmt(FID, Check, ErrorST, Context, Heuristic, Level, ErrBBL);
+  }
+
   void addErrorPoint(Stmt *CE, FnReturnType RetType) {
     Info.addErrorPointStmt(FID, CE, RetType, Context);
   }

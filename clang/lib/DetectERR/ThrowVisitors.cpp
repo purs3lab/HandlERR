@@ -34,7 +34,9 @@ bool ThrowVisitor::VisitCXXThrowExpr(CXXThrowExpr *TE) {
                      << "\n";
         return true;
       }
-      addErrorGuard(check, TE, level);
+      uint32_t ErrBBL = getFirstLineNo(CurBB, Context);
+      // addErrorGuard(check, TE, level);
+      addErrorGuard(check, TE, level, ErrBBL);
     }
   }
   return true;

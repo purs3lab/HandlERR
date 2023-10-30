@@ -11,6 +11,7 @@
 #include "clang/DetectERR/ProjectInfo.h"
 #include "clang/DetectERR/ErrGruard.h"
 #include "clang/DetectERR/ErrPoint.h"
+#include <cstdint>
 
 using namespace clang;
 
@@ -23,6 +24,20 @@ bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID,
   PersistentSourceLoc ErrL = PersistentSourceLoc::mkPSL(ErrST, *C);
   if (GuardL.valid()) {
     ErrGuard EG = ErrGuard::mkErrGuard(GuardL, ErrL, Heuristic, Lvl);
+    RetVal = ErrGuardingConds[FID].insert(EG).second;
+  }
+  return RetVal;
+}
+
+bool ProjectInfo::addErrorGuardingStmt(const FuncId &FID,
+                                       const clang::Stmt *GuardST,
+                                       const clang::Stmt *ErrST, ASTContext *C,
+                                       HeuristicID Heuristic, GuardLevel Lvl, uint32_t ErrBBL) {
+  bool RetVal = false;
+  PersistentSourceLoc GuardL = PersistentSourceLoc::mkPSL(GuardST, *C);
+  PersistentSourceLoc ErrL = PersistentSourceLoc::mkPSL(ErrST, *C);
+  if (GuardL.valid()) {
+    ErrGuard EG = ErrGuard::mkErrGuard(GuardL, ErrL, Heuristic, Lvl, ErrBBL);
     RetVal = ErrGuardingConds[FID].insert(EG).second;
   }
   return RetVal;

@@ -565,3 +565,35 @@ void removeChecksUsingParams(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
 /// check if given location is due to a macro expansion
 bool isMacroExpanded(Expr *Exp) { return Exp->getExprLoc().isMacroID(); }
 bool isMacroExpanded(Stmt *St) { return St->getBeginLoc().isMacroID() || St->getEndLoc().isMacroID(); }
+
+/// get the first line number of the basic block
+uint32_t getFirstLineNo(CFGBlock *BB, ASTContext *C){
+  auto It = BB->begin();
+  if (It == BB->end()){
+    llvm::errs() << "[getFirstLineNo] BB begin() is the same as end() (PLEASE INVESTIGATE)\n";
+    return 0;
+  }
+
+  // get the line number of the first statement
+  // NOTE: we are using the source location of the first statement
+  //      as the source location of the BB
+  //      this is because the source location of the BB is not available
+  //      in the CFG
+  const Stmt *FirstStmt = (*It).getAs<CFGStmt>()->getStmt();
+  SourceLocation FirstStmtLoc = FirstStmt->getBeginLoc();
+  const SourceManager &SM = C->getSourceManager();
+  // SR.dump(SM);
+  
+  PresumedLoc PL = SM.getPresumedLoc(FirstStmtLoc);
+  // If there is no PresumedLoc, return 0;
+  if (!PL.isValid())
+    return 0;
+
+  SourceLocation ESL = SM.getExpansionLoc(FirstStmtLoc);
+  // ESL.dump(SM);
+  FullSourceLoc FESL = C->getFullLoc(ESL);
+  // FESL.dump();
+
+  assert(FESL.isValid());
+  return FESL.getExpansionLineNumber();
+}

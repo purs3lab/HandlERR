@@ -121,4 +121,7 @@ void removeChecksUsingParams(std::vector<std::pair<Stmt *, CFGBlock *>> &Checks,
 bool isMacroExpanded(Expr *Exp);
 bool isMacroExpanded(Stmt *St);
 
+/// get the first line number of the basic block
+uint32_t getFirstLineNo(CFGBlock *BB, ASTContext *C);
+
 #endif //LLVM_CLANG_DETECTERR_UTILS_H

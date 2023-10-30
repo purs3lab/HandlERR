@@ -43,7 +43,9 @@ bool ReturnNullVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
                          << "\n";
             return true;
           }
-          addErrorGuard(check, ReturnST, level);
+          uint32_t ErrBBL = getFirstLineNo(ReturnBB, Context);
+          // addErrorGuard(check, ReturnST, level);
+          addErrorGuard(check, ReturnST, level, ErrBBL);
         }
       }
     }
@@ -96,7 +98,9 @@ bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
             return true;
           }
 
-          addErrorGuard(check, ReturnST, level);
+          uint32_t ErrBBL = getFirstLineNo(CurBB, Context);
+          // addErrorGuard(check, ReturnST, level);
+          addErrorGuard(check, ReturnST, level, ErrBBL);
         }
       }
     }
@@ -133,7 +137,9 @@ bool ReturnZeroVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
                        << "\n";
           return true;
         }
-        addErrorGuard(check, ReturnST, level);
+        uint32_t ErrBBL = getFirstLineNo(CurBB, Context);
+        // addErrorGuard(check, ReturnST, level);
+        addErrorGuard(check, ReturnST, level, ErrBBL);
       }
     }
   }
@@ -260,8 +266,8 @@ bool ReturnValVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
                     }
 
                     return false;
-                    Info.addErrorGuardingStmt(FID, TStmt, ReturnST, Context,
-                                              Heuristic, Lvl);
+                    // Info.addErrorGuardingStmt(FID, TStmt, ReturnST, Context,
+                    //                           Heuristic, Lvl);
                   }
                 }
               }
@@ -315,7 +321,9 @@ bool ReturnEarlyVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
                        << "\n";
           return true;
         }
-        addErrorGuard(check, ReturnST, level);
+        uint32_t ErrBBL = getFirstLineNo(ReturnBB, Context);
+        // addErrorGuard(check, ReturnST, level);
+        addErrorGuard(check, ReturnST, level, ErrBBL);
       }
     }
   }

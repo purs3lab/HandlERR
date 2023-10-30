@@ -72,8 +72,19 @@ public:
   };
 
   static ErrGuard mkErrGuard(PersistentSourceLoc GuardL,
+                             PersistentSourceLoc ErrL, HeuristicID HID,
+                             GuardLevel Lvl, uint32_t ErrBBL) {
+    return ErrGuard(GuardL, ErrL, HID, Lvl, ErrBBL);
+  };
+
+  static ErrGuard mkErrGuard(PersistentSourceLoc GuardL,
                              PersistentSourceLoc ErrL, HeuristicID HID) {
     return ErrGuard(GuardL, ErrL, HID, GuardLevel::Default);
+  };
+
+  static ErrGuard mkErrGuard(PersistentSourceLoc GuardL,
+                             PersistentSourceLoc ErrL, HeuristicID HID, uint32_t ErrBBL) {
+    return ErrGuard(GuardL, ErrL, HID, GuardLevel::Default, ErrBBL);
   };
 
   bool operator<(const ErrGuard &O) const {
@@ -98,7 +109,11 @@ public:
 private:
   ErrGuard(PersistentSourceLoc GuardL, PersistentSourceLoc ErrL,
            HeuristicID Hid, GuardLevel Lvl)
-      : GuardLoc(GuardL), ErrLoc(ErrL), HID(Hid), Level(Lvl) {}
+      : GuardLoc(GuardL), ErrLoc(ErrL), HID(Hid), Level(Lvl), ErrorBBFirstLineNo(0) {}
+
+  ErrGuard(PersistentSourceLoc GuardL, PersistentSourceLoc ErrL,
+           HeuristicID Hid, GuardLevel Lvl, uint32_t ErrBBL)
+      : GuardLoc(GuardL), ErrLoc(ErrL), HID(Hid), Level(Lvl), ErrorBBFirstLineNo(ErrBBL) {}
 
   PersistentSourceLoc GuardLoc;
   PersistentSourceLoc ErrLoc;
@@ -106,6 +121,7 @@ private:
   GuardLevel Level;
   static std::map<HeuristicID, std::string> HeuristicLabel;
   static std::map<GuardLevel, std::string> GuardLevelLabel;
+  uint32_t ErrorBBFirstLineNo;
 };
 
 #endif //LLVM_CLANG_DETECTERR_ERRGUARD_H
