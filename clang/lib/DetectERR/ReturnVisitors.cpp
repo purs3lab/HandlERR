@@ -58,25 +58,6 @@ bool ReturnNegativeNumVisitor::VisitReturnStmt(ReturnStmt *ReturnST) {
   if (FnDecl->getReturnType()->isIntegerType()) {
     CFGBlock *CurBB;
 
-    // tmp: shank
-    // if (FnDecl->getNameAsString() == "file_size" ||
-    //     FnDecl->getNameAsString() == "retneg1" ||
-    //     FnDecl->getNameAsString() == "retneg2") {
-    //   errs() << "=======================================================\n";
-
-    //   ReturnST->dumpColor();
-
-    //   errs() << "=======================================================\n";
-
-    //   if (ReturnST->getRetValue()) {
-    //     ReturnST->getRetValue()->dumpColor();
-    //   } else {
-    //     errs() << "ReturnST->getRetValue() is null\n";
-    //   }
-
-    //   errs() << "=======================================================\n";
-    // }
-
     if (ReturnST->getRetValue() &&
         isNegativeNumber(ReturnST->getRetValue(), *Context)) {
       if (StMap.find(ReturnST) != StMap.end()) {

@@ -26,6 +26,7 @@ int *yet_another3(int *a) {
         }
         return x;
     }
+    printf("hello world");
     return NULL;
 }
 

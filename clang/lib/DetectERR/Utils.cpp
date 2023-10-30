@@ -50,12 +50,22 @@ bool isNULLExpr(const clang::Expr *E, ASTContext &C) {
 
 bool isNegativeNumber(const clang::Expr *E, ASTContext &C) {
   E = removeAuxillaryCasts(E);
+
+  // in C++, return false is not an "integer constant expr"
+  // it needs to be handled differently
+  // check if E is a CXXBoolLiteralExpr
+  if (const auto *BoolLitExpr = dyn_cast<CXXBoolLiteralExpr>(E)) {
+    return BoolLitExpr->getValue() == false;
+  }
+
+  // handle C
   if (!E->isValueDependent() && E->isIntegerConstantExpr(C)) {
     auto NewAPI = E->getIntegerConstantExpr(C);
     if (NewAPI.hasValue()) {
       return (NewAPI->getSExtValue() < 0);
     }
   }
+
   return false;
 }
 
