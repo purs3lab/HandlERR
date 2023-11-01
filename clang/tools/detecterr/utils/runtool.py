@@ -436,7 +436,7 @@ def process_errblocks_for_dir(dir):
                         cumulative_data.extend(data["ErrPoints"])
 
         # process dirs
-        elif os.path.isdir(f_abspath):
+        elif os.path.isdir(f_abspath) and not os.path.islink(f_abspath):
             cumulative_data.extend(process_errblocks_for_dir(f_abspath))
 
     return cumulative_data
