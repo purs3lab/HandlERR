@@ -486,7 +486,7 @@ def generate_stats(dirs):
     # if the BENCHMARKS_PATH is not empty, rename it as <existing_name>_<timestamp>
     # and create a new folder with <existing_name>
     if len(os.listdir(os.path.abspath(BENCHMARKS_PATH))):
-        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
         new_name = os.path.abspath(BENCHMARKS_PATH) + "_" + timestamp
         shutil.move(os.path.abspath(BENCHMARKS_PATH), new_name)
         os.mkdir(os.path.join(BENCHMARKS_PATH))
