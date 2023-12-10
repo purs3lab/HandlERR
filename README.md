@@ -1,109 +1,110 @@
-# The Checked C clang repo
+# DetectERR Repo
 
-This repo contains a version of the LLVM/Clang toolchain that is being modified
-to support Checked C. Checked C extends C with checking to detect or prevent
-common programming errors such as out-of-bounds memory accesses. The Checked
-C specification is available at the
-[Checked C repo](https://github.com/Microsoft/checkedc).
+This repository contains a version of LLVM/Clang toolchain alongwith the Clang-frontend tool called `DetectERR`. This tool is a part of our research paper accepted at AsiaCCS-2024, titled "Fuzzing API Error Handling Behaviors using Coverage Guided Fault Injection".
 
-## Announcements
+`DetectERR` identifies potential error injection points in a given library source code and provides this information in the form of a `ErrorBlocks.json`. Please refer our paper for further details.
 
-### Source code update
+## Build DetectERR
 
-On Feb 19, 2021 we updated the checkedc-clang sources to upstream release_110,
-specifically [this](https://github.com/llvm/llvm-project/commit/2e10b7a39b930ef8d9c4362509d8835b221fbc0a) commit.
+The instruction below are assuming Ubuntu-22.04 as the OS.
 
-On Feb 18, 2020 we updated the checkedc-clang sources to upstream release_90,
-specifically [this](https://github.com/llvm/llvm-project/commit/c89a3d78f43d81b9cff7b9248772ddf14d21b749) commit.
+1. Install the prerequisites: clang-13, llvm-13, ninja, gdb, lld-13, bear.
 
-### Transition to monorepo
+2. Build
+    mkdir build && cd build
+    cmake ../llvm \
+        -GNinja \
+        -DCMAKE_BUILD_TYPE=Debug \
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+        -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra" \
+        -DLLVM_PARALLEL_LINK_JOBS=2 \
+        -DLLVM_TARGETS_TO_BUILD="host" \
+        -DLLVM_OPTIMIZED_TABLEGEN="ON" \
+        -DCLANG_INCLUDE_DOCS="OFF" \
+        -DLLVM_INCLUDE_TESTS="OFF" \
+        -DLLVM_USE_LINKER=lld \
+        -DCMAKE_SHARED_LINKER_FLAGS='-B$ldpath -Wl,--gdb-index' \
+        -DCMAKE_EXE_LINKER_FLAGS='-B$ldpath -Wl,--gdb-index'
+    cmake --build . -- detecterr -j$(nproc)
 
-Early in 2019, the LLVM community
-[transitioned](https://forums.swift.org/t/llvm-monorepo-transition/25689) to
-"monorepo".
+## Run DetectERR
 
-We moved Checked C to a monorepo on Oct 30, 2019. This has resulted in the following changes:
+The repository contains a python script `runtool.py` that can run `detecterr` on the directory containing the source code for the library. The following command is to be run from the root of the DetectERR repository.
 
-1. [checkedc-llvm](https://github.com/Microsoft/checkedc-llvm) and
-   [checkedc-clang](https://github.com/Microsoft/checkedc-clang) (as well as other
-   LLVM subprojects) are now tracked via a single git repo.
+    clang/tools/detecterr/utils/runtool.py \
+    -p </path/to/detecterr> \
+    -m </path/to/detecterr_benchmarks> \
+    -b </path/to/bear> \
+    -s </path/to/extracted/library-code>
 
-2. The [checkedc-llvm](https://github.com/Microsoft/checkedc-llvm) repo will
-   no longer be maintained. The
-   [checkedc-clang](https://github.com/Microsoft/checkedc-clang) repo will be the
-   new monorepo.
+where:
 
-3. There will be no changes to the
-   [checkedc](https://github.com/Microsoft/checkedc) repo. It will continue to be
-   a separate git repo.
+1. `</path/to/detecterr>` is the path to the `detecterr` binary (usually `build/bin/detecterr`).
+2. `</path/to/detecterr_benchmarks>` is the path to a directory where `detecterr` will write out some intermendiate files while processing the library code.
+3. `</path/to/bear>` is the path to `bear` binary (usually `/usr/bin/bear`).
+4. `</path/to/extracted/library-code>` is the path to the library source code. Please note that this directory should contain the compilation database file (`compile_commands.json`) for the library.
 
-4. All future patches should be based off this new monorepo.
+Below is a sample excerpt from the generated errblocks.json file.
 
-5. You can use
-   [this](https://github.com/microsoft/checkedc-clang/blob/master/clang/automation/UNIX/cherry-pick-to-monorepo.sh)
-   script to cherry-pick your existing patches to the new monorepo.
-
-6. Make sure to set the following CMake flag to enable clang in your builds:
-   `-DLLVM_ENABLE_PROJECTS=clang`
-
-## Trying out Checked C
-
-Programmers are welcome to use Checked C as it is being implemented. We have
-pre-built compiler installers for Windows available for download on the
-[release page](https://github.com/Microsoft/checkedc-clang/releases). For
-other platforms, you will have to build your own copy of the compiler. For
-directions on how to do this, see the [Checked C clang
-wiki](https://github.com/Microsoft/checkedc-clang/wiki). The compiler user
-manual is
-[here](https://github.com/Microsoft/checkedc-clang/wiki/Checked-C-clang-user-manual).
-For more information on Checked C and pointers to example code, see our
-[Wiki](https://github.com/Microsoft/checkedc/wiki).
-
-## 3C: Semi-automated conversion of C code to Checked C
-
-This repository includes a tool called 3C that partially automates the
-conversion of C code to Checked C. Quick documentation links:
-
-* [General information](clang/docs/checkedc/3C/README.md), including development
-  status and how to contribute
-
-* [Build instructions](clang/docs/checkedc/3C/INSTALL.md)
-
-* [Usage instructions for the `3c` command-line tool](clang/tools/3c/README.md)
-
-## More information
-
-For more information on the Checked C clang compiler, see the [Checked C clang
-wiki](https://github.com/Microsoft/checkedc-clang/wiki).
-
-## Build Status
-
-| Configuration     | Testing                                   | Status                                                                                                                                         |
-| ----------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Debug X86 Windows | Checked C and clang regression tests      | ![Debug X86 Windows status](https://msresearch.visualstudio.com/_apis/public/build/definitions/f6454e27-a46c-49d9-8453-29d89d53d2f9/211/badge) |
-| Debug X64 Windows | Checked C and clang regression tests      | ![Debug X64 Windows status](https://msresearch.visualstudio.com/_apis/public/build/definitions/f6454e27-a46c-49d9-8453-29d89d53d2f9/205/badge) |
-| Debug X64 Linux   | Checked C and clang regression tests      | ![Debug X64 Linux status](https://msresearch.visualstudio.com/_apis/public/build/definitions/f6454e27-a46c-49d9-8453-29d89d53d2f9/217/badge)   |
-| Debug X64 Linux   | 3C (Checked-C-Convert tool) nightly tests | ![Nightly Sanity Tests](https://github.com/correctcomputation/checkedc-clang/workflows/Nightly%20Sanity%20Tests/badge.svg?branch=master)       |
-| Release X64 Linux | Checked C, clang, and LLVM nightly tests  | ![Release X64 Linux status](https://msresearch.visualstudio.com/_apis/public/build/definitions/f6454e27-a46c-49d9-8453-29d89d53d2f9/238/badge) |
-
-## Contributing
-
-We welcome contributions to the Checked C project. To get involved in the
-project, see [Contributing to Checked
-C](https://github.com/Microsoft/checkedc/blob/master/CONTRIBUTING.md). We
-have a wish list of possible projects there.
-
-For code contributions, we follow the standard [Github
-workflow](https://guides.github.com/introduction/flow/). See [Contributing to
-Checked C](https://github.com/Microsoft/checkedc/blob/master/CONTRIBUTING.md)
-for more detail. You will need to sign a contributor license agreement before
-contributing code.
-
-## Code of conduct
-
-This project has adopted the [Microsoft Open Source Code of
-Conduct](https://opensource.microsoft.com/codeofconduct/). For more
-information see the [Code of Conduct
-FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact
-[opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional
-questions or comments.
+```json
+[
+    ...
+    {
+        "FunctionInfo": {
+            "Name": "process_data_context_main",
+            "File": "/home/shank/code/research/detecterr_input/libjpeg-turbo_2.1.2.orig/libjpeg-turbo-2.1.2/jdmainct.c"
+        },
+        "ErrConditions": [
+            {
+                "File": "/home/shank/code/research/detecterr_input/libjpeg-turbo_2.1.2.orig/libjpeg-turbo-2.1.2/jdmainct.c",
+                "LineNo": 339,
+                "ColNo": 5,
+                "Heuristic": "H07",
+                "Level": "Inner",
+                "ErrorLoc": {
+                    "File": "/home/shank/code/research/detecterr_input/libjpeg-turbo_2.1.2.orig/libjpeg-turbo-2.1.2/jdmainct.c",
+                    "LineNo": 341,
+                    "ColNo": 7
+                }
+            },
+            {
+                "File": "/home/shank/code/research/detecterr_input/libjpeg-turbo_2.1.2.orig/libjpeg-turbo-2.1.2/jdmainct.c",
+                "LineNo": 359,
+                "ColNo": 5,
+                "Heuristic": "H07",
+                "Level": "Inner",
+                "ErrorLoc": {
+                    "File": "/home/shank/code/research/detecterr_input/libjpeg-turbo_2.1.2.orig/libjpeg-turbo-2.1.2/jdmainct.c",
+                    "LineNo": 360,
+                    "ColNo": 7
+                }
+            },
+            {
+                "File": "/home/shank/code/research/detecterr_input/libjpeg-turbo_2.1.2.orig/libjpeg-turbo-2.1.2/jdmainct.c",
+                "LineNo": 359,
+                "ColNo": 5,
+                "Heuristic": "H07",
+                "Level": "Default",
+                "ErrorLoc": {
+                    "File": "/home/shank/code/research/detecterr_input/libjpeg-turbo_2.1.2.orig/libjpeg-turbo-2.1.2/jdmainct.c",
+                    "LineNo": 363,
+                    "ColNo": 7
+                }
+            },
+            {
+                "File": "/home/shank/code/research/detecterr_input/libjpeg-turbo_2.1.2.orig/libjpeg-turbo-2.1.2/jdmainct.c",
+                "LineNo": 383,
+                "ColNo": 5,
+                "Heuristic": "H07",
+                "Level": "Inner",
+                "ErrorLoc": {
+                    "File": "/home/shank/code/research/detecterr_input/libjpeg-turbo_2.1.2.orig/libjpeg-turbo-2.1.2/jdmainct.c",
+                    "LineNo": 384,
+                    "ColNo": 7
+                }
+            }
+        ]
+    },
+    ...
+]
+```
